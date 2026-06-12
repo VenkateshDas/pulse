@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse for Mac — Design Mockups · HALO Design System</title>
+<style>
+  /* ============ HALO DESIGN SYSTEM TOKENS ============ */
+  :root {
+    --void: #06090f;          /* page background — deep space */
+    --surface-0: #0a0f18;     /* app window base */
+    --surface-1: #0e1520;     /* panel */
+    --surface-2: #141d2c;     /* raised panel */
+    --glass: rgba(20, 30, 48, 0.55);
+    --line: #1c2738;          /* hairline borders */
+    --line-bright: #2a3a52;
+    --text-hi: #eef4fb;
+    --text-mid: #9fb0c3;
+    --text-low: #5d6e84;
+    --ion: #00e5ff;           /* primary accent — electric cyan */
+    --ion-dim: rgba(0,229,255,.14);
+    --volt: #7c5cff;          /* secondary — violet */
+    --volt-dim: rgba(124,92,255,.14);
+    --pulse-green: #2ee6a8;   /* safe / healthy */
+    --green-dim: rgba(46,230,168,.13);
+    --amber: #ffb02e;         /* careful / warning */
+    --amber-dim: rgba(255,176,46,.13);
+    --flare: #ff4d6a;         /* review / danger */
+    --flare-dim: rgba(255,77,106,.12);
+    --mono: "SF Mono", ui-monospace, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", Inter, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--void); color: var(--text-hi); font-family: var(--sans); line-height: 1.55; padding: 40px 20px 80px; }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(1200px 500px at 70% -10%, rgba(124,92,255,.07), transparent 60%),
+      radial-gradient(900px 400px at 10% 110%, rgba(0,229,255,.05), transparent 60%);
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; position: relative; z-index: 1; }
+  nav.crumb { margin-bottom: 24px; font-size: .9rem; display: flex; justify-content: space-between; }
+  nav.crumb a { color: var(--ion); text-decoration: none; }
+  header.page { text-align: center; margin-bottom: 40px; }
+  header.page h1 { font-size: 2.4rem; letter-spacing: -1px; font-weight: 800; }
+  header.page h1 .glow { color: var(--ion); text-shadow: 0 0 24px rgba(0,229,255,.45); }
+  header.page p { color: var(--text-mid); margin-top: 8px; }
+  h2.sect { font-size: 1.3rem; margin: 64px 0 6px; color: var(--text-hi); letter-spacing: -0.3px; }
+  h2.sect .n { color: var(--ion); font-family: var(--mono); font-size: .95rem; margin-right: 10px; }
+  p.sect-sub { color: var(--text-low); font-size: .92rem; margin-bottom: 20px; }
+
+  /* ============ DESIGN SYSTEM SHOWCASE ============ */
+  .ds-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .ds-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .ds-card h4 { font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-low); margin-bottom: 12px; }
+  .swatch-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch { width: 64px; }
+  .swatch .chip { height: 40px; border-radius: 8px; border: 1px solid var(--line); }
+  .swatch .nm { font-size: .65rem; font-family: var(--mono); color: var(--text-low); margin-top: 4px; }
+  .type-demo div { margin: 6px 0; }
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px; border-radius: 9px; font-size: .82rem; font-weight: 600; border: 1px solid transparent; cursor: default; }
+  .btn.primary { background: linear-gradient(135deg, #00cfe8, #00e5ff); color: #03222a; box-shadow: 0 0 18px rgba(0,229,255,.35); }
+  .btn.ghost { background: transparent; border-color: var(--line-bright); color: var(--text-mid); }
+  .btn.danger { background: var(--flare-dim); color: var(--flare); border-color: rgba(255,77,106,.3); }
+  .btn.safe { background: var(--green-dim); color: var(--pulse-green); border-color: rgba(46,230,168,.3); }
+  .grade { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 20px; font-size: .68rem; font-weight: 800; letter-spacing: .8px; font-family: var(--mono); }
+  .grade::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+  .grade.safe { background: var(--green-dim); color: var(--pulse-green); }
+  .grade.careful { background: var(--amber-dim); color: var(--amber); }
+  .grade.review { background: var(--flare-dim); color: var(--flare); }
+
+  /* ============ APP WINDOW FRAME ============ */
+  .mock { margin: 26px 0 10px; }
+  .window {
+    background: var(--surface-0); border: 1px solid var(--line-bright); border-radius: 14px;
+    overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(0,229,255,.05);
+  }
+  .titlebar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: rgba(255,255,255,.02); border-bottom: 1px solid var(--line); }
+  .tl { width: 11px; height: 11px; border-radius: 50%; }
+  .tl.r { background: #ff5f57; } .tl.y { background: #febc2e; } .tl.g { background: #28c840; }
+  .titlebar .title { flex: 1; text-align: center; font-size: .78rem; color: var(--text-low); font-weight: 600; letter-spacing: .4px; }
+  .titlebar .cmdk { font-family: var(--mono); font-size: .68rem; color: var(--text-low); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; }
+  .app-body { display: grid; grid-template-columns: 192px 1fr; min-height: 560px; }
+  .caption { color: var(--text-low); font-size: .85rem; margin: 10px 4px 0; }
+  .caption b { color: var(--text-mid); }
+
+  /* sidebar */
+  .side { background: rgba(8,12,20,.8); border-right: 1px solid var(--line); padding: 16px 10px; display: flex; flex-direction: column; }
+  .logo { display: flex; align-items: center; gap: 9px; padding: 4px 8px 16px; }
+  .logo .mark { width: 26px; height: 26px; border-radius: 8px; background: radial-gradient(circle at 30% 30%, #00e5ff, #7c5cff); box-shadow: 0 0 16px rgba(0,229,255,.5); position: relative; }
+  .logo .mark::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--surface-0); }
+  .logo b { font-size: .95rem; letter-spacing: .5px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: .82rem; color: var(--text-mid); margin: 1px 0; }
+  .nav-item .ico { width: 17px; text-align: center; opacity: .9; }
+  .nav-item.active { background: linear-gradient(90deg, var(--ion-dim), transparent); color: var(--text-hi); border-left: 2px solid var(--ion); font-weight: 600; }
+  .nav-item .badge { margin-left: auto; font-family: var(--mono); font-size: .62rem; background: var(--volt-dim); color: var(--volt); padding: 1px 7px; border-radius: 10px; }
+  .nav-item .badge.hot { background: var(--amber-dim); color: var(--amber); }
+  .side .foot { margin-top: auto; padding: 10px 8px 2px; border-top: 1px solid var(--line); font-size: .7rem; color: var(--text-low); font-family: var(--mono); }
+  .side .foot .ok { color: var(--pulse-green); }
+
+  /* main pane generic */
+  .main { padding: 20px 22px; overflow: hidden; }
+  .main h3.screen-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -.2px; }
+  .main .sub { color: var(--text-low); font-size: .78rem; margin-bottom: 16px; }
+  .row { display: flex; gap: 14px; }
+  .panel { background: var(--surface-1); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .panel .p-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .panel .p-head h5 { font-size: .68rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-low); }
+  .panel .p-head .live { font-family: var(--mono); font-size: .62rem; color: var(--pulse-green); }
+  .panel .p-head .live::before { content: "●"; margin-right: 5px; animation: blink 2s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* hero rings */
+  .rings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+  .ring-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; gap: 12px; align-items: center; }
+  .ring { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; position: relative; flex-shrink: 0; }
+  .ring::after { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: var(--surface-1); }
+  .ring b { position: relative; z-index: 1; font-family: var(--mono); font-size: .78rem; }
+  .ring-card .meta .lbl { font-size: .66rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-low); }
+  .ring-card .meta .val { font-size: .8rem; color: var(--text-mid); }
+  .spark { display: block; margin-top: 3px; }
+
+  /* cause-fix cards */
+  .fix-card { display: flex; align-items: center; gap: 12px; background: linear-gradient(90deg, var(--surface-2), var(--surface-1)); border: 1px solid var(--line-bright); border-left: 3px solid var(--amber); border-radius: 11px; padding: 11px 14px; margin: 8px 0; }
+  .fix-card.ion { border-left-color: var(--ion); }
+  .fix-card.green { border-left-color: var(--pulse-green); }
+  .fix-card .sig { font-size: 1.05rem; }
+  .fix-card .txt { flex: 1; }
+  .fix-card .txt b { font-size: .82rem; display: block; }
+  .fix-card .txt span { font-size: .72rem; color: var(--text-low); }
+  .fix-card .btn { flex-shrink: 0; }
+
+  /* charts */
+  .chart-frame { position: relative; }
+  .chart-frame svg { display: block; width: 100%; }
+  .grid-lines line { stroke: var(--line); stroke-width: 1; }
+  .axis-lbl { font-family: var(--mono); font-size: 8px; fill: var(--text-low); }
+
+  /* processes mini table */
+  table.proc { width: 100%; border-collapse: collapse; font-size: .74rem; }
+  table.proc th { text-align: left; font-size: .6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-low); padding: 5px 8px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  table.proc td { padding: 6px 8px; border-bottom: 1px solid rgba(28,39,56,.5); color: var(--text-mid); }
+  table.proc td:first-child { color: var(--text-hi); font-weight: 600; }
+  table.proc .num { color: var(--text-hi); }
+  .meter { width: 64px; height: 5px; border-radius: 3px; background: var(--surface-2); display: inline-block; vertical-align: middle; margin-right: 7px; overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--ion), var(--volt)); }
+  .meter.hot i { background: linear-gradient(90deg, var(--amber), var(--flare)); }
+
+  /* treemap */
+  .treemap { display: grid; gap: 4px; grid-template-columns: 1.6fr 1fr .8fr; grid-template-rows: 1.2fr 1fr .8fr; height: 320px; }
+  .tm { border-radius: 8px; padding: 8px 10px; font-size: .68rem; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.06); }
+  .tm b { display: block; font-size: .75rem; }
+  .tm .sz { font-family: var(--mono); opacity: .8; }
+  .tm .gr { position: absolute; right: 8px; top: 8px; }
+  .lens-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .lens { font-size: .68rem; padding: 4px 12px; border-radius: 16px; border: 1px solid var(--line-bright); color: var(--text-mid); }
+  .lens.on { background: var(--ion-dim); border-color: rgba(0,229,255,.45); color: var(--ion); font-weight: 700; box-shadow: 0 0 12px rgba(0,229,255,.15); }
+  .crumbs { font-family: var(--mono); font-size: .68rem; color: var(--text-low); margin-bottom: 8px; }
+  .crumbs b { color: var(--ion); }
+
+  /* clean rows */
+  .clean-row { display: grid; grid-template-columns: 26px 1fr 110px 86px 90px; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-1); margin: 6px 0; font-size: .76rem; }
+  .clean-row.sel { border-color: rgba(46,230,168,.4); background: linear-gradient(90deg, rgba(46,230,168,.06), var(--surface-1)); }
+  .cbox { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--line-bright); }
+  .cbox.on { background: var(--pulse-green); border-color: var(--pulse-green); position: relative; }
+  .cbox.on::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; color: #04261a; font-size: .65rem; font-weight: 900; }
+  .clean-row .what b { display: block; color: var(--text-hi); }
+  .clean-row .what span { color: var(--text-low); font-size: .68rem; }
+  .clean-row .sz { font-family: var(--mono); text-align: right; color: var(--text-hi); font-size: .82rem; }
+  .clean-row .age { color: var(--text-low); font-family: var(--mono); font-size: .68rem; text-align: right; }
+  .evidence { background: var(--surface-2); border: 1px dashed var(--line-bright); border-radius: 10px; padding: 10px 14px; font-size: .72rem; color: var(--text-mid); margin: 6px 0 12px 36px; }
+  .evidence b { color: var(--ion); }
+  .clean-foot { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 13px 16px; background: linear-gradient(90deg, var(--surface-2), var(--surface-1)); border: 1px solid var(--line-bright); border-radius: 12px; }
+  .clean-foot .total { font-family: var(--mono); font-size: 1.15rem; color: var(--pulse-green); font-weight: 700; text-shadow: 0 0 14px rgba(46,230,168,.4); }
+  .clean-foot .note { font-size: .68rem; color: var(--text-low); flex: 1; }
+
+  /* vault */
+  .vault-session { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1); padding: 13px 16px; margin: 9px 0; display: flex; align-items: center; gap: 14px; }
+  .vault-session .ic { width: 34px; height: 34px; border-radius: 9px; background: var(--volt-dim); display: grid; place-items: center; font-size: 1rem; }
+  .vault-session .meta { flex: 1; }
+  .vault-session .meta b { font-size: .82rem; display: block; }
+  .vault-session .meta span { font-size: .7rem; color: var(--text-low); font-family: var(--mono); }
+  .countdown { font-family: var(--mono); font-size: .68rem; color: var(--amber); }
+  .ttl-bar { width: 90px; height: 4px; background: var(--surface-2); border-radius: 2px; margin-top: 4px; }
+  .ttl-bar i { display: block; height: 100%; border-radius: 2px; background: var(--amber); }
+
+  /* timeline */
+  .legend { display: flex; gap: 14px; font-size: .66rem; color: var(--text-mid); margin-top: 8px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+  /* menu bar popover */
+  .menubar-strip { background: rgba(16,22,34,.9); border: 1px solid var(--line-bright); border-radius: 10px; padding: 6px 16px; display: inline-flex; gap: 18px; font-family: var(--mono); font-size: .72rem; color: var(--text-mid); align-items: center; }
+  .menubar-strip .hot { color: var(--amber); }
+  .popover { width: 340px; background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--line-bright); border-radius: 16px; padding: 16px; margin-top: 10px; box-shadow: 0 24px 60px rgba(0,0,0,.65); }
+  .pop-vital { display: grid; grid-template-columns: 64px 1fr 70px; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid rgba(28,39,56,.6); font-size: .74rem; }
+  .pop-vital:last-of-type { border-bottom: none; }
+  .pop-vital .k { color: var(--text-low); font-size: .66rem; text-transform: uppercase; letter-spacing: .8px; }
+  .pop-vital .v { font-family: var(--mono); text-align: right; color: var(--text-hi); }
+  .quick-row { display: flex; gap: 8px; margin-top: 12px; }
+  .quick-row .btn { flex: 1; justify-content: center; font-size: .72rem; padding: 8px 6px; }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--text-low); font-size: .85rem; }
+  footer a { color: var(--ion); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumb">
+  <a href="market_research_report.html">← Market Research</a>
+  <a href="product_spec.html">Product Spec →</a>
+</nav>
+
+<header class="page">
+  <h1>Pulse <span class="glow">·</span> Design Mockups</h1>
+  <p>HALO Design System — “a cockpit, not a dashboard.” Futuristic command center: bold, glowing, but every pixel legible and every signal actionable.</p>
+</header>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">00</span>HALO Design System</h2>
+<p class="sect-sub">Dark-first. One electric accent (Ion Cyan) for live data and primary action; violet for history/secondary; the three safety colors are reserved exclusively for safety meaning — never decoration. Numbers always monospaced. Glow = “live and healthy”; absence of glow = inert.</p>
+
+<div class="ds-grid">
+  <div class="ds-card">
+    <h4>Core palette</h4>
+    <div class="swatch-row">
+      <div class="swatch"><div class="chip" style="background:#06090f"></div><div class="nm">void</div></div>
+      <div class="swatch"><div class="chip" style="background:#0e1520"></div><div class="nm">surface-1</div></div>
+      <div class="swatch"><div class="chip" style="background:#141d2c"></div><div class="nm">surface-2</div></div>
+      <div class="swatch"><div class="chip" style="background:#00e5ff; box-shadow:0 0 14px rgba(0,229,255,.5)"></div><div class="nm">ion</div></div>
+      <div class="swatch"><div class="chip" style="background:#7c5cff"></div><div class="nm">volt</div></div>
+    </div>
+  </div>
+  <div class="ds-card">
+    <h4>Safety semantics (reserved)</h4>
+    <div class="swatch-row">
+      <div class="swatch"><div class="chip" style="background:#2ee6a8"></div><div class="nm">safe</div></div>
+      <div class="swatch"><div class="chip" style="background:#ffb02e"></div><div class="nm">careful</div></div>
+      <div class="swatch"><div class="chip" style="background:#ff4d6a"></div><div class="nm">review</div></div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">
+      <span class="grade safe">SAFE</span><span class="grade careful">CAREFUL</span><span class="grade review">REVIEW</span>
+    </div>
+  </div>
+  <div class="ds-card">
+    <h4>Type &amp; numerals</h4>
+    <div class="type-demo">
+      <div style="font-size:1.3rem; font-weight:800; letter-spacing:-.5px">SF Pro Display — headlines</div>
+      <div style="font-size:.85rem; color:var(--text-mid)">SF Pro Text — body &amp; labels</div>
+      <div class="num" style="font-size:1.1rem; color:var(--ion)">142.7 GB · 38% · 1,204 MB/s</div>
+      <div style="font-size:.7rem; color:var(--text-low)">SF Mono — every number, always tabular</div>
+    </div>
+  </div>
+  <div class="ds-card">
+    <h4>Actions</h4>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <span class="btn primary">⚡ Clean 14.8 GB</span>
+      <span class="btn ghost">Inspect</span>
+      <span class="btn safe">↺ Restore</span>
+      <span class="btn danger">Force Quit</span>
+    </div>
+    <p style="font-size:.7rem; color:var(--text-low); margin-top:10px">One glowing primary per screen. Destructive actions never glow — glow is earned by safety.</p>
+  </div>
+</div>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">01</span>Command Center — Dashboard</h2>
+<p class="sect-sub">The home screen. Vitals as glowing rings, Cause→Fix cards front and center (the “monitoring that acts” differentiator), live charts below. User lands here and immediately knows: status, what’s wrong, the button that fixes it.</p>
+
+<div class="mock"><div class="window">
+  <div class="titlebar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><span class="title">Pulse — Command Center</span><span class="cmdk">⌘K</span></div>
+  <div class="app-body">
+    <div class="side">
+      <div class="logo"><div class="mark"></div><b>PULSE</b></div>
+      <div class="nav-item active"><span class="ico">◉</span> Dashboard</div>
+      <div class="nav-item"><span class="ico">◍</span> Storage <span class="badge hot">81%</span></div>
+      <div class="nav-item"><span class="ico">✦</span> Clean <span class="badge">14.8G</span></div>
+      <div class="nav-item"><span class="ico">∿</span> Monitor</div>
+      <div class="nav-item"><span class="ico">♥</span> Health</div>
+      <div class="nav-item"><span class="ico">⛉</span> Vault <span class="badge">3</span></div>
+      <div class="nav-item"><span class="ico">⌘</span> Dev Mode</div>
+      <div class="foot"><span class="ok">● ALL SYSTEMS NOMINAL</span><br>MacBook Pro M3 · 14h uptime</div>
+    </div>
+    <div class="main">
+      <h3 class="screen-title">Good evening, Venkatesh</h3>
+      <div class="sub">Your Mac is healthy · 2 things need attention · last full scan 18 min ago</div>
+
+      <div class="rings">
+        <div class="ring-card">
+          <div class="ring" style="background: conic-gradient(var(--ion) 0 38%, var(--surface-2) 38% 100%); box-shadow: 0 0 18px rgba(0,229,255,.25)"><b>38%</b></div>
+          <div class="meta"><div class="lbl">CPU</div><div class="val">E 22% · P 51%</div>
+            <svg class="spark" width="70" height="14" viewBox="0 0 70 14"><polyline points="0,10 8,9 16,11 24,6 32,8 40,4 48,7 56,3 64,6 70,5" fill="none" stroke="#00e5ff" stroke-width="1.5" opacity=".8"/></svg></div>
+        </div>
+        <div class="ring-card">
+          <div class="ring" style="background: conic-gradient(var(--pulse-green) 0 54%, var(--surface-2) 54% 100%); box-shadow: 0 0 18px rgba(46,230,168,.22)"><b>54%</b></div>
+          <div class="meta"><div class="lbl">Memory</div><div class="val">pressure OK · swap 0.4G</div>
+            <svg class="spark" width="70" height="14" viewBox="0 0 70 14"><polyline points="0,8 10,8 20,7 30,9 40,8 50,8 60,7 70,8" fill="none" stroke="#2ee6a8" stroke-width="1.5" opacity=".8"/></svg></div>
+        </div>
+        <div class="ring-card">
+          <div class="ring" style="background: conic-gradient(var(--amber) 0 81%, var(--surface-2) 81% 100%); box-shadow: 0 0 18px rgba(255,176,46,.25)"><b>81%</b></div>
+          <div class="meta"><div class="lbl">Disk</div><div class="val">92.4 GB free · −4.2 G/wk</div>
+            <svg class="spark" width="70" height="14" viewBox="0 0 70 14"><polyline points="0,11 10,10 20,10 30,9 40,8 50,7 60,5 70,4" fill="none" stroke="#ffb02e" stroke-width="1.5" opacity=".8"/></svg></div>
+        </div>
+        <div class="ring-card">
+          <div class="ring" style="background: conic-gradient(var(--volt) 0 67%, var(--surface-2) 67% 100%); box-shadow: 0 0 18px rgba(124,92,255,.25)"><b>41°</b></div>
+          <div class="meta"><div class="lbl">Thermal · Power</div><div class="val">12.4 W · fans 0 rpm</div>
+            <svg class="spark" width="70" height="14" viewBox="0 0 70 14"><polyline points="0,7 10,8 20,6 30,7 40,9 50,8 60,7 70,7" fill="none" stroke="#7c5cff" stroke-width="1.5" opacity=".8"/></svg></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:14px">
+        <div class="p-head"><h5>Needs attention — cause → fix</h5><span class="live">LIVE</span></div>
+        <div class="fix-card">
+          <span class="sig">🌡</span>
+          <div class="txt"><b>Chrome Helper (GPU) is 61% of CPU load — 3 runaway tabs detected</b>
+          <span>twitch.tv, figma.com ×2 · driving P-cores + 4.1 W extra draw for 22 min</span></div>
+          <span class="btn ghost">Inspect</span><span class="btn primary">Quit Helpers</span>
+        </div>
+        <div class="fix-card ion">
+          <span class="sig">💾</span>
+          <div class="txt"><b>Disk grew 4.2 GB this week — 3.1 GB is Final Cut render cache</b>
+          <span>safe to clear · project “interview_edit” untouched 12 days</span></div>
+          <span class="btn ghost">Timeline</span><span class="btn primary">Clean 3.1 GB</span>
+        </div>
+        <div class="fix-card green">
+          <span class="sig">🌙</span>
+          <div class="txt"><b>Teams prevented sleep for 1h 48m last night</b>
+          <span>cost ≈ 9% battery · assertion: PreventUserIdleSystemSleep</span></div>
+          <span class="btn ghost">Details</span><span class="btn safe">Allow Sleep</span>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="panel" style="flex:1.4">
+          <div class="p-head"><h5>CPU · 24h</h5><span class="live">LIVE</span></div>
+          <div class="chart-frame"><svg viewBox="0 0 400 90">
+            <g class="grid-lines"><line x1="0" y1="22" x2="400" y2="22"/><line x1="0" y1="45" x2="400" y2="45"/><line x1="0" y1="68" x2="400" y2="68"/></g>
+            <defs><linearGradient id="cpuG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00e5ff" stop-opacity=".35"/><stop offset="1" stop-color="#00e5ff" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,70 L30,65 L60,68 L90,50 L120,58 L150,30 L180,42 L210,38 L240,55 L270,25 L300,40 L330,35 L360,48 L400,42 L400,90 L0,90 Z" fill="url(#cpuG)"/>
+            <path d="M0,70 L30,65 L60,68 L90,50 L120,58 L150,30 L180,42 L210,38 L240,55 L270,25 L300,40 L330,35 L360,48 L400,42" fill="none" stroke="#00e5ff" stroke-width="1.6"/>
+            <text class="axis-lbl" x="4" y="18">100%</text><text class="axis-lbl" x="4" y="86">0</text><text class="axis-lbl" x="370" y="86">now</text>
+          </svg></div>
+        </div>
+        <div class="panel" style="flex:1">
+          <div class="p-head"><h5>Top processes</h5><span style="font-size:.62rem; color:var(--text-low)">by CPU ▾</span></div>
+          <table class="proc">
+            <tr><td>Chrome Helper (GPU)</td><td><span class="meter hot"><i style="width:78%"></i></span><span class="num">61%</span></td></tr>
+            <tr><td>Final Cut Pro</td><td><span class="meter"><i style="width:30%"></i></span><span class="num">19%</span></td></tr>
+            <tr><td>WindowServer</td><td><span class="meter"><i style="width:18%"></i></span><span class="num">11%</span></td></tr>
+            <tr><td>pulse-agent</td><td><span class="meter"><i style="width:2%"></i></span><span class="num">0.4%</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+<p class="caption"><b>Key moves:</b> safety colors do system semaphore duty (disk ring amber at 81%); every alert card ends in a glowing action; “pulse-agent 0.4%” row is deliberate — the app showing its own discipline builds trust.</p>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">02</span>Storage — Disk Map with Lenses + Timeline</h2>
+<p class="sect-sub">DaisyDisk territory, escalated: GPU treemap with switchable lenses (Safety / Age / Owner), and below it the killer feature — the Storage Timeline that explains <em>what ate the disk this week</em>.</p>
+
+<div class="mock"><div class="window">
+  <div class="titlebar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><span class="title">Pulse — Storage</span><span class="cmdk">⌘K</span></div>
+  <div class="app-body">
+    <div class="side">
+      <div class="logo"><div class="mark"></div><b>PULSE</b></div>
+      <div class="nav-item"><span class="ico">◉</span> Dashboard</div>
+      <div class="nav-item active"><span class="ico">◍</span> Storage <span class="badge hot">81%</span></div>
+      <div class="nav-item"><span class="ico">✦</span> Clean <span class="badge">14.8G</span></div>
+      <div class="nav-item"><span class="ico">∿</span> Monitor</div>
+      <div class="nav-item"><span class="ico">♥</span> Health</div>
+      <div class="nav-item"><span class="ico">⛉</span> Vault <span class="badge">3</span></div>
+      <div class="nav-item"><span class="ico">⌘</span> Dev Mode</div>
+      <div class="foot"><span class="ok">● SCAN FRESH</span><br>1.2M files · indexed 18m ago</div>
+    </div>
+    <div class="main">
+      <h3 class="screen-title">Macintosh HD <span class="num" style="color:var(--amber)">389.6 / 494 GB</span> <span style="font-size:.7rem; color:var(--text-low)">· 11.2 GB purgeable · 2 TM snapshots (6.4 GB)</span></h3>
+      <div class="sub">Forecast: full in <b style="color:var(--amber)">23 days</b> at this week’s rate — fastest grower: ~/Movies/FCP Render</div>
+
+      <div class="lens-bar">
+        <span style="font-size:.66rem; color:var(--text-low); letter-spacing:1px">LENS</span>
+        <span class="lens on">🛡 Safety</span><span class="lens">⏱ Age</span><span class="lens">▣ Owner</span>
+        <span style="flex:1"></span>
+        <span class="crumbs" style="margin:0">/ Users / <b>venkatesh</b></span>
+      </div>
+
+      <div class="treemap">
+        <div class="tm" style="grid-row:1/3; background:linear-gradient(135deg, rgba(255,77,106,.16), rgba(255,77,106,.05))"><b>Movies</b><span class="sz">112.4 GB</span><span class="gr"><span class="grade review">REVIEW</span></span><div style="position:absolute; bottom:8px; left:10px; font-size:.62rem; color:var(--text-low)">FCP Render 38.2 G · interview_raw.mov 24.1 G</div></div>
+        <div class="tm" style="background:linear-gradient(135deg, rgba(46,230,168,.18), rgba(46,230,168,.05))"><b>Library / Caches</b><span class="sz">22.8 GB</span><span class="gr"><span class="grade safe">SAFE</span></span></div>
+        <div class="tm" style="background:linear-gradient(135deg, rgba(255,176,46,.18), rgba(255,176,46,.05))"><b>Downloads</b><span class="sz">18.3 GB</span><span class="gr"><span class="grade careful">CAREFUL</span></span></div>
+        <div class="tm" style="background:linear-gradient(135deg, rgba(46,230,168,.15), rgba(46,230,168,.04))"><b>Xcode / DerivedData</b><span class="sz">14.6 GB</span><span class="gr"><span class="grade safe">SAFE</span></span></div>
+        <div class="tm" style="background:linear-gradient(135deg, rgba(255,77,106,.13), rgba(255,77,106,.04))"><b>Photos Library</b><span class="sz">96.2 GB</span><span class="gr"><span class="grade review">REVIEW</span></span></div>
+        <div class="tm" style="background:linear-gradient(135deg, rgba(255,176,46,.15), rgba(255,176,46,.04))"><b>software_codes</b><span class="sz">31.7 GB</span><span class="gr"><span class="grade careful">CAREFUL</span></span><div style="position:absolute; bottom:8px; left:10px; font-size:.62rem; color:var(--text-low)">9.8 G regenerable (node_modules, .venv)</div></div>
+        <div class="tm" style="background:linear-gradient(135deg, rgba(124,92,255,.16), rgba(124,92,255,.05))"><b>Docker.raw</b><span class="sz">12.1 GB</span><span class="gr"><span class="grade careful">CAREFUL</span></span></div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="p-head"><h5>Storage timeline — 30 days <span style="color:var(--volt)">● what ate my disk</span></h5><span style="font-size:.62rem; color:var(--text-low)">click a spike to clean it</span></div>
+        <div class="chart-frame"><svg viewBox="0 0 400 78">
+          <defs>
+            <linearGradient id="t1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c5cff" stop-opacity=".5"/><stop offset="1" stop-color="#7c5cff" stop-opacity=".15"/></linearGradient>
+            <linearGradient id="t2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00e5ff" stop-opacity=".45"/><stop offset="1" stop-color="#00e5ff" stop-opacity=".12"/></linearGradient>
+          </defs>
+          <g class="grid-lines"><line x1="0" y1="26" x2="400" y2="26"/><line x1="0" y1="52" x2="400" y2="52"/></g>
+          <path d="M0,60 L60,59 L120,58 L180,57 L240,56 L300,55 L360,54 L400,54 L400,78 L0,78 Z" fill="url(#t1)"/>
+          <path d="M0,52 L60,51 L120,49 L180,48 L240,40 L300,32 L330,24 L360,18 L400,14 L400,54 L360,54 L300,55 L240,56 L180,57 L120,58 L60,59 L0,60 Z" fill="url(#t2)"/>
+          <circle cx="330" cy="24" r="4" fill="#ffb02e"><animate attributeName="opacity" values="1;.4;1" dur="2s" repeatCount="indefinite"/></circle>
+          <text class="axis-lbl" x="296" y="14" fill="#ffb02e">+3.1G FCP render · Jun 9</text>
+          <text class="axis-lbl" x="4" y="74">May 13</text><text class="axis-lbl" x="372" y="74">today</text>
+        </svg></div>
+        <div class="legend">
+          <span><i style="background:#00e5ff"></i>~/Movies (fastest grower)</span>
+          <span><i style="background:#7c5cff"></i>everything else</span>
+          <span style="margin-left:auto" class="btn primary" >⚡ Clean the spike — 3.1 GB</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>
+<p class="caption"><b>Key moves:</b> safety lens tints the map itself — green regions are pre-vetted reclaim, red regions the app will never bulk-touch; the pulsing spike marker on the timeline is the demo moment; purgeable + snapshot truth shown in the header (the “Finder lies about free space” fix).</p>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">03</span>Smart Clean — Evidence-Based Cleaning</h2>
+<p class="sect-sub">The anti-CleanMyMac screen. No “347 issues!” — instead per-item evidence, expandable proof, safe tier pre-selected only, and the Vault promise printed right on the action bar.</p>
+
+<div class="mock"><div class="window">
+  <div class="titlebar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><span class="title">Pulse — Smart Clean</span><span class="cmdk">⌘K</span></div>
+  <div class="app-body">
+    <div class="side">
+      <div class="logo"><div class="mark"></div><b>PULSE</b></div>
+      <div class="nav-item"><span class="ico">◉</span> Dashboard</div>
+      <div class="nav-item"><span class="ico">◍</span> Storage <span class="badge hot">81%</span></div>
+      <div class="nav-item active"><span class="ico">✦</span> Clean <span class="badge">14.8G</span></div>
+      <div class="nav-item"><span class="ico">∿</span> Monitor</div>
+      <div class="nav-item"><span class="ico">♥</span> Health</div>
+      <div class="nav-item"><span class="ico">⛉</span> Vault <span class="badge">3</span></div>
+      <div class="nav-item"><span class="ico">⌘</span> Dev Mode</div>
+      <div class="foot"><span class="ok">● RULES KB v847</span><br>0 incidents · ever</div>
+    </div>
+    <div class="main">
+      <h3 class="screen-title">Smart Clean <span style="font-size:.7rem; color:var(--text-low); font-weight:400">— every item explained · everything undoable for 7 days</span></h3>
+      <div class="sub"><span class="grade safe">SAFE</span> auto-selected · <span class="grade careful">CAREFUL</span> needs your tick · <span class="grade review">REVIEW</span> never bulk-selectable</div>
+
+      <div class="clean-row sel">
+        <span class="cbox on"></span>
+        <div class="what"><b>🎬 Final Cut Pro — render cache</b><span>regenerates when you reopen the project · last render Jun 9</span></div>
+        <span class="grade safe">SAFE</span>
+        <span class="age">12d idle</span>
+        <span class="sz">3.10 GB</span>
+      </div>
+      <div class="evidence">▾ <b>Why SAFE:</b> matches rule <b>com.apple.FinalCut · render-cache v12</b> — derived files, rebuilt on demand. 214 files in ~/Movies/FCP Render/interview_edit. <u>Reveal in Finder</u> · <u>view file list</u></div>
+
+      <div class="clean-row sel">
+        <span class="cbox on"></span>
+        <div class="what"><b>🌐 Chrome — HTTP cache &amp; GPU shader cache</b><span>pages reload slightly slower once · Chrome is running, will skip in-use files</span></div>
+        <span class="grade safe">SAFE</span>
+        <span class="age">live</span>
+        <span class="sz">2.84 GB</span>
+      </div>
+      <div class="clean-row sel">
+        <span class="cbox on"></span>
+        <div class="what"><b>⚙️ Xcode — DerivedData (4 projects)</b><span>next build is a clean build (~2–6 min) · no source touched</span></div>
+        <span class="grade safe">SAFE</span>
+        <span class="age">31d idle</span>
+        <span class="sz">5.62 GB</span>
+      </div>
+      <div class="clean-row">
+        <span class="cbox"></span>
+        <div class="what"><b>📦 Old installers — 7 files in ~/Downloads</b><span>Docker.dmg, Slack.pkg… all apps already installed</span></div>
+        <span class="grade careful">CAREFUL</span>
+        <span class="age">&gt; 60d</span>
+        <span class="sz">3.21 GB</span>
+      </div>
+      <div class="clean-row">
+        <span class="cbox"></span>
+        <div class="what"><b>🧑‍💻 node_modules — “portfolio-site” idle 94 days</b><span>restores with one npm install · repo itself untouched</span></div>
+        <span class="grade careful">CAREFUL</span>
+        <span class="age">94d idle</span>
+        <span class="sz">1.48 GB</span>
+      </div>
+      <div class="clean-row" style="opacity:.75">
+        <span class="cbox" style="border-style:dashed"></span>
+        <div class="what"><b>🎥 interview_raw.mov — forgotten in ~/Desktop/old</b><span>real footage — Pulse will never bulk-select this. Review it yourself.</span></div>
+        <span class="grade review">REVIEW</span>
+        <span class="age">9 mo</span>
+        <span class="sz">24.1 GB</span>
+      </div>
+
+      <div class="clean-foot">
+        <div><div style="font-size:.62rem; color:var(--text-low); letter-spacing:1px">SELECTED</div><div class="total">11.56 GB</div></div>
+        <div class="note">→ staged in <b style="color:var(--volt)">Vault</b> for 7 days · restore anytime · freed space verified against the disk, not estimated</div>
+        <span class="btn ghost">Review selection</span>
+        <span class="btn primary" style="font-size:.95rem; padding:11px 26px">⚡ Clean 11.56 GB</span>
+      </div>
+    </div>
+  </div>
+</div></div>
+<p class="caption"><b>Key moves:</b> expanded evidence card under the first row shows the inspectability pattern (rule ID + version + file list link); REVIEW row rendered de-emphasized with dashed checkbox — visible but bulk-untouchable; footer states the Vault promise at the exact moment of fear.</p>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">04</span>Safety Vault — Undo for Everything</h2>
+<p class="sect-sub">The trust engine made visible. Cleanup sessions with countdowns, one-click restore, and the single irreversible action in the app clearly marked.</p>
+
+<div class="mock"><div class="window">
+  <div class="titlebar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><span class="title">Pulse — Vault</span><span class="cmdk">⌘K</span></div>
+  <div class="app-body">
+    <div class="side">
+      <div class="logo"><div class="mark"></div><b>PULSE</b></div>
+      <div class="nav-item"><span class="ico">◉</span> Dashboard</div>
+      <div class="nav-item"><span class="ico">◍</span> Storage <span class="badge hot">81%</span></div>
+      <div class="nav-item"><span class="ico">✦</span> Clean</div>
+      <div class="nav-item"><span class="ico">∿</span> Monitor</div>
+      <div class="nav-item"><span class="ico">♥</span> Health</div>
+      <div class="nav-item active"><span class="ico">⛉</span> Vault <span class="badge">3</span></div>
+      <div class="nav-item"><span class="ico">⌘</span> Dev Mode</div>
+      <div class="foot"><span class="ok">● 14.7 GB STAGED</span><br>auto-purge oldest-first if disk low</div>
+    </div>
+    <div class="main">
+      <h3 class="screen-title">Safety Vault</h3>
+      <div class="sub">Everything Pulse removes lands here first. Same-volume staging = instant, no copy. Restore is always one click.</div>
+
+      <div class="vault-session">
+        <div class="ic">✦</div>
+        <div class="meta"><b>Smart Clean — today 18:42</b><span>847 files · FCP render cache, Chrome cache, DerivedData</span></div>
+        <div style="text-align:right"><div class="countdown">purges in 6d 22h</div><div class="ttl-bar"><i style="width:98%"></i></div></div>
+        <span class="num" style="font-size:.95rem">11.56 GB</span>
+        <span class="btn safe">↺ Restore all</span>
+      </div>
+      <div class="vault-session">
+        <div class="ic">🗑</div>
+        <div class="meta"><b>Uninstall — “Loom” + leftovers — Jun 8</b><span>app bundle, 3 LaunchAgents, Application Support, caches</span></div>
+        <div style="text-align:right"><div class="countdown">purges in 3d 04h</div><div class="ttl-bar"><i style="width:46%"></i></div></div>
+        <span class="num" style="font-size:.95rem">412 MB</span>
+        <span class="btn safe">↺ Restore all</span>
+      </div>
+      <div class="vault-session">
+        <div class="ic">📦</div>
+        <div class="meta"><b>Manual — old installers — Jun 5</b><span>7 files from ~/Downloads</span></div>
+        <div style="text-align:right"><div class="countdown">purges in 11h</div><div class="ttl-bar"><i style="width:7%; background:var(--flare)"></i></div></div>
+        <span class="num" style="font-size:.95rem">2.74 GB</span>
+        <span class="btn safe">↺ Restore all</span>
+      </div>
+
+      <div class="clean-foot" style="margin-top:18px">
+        <div><div style="font-size:.62rem; color:var(--text-low); letter-spacing:1px">VAULT TOTAL</div><div class="total" style="color:var(--volt); text-shadow:0 0 14px rgba(124,92,255,.4)">14.71 GB</div></div>
+        <div class="note">Emptying the Vault is the <b style="color:var(--flare)">only irreversible action in Pulse</b> — it always asks, it never glows.</div>
+        <span class="btn danger">Empty Vault now…</span>
+      </div>
+    </div>
+  </div>
+</div></div>
+<p class="caption"><b>Key moves:</b> per-session restore (not per-file hunting); countdown bars create gentle urgency to confirm cleanups were fine; the danger button is flat and matte — HALO rule: glow is earned by safety.</p>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">05</span>Menu Bar — Always-On Cockpit</h2>
+<p class="sect-sub">iStat territory. Strip stays under 1% CPU; popover gives 30-second triage + the two actions people actually want without opening the window.</p>
+
+<div class="mock" style="background:linear-gradient(180deg, rgba(124,92,255,.06), transparent); border:1px solid var(--line); border-radius:16px; padding:26px;">
+  <div class="menubar-strip">
+    <span>◉ <b style="color:var(--ion)">38%</b></span>
+    <span>▦ 54%</span>
+    <span class="hot">◍ 92G</span>
+    <span>∿ 1.2M↓</span>
+    <span>⚡ 12W</span>
+    <span style="color:var(--text-low)">| 🔋 84% · 18:42</span>
+  </div>
+  <div class="popover">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px">
+      <b style="font-size:.85rem">Pulse</b><span style="font-family:var(--mono); font-size:.62rem; color:var(--pulse-green)">● HEALTHY · 2 notices</span>
+    </div>
+    <div class="pop-vital"><span class="k">CPU</span>
+      <svg width="100%" height="16" viewBox="0 0 160 16" preserveAspectRatio="none"><polyline points="0,12 16,10 32,13 48,7 64,9 80,4 96,8 112,5 128,9 144,6 160,7" fill="none" stroke="#00e5ff" stroke-width="1.5"/></svg>
+      <span class="v">38%</span></div>
+    <div class="pop-vital"><span class="k">Memory</span>
+      <svg width="100%" height="16" viewBox="0 0 160 16" preserveAspectRatio="none"><polyline points="0,9 32,9 64,8 96,9 128,8 160,8" fill="none" stroke="#2ee6a8" stroke-width="1.5"/></svg>
+      <span class="v">54%</span></div>
+    <div class="pop-vital"><span class="k">Disk</span>
+      <svg width="100%" height="16" viewBox="0 0 160 16" preserveAspectRatio="none"><polyline points="0,12 40,11 80,9 120,7 160,5" fill="none" stroke="#ffb02e" stroke-width="1.5"/></svg>
+      <span class="v" style="color:var(--amber)">92.4 G</span></div>
+    <div class="pop-vital"><span class="k">Network</span>
+      <svg width="100%" height="16" viewBox="0 0 160 16" preserveAspectRatio="none"><polyline points="0,13 20,12 40,6 60,11 80,12 100,4 120,10 140,12 160,9" fill="none" stroke="#7c5cff" stroke-width="1.5"/></svg>
+      <span class="v">1.2 M↓</span></div>
+    <div style="margin-top:10px; padding:9px 11px; background:var(--amber-dim); border:1px solid rgba(255,176,46,.25); border-radius:10px; font-size:.7rem;">
+      🌡 <b>Chrome Helper at 61%</b> for 22 min — <u style="color:var(--ion)">fix it</u>
+    </div>
+    <div class="quick-row">
+      <span class="btn primary">⚡ Quick Clean 11.6 G</span>
+      <span class="btn ghost">🗑 Trash 1.2 G</span>
+      <span class="btn ghost">Open Pulse ⌘⏎</span>
+    </div>
+  </div>
+</div>
+<p class="caption"><b>Key moves:</b> disk turns amber in the strip itself — ambient awareness without opening anything; popover triage in 4 sparklines + 1 alert + 3 buttons; Quick Clean from the menu bar is the habit loop.</p>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">06</span>Weekly Pulse Report</h2>
+<p class="sect-sub">Saturday 10:00 notification → this card. The retention engine: one screen, the week’s story, three actions. This is the screenshot users share.</p>
+
+<div class="mock" style="display:flex; justify-content:center; background:linear-gradient(180deg, rgba(0,229,255,.04), transparent); border:1px solid var(--line); border-radius:16px; padding:30px;">
+  <div style="width:520px; background:var(--surface-1); border:1px solid var(--line-bright); border-radius:18px; padding:26px; box-shadow:0 24px 60px rgba(0,0,0,.55)">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px">
+      <div class="logo" style="padding:0"><div class="mark" style="width:22px; height:22px"></div></div>
+      <b>Your Weekly Pulse</b><span style="margin-left:auto; font-family:var(--mono); font-size:.66rem; color:var(--text-low)">Jun 6 – Jun 12</span>
+    </div>
+    <div style="font-size:1.25rem; font-weight:800; letter-spacing:-.4px; margin:10px 0 16px">A busy week for your disk. <span style="color:var(--ion)">3.1 GB</span> is one click from coming back.</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:16px">
+      <div class="panel" style="text-align:center"><div class="num" style="font-size:1.2rem; color:var(--amber)">+12.4 G</div><div style="font-size:.62rem; color:var(--text-low); letter-spacing:.8px">DISK GROWTH</div><div style="font-size:.66rem; color:var(--text-mid)">8.1 G = FCP renders</div></div>
+      <div class="panel" style="text-align:center"><div class="num" style="font-size:1.2rem; color:var(--flare)">Tue</div><div style="font-size:.62rem; color:var(--text-low); letter-spacing:.8px">WORST BATTERY DAY</div><div style="font-size:.66rem; color:var(--text-mid)">Teams · 9% overnight</div></div>
+      <div class="panel" style="text-align:center"><div class="num" style="font-size:1.2rem; color:var(--pulse-green)">3.1 G</div><div style="font-size:.62rem; color:var(--text-low); letter-spacing:.8px">SAFE TO RECLAIM</div><div style="font-size:.66rem; color:var(--text-mid)">verified by rules KB</div></div>
+    </div>
+    <div style="display:flex; gap:8px">
+      <span class="btn primary" style="flex:1; justify-content:center">⚡ Clean 3.1 GB</span>
+      <span class="btn ghost" style="flex:1; justify-content:center">Stop Teams sleep-block</span>
+      <span class="btn ghost" style="flex:1; justify-content:center">See timeline</span>
+    </div>
+  </div>
+</div>
+<p class="caption"><b>Key moves:</b> headline written as a story, not a stat dump; exactly three numbers, exactly three actions; the green number is always the verified-reclaimable one — the report always ends in agency, never anxiety.</p>
+
+<!-- ====================================================== -->
+<h2 class="sect"><span class="n">07</span>Interaction &amp; motion rules</h2>
+<div class="ds-grid">
+  <div class="ds-card"><h4>Motion</h4><p style="font-size:.78rem; color:var(--text-mid)">Springs only (matched to macOS), 150–300ms. Treemap zoom = continuous transform, never crossfade. Live charts scroll, never repaint. Glow pulses reserved for: live indicators, the timeline spike, and freed-space confirmation. Nothing else animates idly.</p></div>
+  <div class="ds-card"><h4>Keyboard layer</h4><p style="font-size:.78rem; color:var(--text-mid)"><span class="num" style="color:var(--ion)">⌘K</span> command palette everywhere (“clean safe”, “empty trash”, “why is cpu hot”). <span class="num" style="color:var(--ion)">1–7</span> switch sections. <span class="num" style="color:var(--ion)">space</span> toggle selection. TUI heritage, prosumer love.</p></div>
+  <div class="ds-card"><h4>The control feeling</h4><p style="font-size:.78rem; color:var(--text-mid)">Every screen answers, in order: <b style="color:var(--text-hi)">Am I OK? → What changed? → What can I do?</b> Status top-left, deltas everywhere (−4.2 G/wk), action bottom-right glowing. The user always leaves a screen having been offered a verb.</p></div>
+  <div class="ds-card"><h4>Verification ritual</h4><p style="font-size:.78rem; color:var(--text-mid)">After every clean: counter animates from old free-space to new, sourced from the real df reading — the mac-monitor lesson (“why didn’t free space change?”) turned into the product’s signature moment of proof.</p></div>
+</div>
+
+<footer>
+  <p>Pulse for Mac — HALO Design System mockups · June 12, 2026 · <a href="market_research_report.html">Market Research</a> · <a href="product_spec.html">Product Spec</a> · Generated with Claude Code</p>
+</footer>
+
+</div>
+</body>
+</html>

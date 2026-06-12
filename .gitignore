@@ -1,0 +1,10 @@
+.DS_Store
+.build/
+.swiftpm/
+pulse/.build/
+pulse/dist/
+pulse/.swiftpm/
+legacy_tui/__pycache__/
+*.xcodeproj/
+xcuserdata/
+DerivedData/

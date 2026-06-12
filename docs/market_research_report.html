@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mac Monitor — Market Research &amp; Product Assessment</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2230;
+    --border: #2d333b;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --blue: #6cb6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6; padding: 40px 20px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 48px; }
+  header h1 { font-size: 2.2rem; letter-spacing: -0.5px; }
+  header h1 .accent { color: var(--blue); }
+  header p.sub { color: var(--muted); margin-top: 8px; font-size: 1.05rem; }
+  .verdict-banner {
+    margin: 32px auto 0; max-width: 820px; padding: 20px 28px;
+    background: linear-gradient(135deg, #1a2233, #161b22);
+    border: 1px solid var(--border); border-left: 4px solid var(--yellow);
+    border-radius: 10px; text-align: left;
+  }
+  .verdict-banner strong { color: var(--yellow); }
+  h2 {
+    font-size: 1.35rem; margin: 48px 0 18px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border); color: var(--blue);
+  }
+  h3 { font-size: 1.05rem; margin: 22px 0 10px; color: var(--text); }
+  p { margin-bottom: 12px; }
+  .muted { color: var(--muted); }
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px;
+  }
+  .stat-card { text-align: center; padding: 24px 16px; }
+  .stat-card .num { font-size: 2rem; font-weight: 700; color: var(--blue); }
+  .stat-card .label { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; }
+  tr:hover td { background: var(--panel2); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .tag.green  { background: rgba(63,185,80,.15);  color: var(--green); }
+  .tag.yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .tag.red    { background: rgba(248,81,73,.15);  color: var(--red); }
+  .tag.blue   { background: rgba(108,182,255,.15);color: var(--blue); }
+  .tag.purple { background: rgba(188,140,255,.15);color: var(--purple); }
+  .bar-row { display: grid; grid-template-columns: 200px 1fr 70px; gap: 12px; align-items: center; margin: 10px 0; font-size: 0.9rem; }
+  .bar-track { background: var(--panel2); border-radius: 6px; height: 18px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--blue), var(--purple)); }
+  .bar-fill.green { background: linear-gradient(90deg, #2ea043, #3fb950); }
+  .bar-fill.yellow { background: linear-gradient(90deg, #b08800, #d29922); }
+  .bar-val { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .swot { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .swot .card h3 { margin-top: 0; }
+  .swot ul { padding-left: 20px; }
+  .swot li { margin: 6px 0; font-size: 0.92rem; }
+  .swot .s h3 { color: var(--green); } .swot .w h3 { color: var(--red); }
+  .swot .o h3 { color: var(--blue); }  .swot .t h3 { color: var(--yellow); }
+  .funnel { margin: 20px 0; }
+  .funnel-step { margin: 8px auto; padding: 12px; border-radius: 8px; text-align: center; font-size: 0.92rem; }
+  .funnel-step .n { font-weight: 700; font-size: 1.1rem; }
+  .f1 { width: 100%; background: rgba(108,182,255,.18); border: 1px solid rgba(108,182,255,.4); }
+  .f2 { width: 78%; background: rgba(108,182,255,.14); border: 1px solid rgba(108,182,255,.35); }
+  .f3 { width: 56%; background: rgba(188,140,255,.14); border: 1px solid rgba(188,140,255,.35); }
+  .f4 { width: 36%; background: rgba(210,153,34,.14);  border: 1px solid rgba(210,153,34,.4); }
+  .f5 { width: 20%; background: rgba(63,185,80,.14);   border: 1px solid rgba(63,185,80,.4); }
+  .roadmap { border-left: 2px solid var(--border); margin-left: 8px; padding-left: 24px; }
+  .roadmap .step { position: relative; margin-bottom: 22px; }
+  .roadmap .step::before {
+    content: ""; position: absolute; left: -31px; top: 6px;
+    width: 12px; height: 12px; border-radius: 50%; background: var(--blue); border: 2px solid var(--bg);
+  }
+  .roadmap .step h3 { margin: 0 0 4px; }
+  .roadmap .step p { font-size: 0.92rem; color: var(--muted); margin: 0; }
+  .feature-check td:first-child { font-weight: 600; }
+  .yes { color: var(--green); } .no { color: var(--red); } .partial { color: var(--yellow); }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  footer a { color: var(--blue); text-decoration: none; }
+  footer ul { padding-left: 20px; }
+  .callout { border-left: 4px solid var(--blue); background: var(--panel); padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 0.95rem; }
+  .callout.warn { border-color: var(--red); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav style="margin-bottom:24px; font-size:0.9rem; text-align:right;">
+  <a href="product_spec.html" style="color:var(--blue); text-decoration:none; border:1px solid var(--border); padding:6px 14px; border-radius:8px; background:var(--panel); margin-right:8px;">Product Specification: Pulse for Mac →</a>
+  <a href="design_mockups.html" style="color:var(--blue); text-decoration:none; border:1px solid var(--border); padding:6px 14px; border-radius:8px; background:var(--panel);">Design Mockups (HALO) →</a>
+</nav>
+<header>
+  <h1>Mac Monitor <span class="accent">— Market Research &amp; Product Assessment</span></h1>
+  <p class="sub">Does a terminal-based Mac command center solve a real problem — and can it be sold? · June 2026</p>
+  <div class="verdict-banner">
+    <strong>Verdict in one line:</strong> The product genuinely solves a real problem and the underlying market is large and proven (CleanMyMac alone has 29M+ downloads) — but a <em>terminal</em> app has almost no precedent of direct sales. The realistic path to value is open-source distribution to developers first, then a paid native companion if traction proves demand.
+  </div>
+</header>
+
+<h2>1 · Is the problem real?</h2>
+<p>Yes — and people demonstrably pay to solve it. Three distinct, validated problems converge in this app:</p>
+<div class="grid grid-3">
+  <div class="card stat-card"><div class="num">29M+</div><div class="label">CleanMyMac downloads — “my disk is full / my Mac is slow” is a mass-market pain</div></div>
+  <div class="card stat-card"><div class="num">66 GB</div><div class="label">junk the average CleanMyMac user removes per year (MacPaw’s own figure)</div></div>
+  <div class="card stat-card"><div class="num">1M+</div><div class="label">downloads of Stats (free menu-bar monitor) — monitoring demand is real even at $0</div></div>
+</div>
+<p style="margin-top:16px">The category splits into three sub-markets, all served by incumbents:</p>
+<table>
+  <tr><th>Problem</th><th>Who pays today</th><th>Mac Monitor coverage</th></tr>
+  <tr><td>“Where did my disk space go?”</td><td>DaisyDisk (~$10), CleanMyMac</td><td><span class="tag green">Strong</span> smart scan + safety taxonomy + tree</td></tr>
+  <tr><td>“Is my Mac healthy / why is it slow?”</td><td>iStat Menus ($11.99), Sensei, Setapp apps</td><td><span class="tag green">Strong</span> dashboard, processes, thermals, battery</td></tr>
+  <tr><td>“Clean it for me safely”</td><td>CleanMyMac ($3.33–9.95/mo or $119.95 lifetime)</td><td><span class="tag yellow">Good core</span> trash-safe deletes, no malware/duplicates yet</td></tr>
+</table>
+
+<h2>2 · Competitive landscape</h2>
+<table>
+  <tr><th>Product</th><th>Type</th><th>Price</th><th>Position</th></tr>
+  <tr><td><b>CleanMyMac</b> (MacPaw)</td><td>GUI, all-in-one</td><td>$3.33–9.95/mo · $119.95 lifetime</td><td>Category leader; cleaning + malware + updater; 15+ yrs</td></tr>
+  <tr><td><b>DaisyDisk</b></td><td>GUI, disk map</td><td>~$10 one-time</td><td>Best-in-class visualization, no automation</td></tr>
+  <tr><td><b>iStat Menus 7</b></td><td>Menu bar monitor</td><td>$11.99 one-time</td><td>“Gold standard” monitoring; no cleaning</td></tr>
+  <tr><td><b>Stats</b></td><td>Menu bar, OSS</td><td>Free</td><td>1M+ downloads; free undercuts paid monitoring</td></tr>
+  <tr><td><b>Sensei</b></td><td>GUI perf + cleaning</td><td>Paid</td><td>Closest feature analogue; manual-control philosophy</td></tr>
+  <tr><td><b>OnyX</b></td><td>GUI maintenance</td><td>Free</td><td>The free power-user choice for 20 yrs</td></tr>
+  <tr><td><b>htop / btop / glances</b></td><td>TUI monitors</td><td>Free, OSS</td><td>The terminal incumbents — none monetized, none Mac-specific, none do cleaning</td></tr>
+</table>
+<div class="callout">
+  <b>The actual gap Mac Monitor occupies:</b> nothing in the terminal combines macOS-specific health (thermals, battery, login items, Spotlight pressure) with smart, safety-graded storage cleanup. btop shows numbers; CleanMyMac acts but is GUI-only, closed, and subscription-priced. Mac Monitor is the only “btop + CleanMyMac core, in tmux, free of telemetry” play.
+</div>
+<div class="callout warn">
+  <b>The hard truth:</b> that gap exists partly because TUI users don’t pay. Surveying the TUI ecosystem (Terminal Trove, awesome-tuis): essentially every successful TUI is free/open-source funded by donations or sponsorship. There is no known example of a directly-sold TUI succeeding at meaningful scale. Paid terminal products that work (e.g., Warp) sell a service/account, not the binary.
+</div>
+
+<h2>3 · Market sizing (honest funnel)</h2>
+<div class="funnel">
+  <div class="funnel-step f1"><span class="n">~100M+ active Macs</span><br><span class="muted">Apple: 2.5B active devices total (Jan 2026); Macs are a subset</span></div>
+  <div class="funnel-step f2"><span class="n">~10M developers on Mac</span><br><span class="muted">~33% of professional developers use macOS; 65%+ of mobile devs</span></div>
+  <div class="funnel-step f3"><span class="n">~2–3M terminal-native users</span><br><span class="muted">comfortable installing via Homebrew, live in iTerm/tmux</span></div>
+  <div class="funnel-step f4"><span class="n">~100–300K realistic reach</span><br><span class="muted">btop/Stats-style adoption via HN, r/macapps, Homebrew, Terminal Trove</span></div>
+  <div class="funnel-step f5"><span class="n">~1–3% would ever pay</span><br><span class="muted">→ low-thousands of paying users at best for a TUI; sponsorship more realistic</span></div>
+</div>
+
+<h2>4 · Feature parity vs. paid apps</h2>
+<p class="muted">What Mac Monitor already does, and what “paid-app parity” still requires.</p>
+<table class="feature-check">
+  <tr><th>Capability</th><th>Mac Monitor</th><th>Notes</th></tr>
+  <tr><td>Live system dashboard (CPU/mem/thermals/power)</td><td class="yes">✔ Yes</td><td>macmon stream, 0.03s/tick, 2.6% CPU steady-state — faster than most GUI apps</td></tr>
+  <tr><td>Process management + kill</td><td class="yes">✔ Yes</td><td>filter, sort, pageins rate</td></tr>
+  <tr><td>Smart storage scan with safety grading</td><td class="yes">✔ Yes</td><td>safe/careful/review taxonomy, per-app cache expansion, dev-junk detection (node_modules, .venv) — <b>a feature no GUI cleaner has</b></td></tr>
+  <tr><td>Trash-safe deletion + Empty Trash + live df</td><td class="yes">✔ Yes</td><td>sudoless, reversible by design</td></tr>
+  <tr><td>App uninstall with leftover cleanup</td><td class="yes">✔ Yes</td><td>matches paid “uninstaller” modules</td></tr>
+  <tr><td>Network connections view</td><td class="yes">✔ Yes</td><td></td></tr>
+  <tr><td>Battery health + login items</td><td class="yes">✔ Yes</td><td></td></tr>
+  <tr><td>Duplicate / similar-file finder</td><td class="no">✘ No</td><td>top-3 requested cleaner feature</td></tr>
+  <tr><td>Malware / adware scan</td><td class="no">✘ No</td><td>CleanMyMac’s biggest differentiator; heavy liability — probably skip</td></tr>
+  <tr><td>App updater</td><td class="no">✘ No</td><td>could wrap <code>brew outdated</code> + Sparkle feeds cheaply</td></tr>
+  <tr><td>Scheduled / background cleanup</td><td class="no">✘ No</td><td>launchd agent + notification would be unique in TUI space</td></tr>
+  <tr><td>Full Disk Access integration</td><td class="partial">◐ Partial</td><td>TCC blocks ~/.Trash sizing; worked around via Finder; FDA onboarding doc needed</td></tr>
+  <tr><td>Code signing / notarization / installer</td><td class="no">✘ No</td><td>required for non-developer distribution; Homebrew tap avoids it for devs</td></tr>
+</table>
+
+<h2>5 · SWOT</h2>
+<div class="swot">
+  <div class="card s"><h3>Strengths</h3><ul>
+    <li>Genuinely fast: zero-subprocess ticks, lazy panes, persistent macmon stream</li>
+    <li>Safety taxonomy + trash-safe deletes — trust is the #1 barrier in this category</li>
+    <li>Dev-junk scanning (node_modules, .venv, stale projects) — unserved by every GUI cleaner</li>
+    <li>No telemetry, no subscription, scriptable, works over SSH/tmux</li>
+  </ul></div>
+  <div class="card w"><h3>Weaknesses</h3><ul>
+    <li>TUI ceiling: invisible to the 95% of Mac users who never open Terminal</li>
+    <li>Python distribution friction (venv vs. single binary like btop)</li>
+    <li>Single maintainer; no signing/notarization/support infrastructure</li>
+    <li>No duplicates finder, updater, or scheduling yet</li>
+  </ul></div>
+  <div class="card o"><h3>Opportunities</h3><ul>
+    <li>“btop for Mac power users” is an empty, nameable niche — strong HN/launch story</li>
+    <li>Homebrew + Terminal Trove + r/macapps = free distribution to exactly the right users</li>
+    <li>GitHub Sponsors precedent: popular system TUIs sustain meaningful sponsorship</li>
+    <li>Proven upgrade path: free TUI builds audience → paid menu-bar/GUI companion on Setapp (70–90% rev share, ~30K impressions at launch)</li>
+  </ul></div>
+  <div class="card t"><h3>Threats</h3><ul>
+    <li>Free incumbents (OnyX, Stats, btop) anchor price at $0 for this audience</li>
+    <li>MacPaw/competitors could ship a CLI mode if niche proves out</li>
+    <li>macOS TCC/security tightening can break collectors each OS release</li>
+    <li>Open-sourcing invites forks — moat is velocity + trust, not code</li>
+  </ul></div>
+</div>
+
+<h2>6 · Monetization options ranked</h2>
+<div class="bar-row"><div>Open source + GitHub Sponsors</div><div class="bar-track"><div class="bar-fill green" style="width:88%"></div></div><div class="bar-val">Best fit</div></div>
+<div class="bar-row"><div>Free TUI → paid GUI companion (Setapp)</div><div class="bar-track"><div class="bar-fill green" style="width:74%"></div></div><div class="bar-val">Strong</div></div>
+<div class="bar-row"><div>Freemium: free monitor, paid “Pro” cleanup ($15–19 one-time, Gumroad)</div><div class="bar-track"><div class="bar-fill yellow" style="width:48%"></div></div><div class="bar-val">Possible</div></div>
+<div class="bar-row"><div>Direct paid TUI binary</div><div class="bar-track"><div class="bar-fill yellow" style="width:22%"></div></div><div class="bar-val">Weak</div></div>
+<div class="bar-row"><div>Subscription TUI</div><div class="bar-track"><div class="bar-fill" style="width:8%; background:var(--red)"></div></div><div class="bar-val">Avoid</div></div>
+<p class="muted" style="margin-top:10px">Gumroad data point: indie Mac apps do sell there (10% fee, no review), but unsigned apps lose ~15–20% of conversions to the Gatekeeper warning, and sales correlate with technical write-ups — which is exactly the open-source playbook anyway.</p>
+
+<h2>7 · Recommended path</h2>
+<div class="roadmap">
+  <div class="step"><h3>Phase 1 — Ship it open (now → 1 month)</h3><p>Clean repo, MIT license, README with SVG screenshots, <code>brew install</code> via tap or pipx. Submit to Terminal Trove + awesome-tuis. Write the launch post around the unique hook: “safety-graded storage cleanup in the terminal — finds your forgotten node_modules.”</p></div>
+  <div class="step"><h3>Phase 2 — Validate demand (1–3 months)</h3><p>Launch on HN / r/macapps / lobste.rs. Success signal: 1K+ GitHub stars and recurring issues from strangers. Enable GitHub Sponsors. Close the cheap gaps: duplicates finder, <code>brew outdated</code> updater, FDA onboarding.</p></div>
+  <div class="step"><h3>Phase 3 — Monetize only if validated (3–9 months)</h3><p>If traction is real, build the paid layer where money actually lives: a signed, notarized menu-bar companion sharing the same collectors, pitched to Setapp (70–90% rev share) or sold one-time at $15–19. TUI stays free forever as the funnel.</p></div>
+</div>
+
+<h2>8 · Bottom line</h2>
+<div class="grid grid-2">
+  <div class="card"><h3 style="color:var(--green)">Does it solve a real user problem?</h3><p><b>Yes.</b> Disk anxiety and “why is my Mac slow” are mass-market, paid-for problems. For terminal-native users specifically, Mac Monitor is already more complete than anything else in its medium, and its dev-junk + safety-graded cleanup is genuinely novel.</p></div>
+  <div class="card"><h3 style="color:var(--yellow)">Can you sell it as-is?</h3><p><b>Not directly, realistically.</b> The audience that loves TUIs expects free; the audience that pays expects a GUI. Sell the trust, not the terminal: open-source the TUI to build reputation and users, then monetize through sponsorship and — if demand proves out — a paid native companion.</p></div>
+</div>
+
+<footer>
+  <p><b>Sources</b></p>
+  <ul>
+    <li><a href="https://macpaw.com/store/cleanmymac">CleanMyMac pricing — MacPaw Store</a> · <a href="https://hamsterstack.com/pricing/cleanmymac/">CleanMyMac pricing tiers 2026 — HamsterStack</a> · <a href="https://macpaw.com/cleanmymac">CleanMyMac product page (29M downloads, 66 GB/yr figures)</a></li>
+    <li><a href="https://www.macworld.com/article/673271/best-mac-cleaner-tested-compared.html">Best Mac cleaner apps 2026 — Macworld</a> · <a href="https://thesweetbits.com/best-mac-cleaner-software/">20+ Mac cleaners tested — TheSweetBits</a> · <a href="https://www.mactools.pro/blog/free-mac-cleaner-and-optimization-tools">Best free Mac cleaners — MacTools</a></li>
+    <li><a href="https://bjango.com/mac/istatmenus/">iStat Menus — Bjango</a> · <a href="https://news.ycombinator.com/item?id=42881342">Stats (1M+ downloads) — Hacker News</a> · <a href="https://setapp.com/app-reviews/best-mac-monitoring-software">Best Mac monitoring software — Setapp</a></li>
+    <li><a href="https://appleinsider.com/articles/26/01/29/apple-reaches-25-billion-active-devices-after-record-breaking-quarter">Apple: 2.5B active devices (Jan 2026) — AppleInsider</a> · <a href="https://www.techlila.com/macos-developer-statistics/">macOS developer statistics 2026 — TechLila</a> · <a href="https://commandlinux.com/statistics/developer-os-preference-stack-overflow-survey/">Developer OS preference — Stack Overflow survey data</a></li>
+    <li><a href="https://terminaltrove.com/categories/tui/">Terminal Trove — TUI category</a> · <a href="https://github.com/rothgar/awesome-tuis">awesome-tuis</a> · <a href="https://news.ycombinator.com/item?id=43477810">btop/glances/htop discussion — Hacker News</a></li>
+    <li><a href="https://en.wikipedia.org/wiki/Setapp">Setapp (rev share, 30K launch impressions) — Wikipedia</a> · <a href="https://dev.to/hiyoyok/selling-mac-apps-on-gumroad-what-works-what-doesnt-honest-numbers-3f0m">Selling Mac apps on Gumroad: honest numbers — DEV</a></li>
+  </ul>
+  <p style="margin-top:12px">Prepared for the mac-monitor project · June 12, 2026 · Generated with Claude Code</p>
+</footer>
+
+</div>
+</body>
+</html>

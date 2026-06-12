@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse for Mac — Product Specification v2.0</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel2: #1c2230;
+    --border: #2d333b;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --blue: #6cb6ff;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --cyan: #39c5cf;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6; padding: 40px 20px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  nav.crumb { margin-bottom: 24px; font-size: 0.9rem; }
+  nav.crumb a { color: var(--blue); text-decoration: none; }
+  header { text-align: center; margin-bottom: 40px; }
+  header h1 { font-size: 2.3rem; letter-spacing: -0.5px; }
+  header h1 .accent { color: var(--blue); }
+  header p.sub { color: var(--muted); margin-top: 8px; font-size: 1.05rem; }
+  .pill-row { margin-top: 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .pill { padding: 4px 14px; border-radius: 14px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border); background: var(--panel); }
+  .pill b { color: var(--blue); }
+  h2 {
+    font-size: 1.4rem; margin: 52px 0 18px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border); color: var(--blue);
+  }
+  h2 .sec { color: var(--muted); font-weight: 400; margin-right: 8px; }
+  h3 { font-size: 1.08rem; margin: 24px 0 10px; }
+  h4 { font-size: 0.95rem; margin: 16px 0 6px; color: var(--cyan); }
+  p { margin-bottom: 12px; }
+  ul, ol { padding-left: 22px; margin-bottom: 12px; }
+  li { margin: 5px 0; }
+  .muted { color: var(--muted); }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 4px; font-size: 0.88em; font-family: "SF Mono", Menlo, monospace; }
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card h3 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9rem; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; }
+  tr:hover td { background: var(--panel2); }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+  .tag.green  { background: rgba(63,185,80,.15);  color: var(--green); }
+  .tag.yellow { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .tag.red    { background: rgba(248,81,73,.15);  color: var(--red); }
+  .tag.blue   { background: rgba(108,182,255,.15);color: var(--blue); }
+  .tag.purple { background: rgba(188,140,255,.15);color: var(--purple); }
+  .tag.cyan   { background: rgba(57,197,207,.15); color: var(--cyan); }
+  .callout { border-left: 4px solid var(--blue); background: var(--panel); padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 0.95rem; }
+  .callout.green { border-color: var(--green); }
+  .callout.warn { border-color: var(--red); }
+  .callout.gold { border-color: var(--yellow); }
+  .module {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px; margin: 20px 0;
+  }
+  .module > .mod-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .module > .mod-head h3 { margin: 0; font-size: 1.15rem; }
+  .killer {
+    background: linear-gradient(135deg, rgba(188,140,255,.08), rgba(108,182,255,.05));
+    border: 1px solid rgba(188,140,255,.35); border-radius: 10px; padding: 16px 20px; margin: 12px 0;
+  }
+  .killer h4 { color: var(--purple); margin-top: 0; }
+  .arch { font-family: "SF Mono", Menlo, monospace; font-size: 0.8rem; line-height: 1.45; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; overflow-x: auto; white-space: pre; color: var(--text); }
+  .roadmap { border-left: 2px solid var(--border); margin-left: 8px; padding-left: 24px; }
+  .roadmap .step { position: relative; margin-bottom: 24px; }
+  .roadmap .step::before { content: ""; position: absolute; left: -31px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--blue); border: 2px solid var(--bg); }
+  .roadmap .step.done::before { background: var(--green); }
+  .roadmap .step h3 { margin: 0 0 4px; }
+  .roadmap .step p, .roadmap .step ul { font-size: 0.92rem; color: var(--muted); margin: 0; }
+  .price-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 20px 0; }
+  .price-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 24px; text-align: center; }
+  .price-card.hero { border-color: var(--blue); box-shadow: 0 0 24px rgba(108,182,255,.12); }
+  .price-card .price { font-size: 2rem; font-weight: 700; color: var(--blue); }
+  .price-card .per { color: var(--muted); font-size: 0.85rem; }
+  .price-card ul { text-align: left; font-size: 0.88rem; margin-top: 14px; padding-left: 18px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  footer a { color: var(--blue); text-decoration: none; }
+  .toc { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 24px; margin: 24px 0; columns: 2; column-gap: 40px; font-size: 0.92rem; }
+  .toc a { color: var(--text); text-decoration: none; display: block; padding: 3px 0; }
+  .toc a:hover { color: var(--blue); }
+  .toc .n { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="crumb" style="display:flex; justify-content:space-between;">
+  <span>← <a href="market_research_report.html">Back to Market Research Report</a></span>
+  <a href="design_mockups.html">Next → Design Mockups (HALO)</a>
+</nav>
+
+<header>
+  <h1>Pulse <span class="accent">for Mac</span></h1>
+  <p class="sub">Product Specification v2.0 — “Your Mac’s command center: see everything, clean safely, fix what’s slow.”</p>
+  <div class="pill-row">
+    <span class="pill">Stack: <b>Swift / SwiftUI</b></span>
+    <span class="pill">Form: <b>Menu bar + Command Center window</b></span>
+    <span class="pill">Pricing: <b>One-time license</b></span>
+    <span class="pill">v0.9 Status: <b>Dev Mode Shipped</b></span>
+    <span class="pill">Core Rules: <b>Zero Subprocesses · &lt; 1% CPU</b></span>
+  </div>
+</header>
+
+<div class="toc">
+  <a href="#positioning"><span class="n">1</span>Positioning &amp; thesis</a>
+  <a href="#differentiators"><span class="n">2</span>The 7 differentiators</a>
+  <a href="#modules"><span class="n">3</span>Feature specification by module</a>
+  <a href="#safety"><span class="n">4</span>The Safety System (core IP)</a>
+  <a href="#ux"><span class="n">5</span>UX principles &amp; key flows</a>
+  <a href="#architecture"><span class="n">6</span>Technical architecture &amp; state</a>
+  <a href="#permissions"><span class="n">7</span>Permissions &amp; sandboxing strategy</a>
+  <a href="#pricing"><span class="n">8</span>Pricing &amp; packaging</a>
+  <a href="#roadmap"><span class="n">9</span>Build plan &amp; milestones</a>
+  <a href="#metrics"><span class="n">10</span>Success metrics</a>
+  <a href="#risks"><span class="n">11</span>Risks &amp; mitigations</a>
+  <a href="#competition"><span class="n">12</span>Competitive scorecard</a>
+  <a href="#buildlog"><span class="n">13</span>Build log &amp; decisions</a>
+  <a href="#questions"><span class="n">14</span>Open Questions</a>
+</div>
+
+<div class="callout warn" style="border-color: var(--red); background: #1a0f12;">
+  <h3 style="color: var(--red); margin-bottom: 8px;">⚠️ Non-Negotiable Rules (Apply to Every Module)</h3>
+  <table style="margin: 0; border: none;">
+    <tr><td style="width: 200px; font-weight: bold; border: none; padding: 4px 8px;">Zero subprocesses</td><td style="border: none; padding: 4px 8px;">Never spawn a process for data collection. All data must come from kernel APIs (<code>host_processor_info</code>, <code>host_statistics64</code>, <code>libproc</code>, <code>IOKit</code>, <code>sysctl</code>).</td></tr>
+    <tr><td style="font-weight: bold; border: none; padding: 4px 8px;">Performance budget</td><td style="border: none; padding: 4px 8px;">Menu bar + dashboard: <code>&lt; 1% CPU</code>, <code>&lt; 50 MB RSS</code> while sampling every 2 s.</td></tr>
+    <tr><td style="font-weight: bold; border: none; padding: 4px 8px;">No data-driven animations</td><td style="border: none; padding: 4px 8px;">Never use <code>.animation</code> on <code>@Observable</code> / <code>@State</code> properties. Every animation frame re-runs the entire hosting view's layout. Springs are for user-initiated transitions only.</td></tr>
+    <tr><td style="font-weight: bold; border: none; padding: 4px 8px;">Render only when visible</td><td style="border: none; padding: 4px 8px;">Never publish snapshots when all windows are closed or the screen is locked.</td></tr>
+    <tr><td style="font-weight: bold; border: none; padding: 4px 8px;">Layout-stable text</td><td style="border: none; padding: 4px 8px;">All dynamically-changing numbers must use monospaced, fixed-width <code>String(format:)</code> so text intrinsic size never changes between samples.</td></tr>
+    <tr><td style="font-weight: bold; border: none; padding: 4px 8px;">Safety Vault</td><td style="border: none; padding: 4px 8px;">Every file deletion must be staged in <code>SafetyVault</code> first. Nothing is ever directly removed.</td></tr>
+    <tr><td style="font-weight: bold; border: none; padding: 4px 8px;">Build via <code>make</code></td><td style="border: none; padding: 4px 8px;">Always use <code>make build</code>, <code>make test</code>, <code>make run</code>. Never call <code>swift build</code> directly.</td></tr>
+  </table>
+</div>
+
+<h2 id="positioning"><span class="sec">1 ·</span> Positioning &amp; thesis</h2>
+<p><b>One sentence:</b> Pulse replaces CleanMyMac + DaisyDisk + iStat Menus + Sensei with a single native app that is <em>safer than CleanMyMac, more visual than DaisyDisk, more actionable than iStat, and cheaper than all three combined</em> — with no subscription.</p>
+
+<div class="grid grid-3">
+  <div class="card"><h3 style="color:var(--green)">What incumbents get right</h3><ul style="font-size:.9rem">
+    <li>CleanMyMac: one-click simplicity, polish</li>
+    <li>DaisyDisk: the sunburst map — joy of seeing space</li>
+    <li>iStat: always-on glanceability, habit loop</li>
+    <li>Sensei: respect for user control</li>
+  </ul></div>
+  <div class="card"><h3 style="color:var(--red)">Where they all fail</h3><ul style="font-size:.9rem">
+    <li>CleanMyMac: subscription fatigue, over-aggressive deletes, scareware-style upsells, black-box “junk” logic</li>
+    <li>DaisyDisk: shows space, can’t explain it, no safety guidance, no monitoring</li>
+    <li>iStat: shows numbers, offers zero actions — “your CPU is hot, good luck”</li>
+    <li>All: four separate $10–120 apps for one problem; none explain <em>why</em></li>
+  </ul></div>
+  <div class="card"><h3 style="color:var(--blue)">Pulse’s wedge</h3><ul style="font-size:.9rem">
+    <li><b>Explain, then act:</b> every metric links to its cause and a one-click fix</li>
+    <li><b>Trust as the product:</b> reversible by default, evidence shown before every delete</li>
+    <li><b>One app, one price, no subscription</b></li>
+    <li><b>Developer-aware:</b> the only cleaner that understands node_modules, Xcode, Docker</li>
+  </ul></div>
+</div>
+
+<div class="callout gold"><b>Target user (v1):</b> “Prosumer Mac owner” — developers, designers, video/photo people, power users with 256–512GB SSDs perpetually full, who currently own 2+ of the incumbent apps or pirate CleanMyMac. They distrust “cleaners,” love evidence, hate subscriptions. Est. 3–5M reachable users. Mass-market consumers are v2 audience via App Store edition.</div>
+
+<h2 id="differentiators"><span class="sec">2 ·</span> The 7 differentiators (why people pay)</h2>
+<p class="muted">Features no single competitor has — each one is a review headline.</p>
+
+<div class="killer"><h4>① Storage Timeline — “what ate my disk this week?”</h4>
+<p>Every competitor shows a <em>snapshot</em>. Pulse records lightweight daily snapshots of per-folder sizes (top ~2K directories, ~200KB/day) and renders a stacked area chart over time. Click any growth spike → see exactly which folder grew, which app wrote it, and the matching cleanup action. FSEvents-driven, near-zero cost. <b>Nobody has this.</b> It converts the one-off “panic clean” into a recurring habit and the single strongest demo moment.</p></div>
+
+<div class="killer"><h4>② Evidence-based cleaning — the anti-CleanMyMac</h4>
+<p>CleanMyMac says “4.2 GB of System Junk” and asks for blind trust — its top complaint is aggressive deletion. Pulse shows <em>per item</em>: what it is in plain English, which app made it, when it was last touched, what happens if deleted (“Spotify will re-download artwork as you listen”), and a safety grade. Every claim is inspectable — click any row → Finder reveal + file list. Trust is the moat; this is how it’s built.</p></div>
+
+<div class="killer"><h4>③ Undo for everything — the Safety Vault</h4>
+<p>All deletions stage into a Vault (APFS clones where possible — instant, zero extra space on same volume) with a 7-day countdown before permanent removal. One-click restore of any cleanup, even after closing the app. Headline: <b>“The only Mac cleaner with Undo.”</b> Kills the #1 fear that stops people from cleaning at all.</p></div>
+
+<div class="killer"><h4>④ Cause → Fix linking (monitoring that acts)</h4>
+<p>iStat shows a red CPU graph; Pulse shows the graph <em>plus</em> “WindowServer + Chrome Helper (GPU) are 78% of load — 3 tabs are runaway” with kill/restart buttons. Memory pressure → top swap offenders → quit. Disk almost full → jump to top reclaim. Battery drain abnormal → which app prevented sleep last night. Every alert ends in a button, not a shrug.</p></div>
+
+<div class="killer"><h4>⑤ Developer Mode — an unserved, high-LTV segment</h4>
+<p>One toggle reveals a category no GUI cleaner touches: stale <code>node_modules</code> / <code>.venv</code> / <code>target</code> / <code>.gradle</code> in projects untouched 60+ days, Xcode DerivedData &amp; old simulators (<code>xcrun simctl delete unavailable</code>), Docker dangling images/volumes, Homebrew cache, old toolchains. Routinely 20–80 GB on dev machines — proven by mac-monitor’s own scans. Developers are exactly the prosumers who pay one-time for tools.</p></div>
+
+<div class="killer"><h4>⑥ Weekly Pulse Report — retention engine</h4>
+<p>Saturday notification: “This week: disk grew 12 GB (8 GB = Final Cut render cache), worst battery day Tuesday (Teams), 3.1 GB safely reclaimable.” One screen, three actions. This is what makes a one-time purchase feel alive without nagging — and the screenshot users share.</p></div>
+
+<div class="killer"><h4>⑦ Honest by design — the brand position</h4>
+<p>No scareware (“347 issues found!!”), no red badges to upsell, no telemetry without opt-in, no fake scanning animations, never auto-selects “review” items. Local-only data. The category has a trust deficit; Pulse markets <em>against</em> the category’s dark patterns. This is positioning, but it’s also a feature spec: every screen is reviewed against a published “no dark patterns” checklist.</p></div>
+
+<h2 id="modules"><span class="sec">3 ·</span> Feature specification by module</h2>
+
+<div class="module">
+  <div class="mod-head"><h3>🧭 Menu Bar</h3><span class="tag green">shipped v0.2</span><span class="tag blue">replaces iStat Menus</span></div>
+  <ul>
+    <li><b>Configurable items:</b> CPU (per-cluster E/P), memory pressure, disk free, network ↑↓, temperature, battery — each toggleable, compact text/graph/icon styles.</li>
+    <li><b>Popover dashboard:</b> click → 30-second sparkline history of all vitals, top 3 processes by CPU and memory, disk free with 7-day delta (“−4.2 GB this week”), quick actions (open Command Center, run Quick Clean, Empty Trash with size).</li>
+    <li><b>Smart alerts (all actionable, all rate-limited, all off-switchable):</b> disk &lt; threshold, memory pressure sustained red, runaway process &gt; 90% CPU for 5 min, app preventing sleep, Time Machine not backed up in N days, charging-limit/battery-health change.</li>
+    <li><b>Performance budget:</b> &lt; 1% CPU average, &lt; 50 MB RSS — published in marketing and enforced in CI (the mac-monitor zero-subprocess discipline carries over: one IOKit/SMC sample loop, no shelling out per tick).</li>
+  </ul>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>💾 Storage — Map, Timeline &amp; Smart Clean</h3><span class="tag green">shipped v0.5</span><span class="tag blue">replaces DaisyDisk + CleanMyMac core</span></div>
+  <h4>Disk Map</h4>
+  <ul>
+    <li>Treemap (default) + sunburst (toggle) of any volume/folder; GPU-rendered (Metal/Canvas), animated zoom, 60fps on 1M+ files. Scan engine: parallel <code>fts</code>/<code>getattrlistbulk</code> walker, ~1M files in &lt; 30s, results cached and incrementally updated via FSEvents — <b>rescans are instant, unlike DaisyDisk</b>.</li>
+    <li>Overlay lenses on the same map: <i>Safety lens</i> (green/yellow/red tint by deletability), <i>Age lens</i> (heat by last-accessed), <i>Owner lens</i> (color by owning app). Lenses are the “more visual than DaisyDisk” claim.</li>
+    <li>APFS-correct math: purgeable space, snapshot sizes (<code>tmutil listlocalsnapshots</code> + <code>diskutil apfs</code>), clone-aware sizing — explains the “Finder says 50 GB free but I can’t use it” mystery, with a “reclaim purgeable” action.</li>
+  </ul>
+  <h4>Smart Clean (the mac-monitor scan engine, matured)</h4>
+  <ul>
+    <li>Categories: app caches (per-app rows, not one blob), logs, browser caches, Xcode/dev junk (Developer Mode), old downloads &amp; installers (.dmg/.pkg &gt; 30d), mail attachments cache, large+old files (review tier), iOS backups, language packs, Trash itself, local TM snapshots, purgeable space.</li>
+    <li>Every row: plain-English description, owning app icon, last-used date, size, safety grade, consequence sentence. Expandable to file list. Finder reveal everywhere.</li>
+    <li><b>Default selection = safe tier only.</b> “Careful” requires explicit tick; “review” items can never be bulk-selected. (Direct answer to CleanMyMac’s over-deletion reputation.)</li>
+    <li>All deletes → Safety Vault (module below). Post-clean report: actual freed space verified against df, not estimated.</li>
+    <li><b>Storage Timeline</b> (differentiator ①): stacked area chart, per-folder growth attribution, click-spike-to-clean.</li>
+    <li><b>Space forecast:</b> “At this week’s rate, full in 23 days” with trend line.</li>
+    <li><b>Duplicates &amp; Similar (v1.1)</b>: Hash-based exact dupes (size prefilter → BLAKE3), near-duplicate images via perceptual hash, “keep newest/largest/in-Photos” rules, always Vault-staged.</li>
+  </ul>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>🛡 Safety Vault</h3><span class="tag green">shipped v0.5</span><span class="tag purple">unique</span></div>
+  <ul>
+    <li>Staging area for every deletion: same-volume moves are APFS renames (instant); shows per-cleanup “sessions” with restore-all or per-file restore.</li>
+    <li>7-day auto-expiry (configurable 1–30d); expiry only when disk not under pressure is OFF by default — Vault purges oldest first if user runs low.</li>
+    <li>Vault size always visible; “Empty Vault now” with the one irreversibility warning in the app (modeled on mac-monitor’s Empty Trash modal).</li>
+    <li>System Trash integration: Trash size/item count, Empty Trash action, “files you trashed haven’t freed space yet” education — the exact confusion fixed in mac-monitor Round 6, productized.</li>
+  </ul>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>🧹 Clean (M3)</h3><span class="tag green">shipped v0.6</span><span class="tag blue">scheduled deep clean</span></div>
+  <p>A scheduled, safe, automated deep-clean system that expands on the existing <code>SmartScanner</code> with background scheduling, UserNotifications, and a one-click clean flow that works even when Pulse is closed.</p>
+  
+  <h4>New Types &amp; Signatures</h4>
+  <pre class="arch"><code>// CleanSchedule
+public struct CleanSchedule: Codable, Sendable {
+    public enum Frequency: String, Codable, Sendable {
+        case daily, weekly, monthly
+    }
+    public var frequency: Frequency
+    public var lastRun: Date?
+    public var nextRun: Date
+    public var autoCleanSafeTier: Bool  // if true, no user confirmation needed
+    public var notifyOnCompletion: Bool
+}
+
+// CleanRecord
+public struct CleanRecord: Codable, Sendable {
+    public let date: Date
+    public let itemsCleaned: Int
+    public let bytesFreed: UInt64
+    public let sessionID: UUID  // links to VaultSession for restore
+}
+
+// CleanScheduler actor
+public actor CleanScheduler {
+    public func scheduleIfNeeded()  // Checks nextRun, posts UserNotification if due
+    public func runNow(autoMode: Bool) async -> CleanRecord
+    public func setSchedule(_ schedule: CleanSchedule)
+    public func history() -> [CleanRecord]
+}</code></pre>
+  <ul>
+    <li><b>Storage:</b> JSON at <code>~/Library/Application Support/Pulse/clean_schedule.json</code> and append-only JSONL at <code>clean_history.jsonl</code>.</li>
+    <li><b>Triggers:</b> Fires via <code>NSBackgroundActivityScheduler</code> (survives sleep/wake correctly) and uses <code>UserNotifications</code> framework (no deprecated <code>NSUserNotificationCenter</code>).</li>
+  </ul>
+
+  <h4>UI Wireframe: CleanView</h4>
+  <pre class="arch">┌─────────────────────────────────────────────────────┐
+│  AUTO CLEAN                                ⚡ WEEKLY │
+│  Next run: Sunday at 03:00 · auto-clean safe items   │
+│  Last run: 7 days ago · freed 1.2 GB                │
+│  [Run Now]  [Configure Schedule]                     │
+├─────────────────────────────────────────────────────┤
+│  CLEAN HISTORY                                       │
+│  Jun 05  1.2 GB · 34 items  [Restore]               │
+│  May 29  867 MB · 28 items  [Restore] [Purge]        │
+├─────────────────────────────────────────────────────┤
+│  PREVIEW (Next Scheduled Run)                        │
+│  ● Chrome Cache (SAFE) - 450 MB                      │
+│  ● Derived Data (SAFE) - 1.2 GB                      │
+└─────────────────────────────────────────────────────┘</pre>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>📊 Monitor (M4)</h3><span class="tag green">shipped v0.7</span><span class="tag blue">replaces process/network panels</span></div>
+  <p>Provides per-process CPU, memory, thread counts, and pagefault rates, plus system-wide network interface telemetry.</p>
+  
+  <div class="callout warn">
+    <b>⚠️ Constraint:</b> Per-process network breakdown is omitted/documented as unavailable. It requires private entitlements (<code>com.apple.private.network.socket-delegate</code>). M4 delivers per-interface network monitoring instead.
+  </div>
+
+  <h4>New Types &amp; Signatures</h4>
+  <pre class="arch"><code>// NetworkSample (added to SystemSnapshot)
+public struct NetworkSample: Sendable, Equatable {
+    public let interfaceName: String
+    public let bytesIn: UInt64     // cumulative
+    public let bytesOut: UInt64    // cumulative
+}
+
+// ProcessExtendedSample
+public struct ProcessExtendedSample: Sendable, Identifiable, Equatable {
+    public let pid: Int32
+    public let name: String
+    public let cpuPercent: Double
+    public let residentBytes: UInt64
+    public let virtualBytes: UInt64
+    public let threadCount: UInt32    // from proc_taskinfo (no root needed)
+    public let pageFaultRate: Double  // from proc_taskinfo.pti_pageins delta
+}
+
+// ProcessNode tree
+public struct ProcessNode: Sendable, Identifiable {
+    public let process: ProcessExtendedSample
+    public let children: [ProcessNode]
+    public var id: Int32 { process.pid }
+}
+
+// MonitorEngine actor
+public actor MonitorEngine {
+    public enum SortKey: String, CaseIterable {
+        case cpu, memory, threads, pageFaults, name, pid
+    }
+    public func sample(sortKey: SortKey, ascending: Bool) -> [ProcessExtendedSample]
+    public func tree() -> [ProcessNode]   // root nodes only; children attached
+    public func networkDeltas() -> [NetworkSample]  // rate since last call
+}</code></pre>
+
+  <h4>UI Wireframe: MonitorView</h4>
+  <pre class="arch">┌─ PROCESSES ───────────────────┬─ CHROME HELPER (RENDERER) · PID 1234 ┐
+│ Sort: CPU ▾   [Tree] [Filter] │ CPU: 22.0%  Mem: 420MB  Threads: 48  │
+│ NAME           CPU     MEM    │ Page Faults: 3/s  Virtual: 2.1 GB    │
+│ ● Xcode        45.2%   3.2GB  │ Parent: Chrome                       │
+│   └ Helper      8.1%   410MB  ├──────────────────────────────────────┤
+│ ● Chrome       22.0%   1.8GB  │ CPU 60s History   [~~~~~~~~~~~~~~~]  │
+└───────────────────────────────┴──────────────────────────────────────┘
+┌─ NETWORK ────────────────────────────────────────────────────────────┐
+│ en0 (WiFi)   ↓ 12.3 MB/s  ↑ 2.1 MB/s                                 │
+│ Overlaid 60s Chart: [Download: Ion / Upload: Volt]                   │
+└──────────────────────────────────────────────────────────────────────┘</pre>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>❤️ Health (M6)</h3><span class="tag green">shipped v0.8</span><span class="tag blue">battery, startup, benchmark</span></div>
+  <p>Provides fast battery health reading via IOKit, launch-agent management without sudo, and on-demand micro-benchmarks. <b>As built (v0.8):</b> login items are intentionally absent — macOS has no public API to enumerate third-party login items (SMAppService manages only the calling app’s own; the BTM store is private), so <code>StartupItem.Kind</code> is <code>userAgent</code>/<code>globalAgent</code> and the UI says so. <code>condition</code> is derived (PermanentFailureStatus ≠ 0 or capacity &lt; 80% → “Service Recommended”) — the registry has no readable BatteryHealth key. Toggle = rename <code>foo.plist</code> ⇄ <code>foo.plist.disabled</code>, applies at next login; global agents are read-only (lock icon, no sudo theater). Added beyond spec: <code>BatteryHistoryStore</code> tracking daily readings of battery consumption (how many hours the battery was used per day) and <code>BenchmarkStore</code> (run history, persisted score with transparent formula: mean of three phase ratios vs fixed M1-class references × 1000). The benchmark card will provide clear baselines (Good/Bad/Worse) to give the user context.</p>
+  
+  <div class="callout green">
+    <b>Performance tip:</b> Do not use <code>system_profiler</code> (takes ~2s). Use raw IOKit reads of <code>AppleSmartBattery</code> (takes ~2ms).
+  </div>
+
+  <h4>New Types &amp; Signatures</h4>
+  <pre class="arch"><code>// BatteryHealth
+public struct BatteryHealth: Sendable, Equatable {
+    public let capacityPercent: Int     // IOKit: AppleRawMaxCapacity / DesignCapacity
+    public let cycleCount: Int          // IOKit: CycleCount
+    public let isCharging: Bool
+    public let isOnAC: Bool
+    public let currentChargePercent: Int
+    public let timeToEvent: TimeInterval?  // Time to full or time remaining
+    public let condition: String           // IOKit: BatteryHealth
+}
+
+// StartupItem
+public struct StartupItem: Sendable, Identifiable, Equatable {
+    public let id: String       // stable path identity
+    public let label: String
+    public let path: String
+    public enum Kind { case loginItem, launchAgent }
+    public let kind: Kind
+    public let isEnabled: Bool
+    public let bundleID: String?
+}
+
+// HealthSampler actor
+public actor HealthSampler {
+    public func sampleBattery() -> BatteryHealth?   // nil on desktop Macs
+    public func listStartupItems() -> [StartupItem]
+    public func toggleStartupItem(_ item: StartupItem) throws
+}</code></pre>
+
+  <h4>UI Wireframe: HealthView</h4>
+  <pre class="arch">┌─ STARTUP ITEMS ───────────────┬─ BATTERY CONSUMPTION (DAILY) ────────┐
+│ ITEM          KIND     STATUS │ Date       Hours on Battery          │
+│ Dropbox       Agent    ● On   │ Today      4.2 hrs                   │
+│ zoom.daemon   Agent    ● On   │ Yesterday  6.1 hrs                   │
+│                               │ Jun 10     2.5 hrs                   │
+│                               │ Jun 09     5.0 hrs                   │
+├───────────────────────────────┴──────────────────────────────────────┤
+│ PERFORMANCE BENCHMARK                                                │
+│ CPU: SHA256 Loop (5s) · Disk: 50MB Write · Memory: 256MB Copy        │
+│ [Run Benchmark]  Last Score: 1,420 (Normal)                          │
+│                                                                      │
+│ 🟩 GOOD: > 1000 (M1+ Class)                                          │
+│ 🟨 BAD: 500-1000 (Older Intel)                                       │
+│ 🟥 WORSE: < 500 (Thermal Throttling / Very Old)                      │
+└──────────────────────────────────────────────────────────────────────┘</pre>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>🛠 Dev Mode (M7)</h3><span class="tag green">shipped v0.9</span><span class="tag blue">diagnostics &amp; sysctls</span></div>
+  <p>Exposes a raw diagnostic console for developers: full SMC sensor reads, a sysctl browser, and per-process file descriptor / thread counting. <b>As built (v0.9):</b> Diagnostic console uses a 3-panel layout refreshing every 5 seconds while visible. SMC key dump iterates the SMC keyspace using <code>dumpAll()</code>, parsing keys with known prefixes. The sysctl browser allows querying system config properties directly via <code>sysctlbyname</code>. Process FDs list enumerates active descriptors using <code>proc_pidinfo(..., PROC_PIDLISTFDS, ...)</code> for own-user processes, ensuring zero subprocesses are spawned.</p>
+  
+  <h4>Features</h4>
+  <ul>
+    <li><b>SMC Sensor Dump:</b> Enumerate all readable SMC keys and their current raw values (averaging keys of CPU/GPU/battery temps, fan status, and system wattage).</li>
+    <li><b>sysctl Browser:</b> Read system configuration properties directly from <code>sysctl()</code> without subprocesses (e.g. <code>hw.logicalcpu</code>, <code>hw.memsize</code>, <code>kern.version</code>).</li>
+  </ul>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>🗑 Uninstaller</h3><span class="tag yellow">v1.1 (Backlog)</span></div>
+  <ul><li>Drag-app-to-uninstall + browse view; leftover detection via bundle-ID matching across ~/Library (Application Support, Caches, Preferences, Containers, LaunchAgents, receipts); orphan scanner for leftovers of already-deleted apps; “last opened” sort to surface abandonware; Vault-staged.</li></ul>
+</div>
+
+<div class="module">
+  <div class="mod-head"><h3>🔄 Updater &amp; Maintenance</h3><span class="tag yellow">v1.1–1.2 (Backlog)</span></div>
+  <ul>
+    <li>App updates: Sparkle-feed reading + Homebrew cask awareness + MAS update list — one screen, no auto-install in v1 (liability control).</li>
+    <li>Maintenance scripts with explanations: flush DNS, rebuild Spotlight index (with “this is why search is broken” detection), rebuild Launch Services, re-sign permissions, free purgeable. Each: what it does, when it helps, expected duration.</li>
+  </ul>
+</div>
+
+<h2 id="safety"><span class="sec">4 ·</span> The Safety System (core IP)</h2>
+<p>The safety grade is the product’s brain. It must be a real, versioned ruleset — not vibes.</p>
+<table>
+  <tr><th>Grade</th><th>Definition</th><th>Examples</th><th>UI behavior</th></tr>
+  <tr><td><span class="tag green">SAFE</span></td><td>Regenerated automatically; zero data loss possible; app behavior unchanged beyond first-run rebuild</td><td>HTTP caches, derived data, dangling Docker layers, logs &gt; 30d</td><td>Auto-selected in Quick Clean; bulk ops allowed</td></tr>
+  <tr><td><span class="tag yellow">CAREFUL</span></td><td>Almost certainly unwanted, but user intent possible</td><td>Old installers, stale node_modules, abandoned app leftovers, downloads &gt; 90d</td><td>Listed, never pre-selected; per-item tick</td></tr>
+  <tr><td><span class="tag red">REVIEW</span></td><td>Real user data that happens to be big/old</td><td>Forgotten videos, old archives, iOS backups</td><td>Surfaced for awareness; no bulk select; Finder-first workflow</td></tr>
+</table>
+<ul>
+  <li><b>Knowledge base:</b> per-app rules (bundle ID → which of its dirs are cache vs data), shipped as signed, versioned data updated independently of app releases. Community-submittable rules with review. This KB compounds into the durable moat.</li>
+  <li><b>Hard floor:</b> never touch ~/Documents, ~/Desktop, ~/Photos Library, Mail data, iCloud Drive contents regardless of rules; system-path denylist; open-file checks before delete; running-app awareness (won’t clear cache of an app mid-write).</li>
+  <li><b>Every grade is explainable:</b> hover → “SAFE because: matches com.spotify.client cache rule v12; directory regenerates on launch.”</li>
+</ul>
+
+<h2 id="ux"><span class="sec">5 ·</span> UX principles &amp; key flows</h2>
+<div class="grid grid-2">
+  <div class="card"><h3>Principles</h3><ul style="font-size:.92rem">
+    <li><b>Glance → Understand → Act → Verify</b>: every screen follows this arc; every action shows its verified result (real df delta, not estimates).</li>
+    <li><b>One window, sidebar nav</b> (Dashboard · Storage · Clean · Monitor · Health · Vault · Dev), translucent material, native toolbar — must feel like a system app, not a web page.</li>
+    <li><b>Speed is a feature:</b> launch &lt; 1s, popover &lt; 100ms, map navigation 60fps; first scan streams results progressively (no spinner walls).</li>
+    <li><b>No dark patterns checklist</b> enforced per screen (no fake urgency, counts, red-badge upsells, pre-selected risk).</li>
+    <li>Keyboard-first power layer (⌘K command palette) — heritage from the TUI, loved by the target user.</li>
+  </ul></div>
+  <div class="card"><h3>Flow: first run (the trust onboarding)</h3><ol style="font-size:.92rem">
+    <li>Welcome → ask for Full Disk Access with honest screen: what it enables, what the app will never do, link to privacy page. Works in degraded mode if declined (clear badges on what’s unavailable).</li>
+    <li>First scan streams the disk map live (delightful, fast).</li>
+    <li>Result: “14.8 GB safely reclaimable” — safe tier pre-selected only, evidence visible, Vault explained inline (“undoable for 7 days”).</li>
+    <li>Clean → animated freed-space verification → menu bar item appears → “Pulse now watches so next time takes one click.”</li>
+  </ol><p class="muted" style="font-size:.85rem">First-run goal: user deletes something within 5 minutes and feels <em>zero</em> fear. That feeling is the product.</p></div>
+</div>
+
+<div class="module" style="margin-top: 20px;">
+  <h3>5.3 HALO Design Spec Guidelines</h3>
+  <table style="margin-top: 10px;">
+    <tr><th>Property</th><th>Specification</th></tr>
+    <tr><td><b>Page Padding</b></td><td>24 pt on all sides</td></tr>
+    <tr><td><b>Card Layout</b></td><td>Background: <code>Halo.surface1</code>, cornerRadius: 14, internal padding: 16 pt</td></tr>
+    <tr><td><b>Row Heights</b></td><td>Selectable: 44 pt · Display-only: 32 pt</td></tr>
+    <tr><td><b>Interactive States</b></td><td>Hover: <code>Halo.surface2</code> (cornerRadius: 8) · Selected: <code>Halo.ion.opacity(0.12)</code> + 2pt <code>Halo.ion</code> left bar</td></tr>
+    <tr><td><b>Typography</b></td><td>Page title: 22 pt Bold · Section header: 10 pt Semibold (tracking 2) · Data values: 12 pt Monospaced · Badge: 9–10 pt Medium</td></tr>
+  </table>
+</div>
+
+<h2 id="architecture"><span class="sec">6 ·</span> Technical architecture &amp; state</h2>
+<div class="arch">┌──────────────────────────────────────────────────────────────────┐
+│  Pulse.app (SwiftUI, sandboxed-optional, signed + notarized)     │
+│                                                                  │
+│  ┌─ MenuBarExtra ─┐   ┌─ Command Center window ───────────────┐ │
+│  │ vitals popover │   │ Dashboard · Storage · Clean · Monitor │ │
+│  └───────┬────────┘   │ Health · Vault · Dev    (SwiftUI)     │ │
+│          │            └──────────────┬────────────────────────┘ │
+│          └──────────┬────────────────┘                          │
+│              ┌──────▼───────────────────────────┐               │
+│              │  PulseKit (Swift package, the core)              │
+│              │  · Collectors: host_statistics64, IOKit/SMC,     │
+│              │    IOReport (power), proc_pidinfo, nettop APIs   │
+│              │    — ONE sample loop, no subprocess per tick     │
+│              │  · ScanEngine: parallel getattrlistbulk walker,  │
+│              │    FSEvents incremental index (SQLite)           │
+│              │  · RulesEngine: signed safety KB + cause→fix     │
+│              │  · Vault: APFS clone/rename staging + manifest   │
+│              │  · Timeline: daily folder-size snapshots (SQLite)│
+│              └──────┬───────────────────────────┘               │
+│                     │ XPC                                       │
+│  ┌──────────────────▼──────────────┐  ┌───────────────────────┐ │
+│  │ Helper (LaunchAgent, user-level)│  │ pulse CLI (optional)  │ │
+│  │ background sampling, snapshots, │  │ clean --safe --json   │ │
+│  │ alerts while app closed — NO    │  │ shares PulseKit       │ │
+│  │ root, no privileged helper v1   │  └───────────────────────┘ │
+│  └─────────────────────────────────┘                            │
+└──────────────────────────────────────────────────────────────────┘</div>
+
+<h3>6.1 File Structure Mapping</h3>
+<pre class="arch">pulse/
+├── Sources/
+│   ├── CPulse/       — C shim: exposes libproc.h to Swift (shim.c + include/)
+│   ├── PulseKit/     — UI-independent core (actors, structs, pure functions only)
+│   └── Pulse/        — SwiftUI app (MenuBarExtra + Window)
+│       ├── PulseApp.swift
+│       ├── DashboardModel.swift
+│       ├── StorageModel.swift
+│       ├── Theme.swift (HALO design system)
+│       └── Views/
+│           ├── RootView.swift
+│           ├── SidebarView.swift
+│           ├── DashboardView.swift
+│           ├── AlertsSection.swift
+│           ├── VitalCard.swift
+│           ├── TopProcessesPanel.swift
+│           ├── HistoryChart.swift
+│           ├── Sparkline.swift
+│           ├── MenuBarContent.swift
+│           └── StorageView.swift
+└── Tests/PulseKitTests/
+    ├── PulseKitTests.swift  (engine, SMC, alerts, history, formatting)
+    └── StorageTests.swift   (vault, smart scan)</pre>
+
+<h3>6.2 Data Layer — <code>SystemSnapshot</code> Schema</h3>
+<p>Every 2 seconds, <code>PulseEngine.sample()</code> updates this core value type. The UI reads only this snapshot.</p>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Kernel Source API</th></tr>
+  <tr><td><code>cpuTotalPercent</code></td><td><code>Double</code></td><td><code>host_processor_info</code> delta ticks</td></tr>
+  <tr><td><code>cpuPerCore</code></td><td><code>[Double]</code></td><td><code>host_processor_info</code> individual core ticks</td></tr>
+  <tr><td><code>cpuEfficiencyPercent</code></td><td><code>Double?</code></td><td>Averaged E-cores (Apple Silicon only)</td></tr>
+  <tr><td><code>cpuPerformancePercent</code></td><td><code>Double?</code></td><td>Averaged P-cores (Apple Silicon only)</td></tr>
+  <tr><td><code>loadAverage1m</code></td><td><code>Double</code></td><td><code>getloadavg()</code></td></tr>
+  <tr><td><code>memoryUsedBytes</code></td><td><code>UInt64</code></td><td><code>host_statistics64(HOST_VM_INFO64_COUNT)</code></td></tr>
+  <tr><td><code>memoryTotalBytes</code></td><td><code>UInt64</code></td><td><code>sysctl("hw.memsize")</code></td></tr>
+  <tr><td><code>swapUsedBytes</code></td><td><code>UInt64</code></td><td><code>host_statistics64</code> VM swap details</td></tr>
+  <tr><td><code>memoryPressure</code></td><td><code>MemoryPressure</code></td><td><code>kern.memorystatus_vm_pressure_level</code></td></tr>
+  <tr><td><code>diskFreeBytes</code></td><td><code>UInt64</code></td><td><code>volumeAvailableCapacityKey</code></td></tr>
+  <tr><td><code>diskTotalBytes</code></td><td><code>UInt64</code></td><td><code>volumeTotalCapacityKey</code></td></tr>
+  <tr><td><code>diskWeeklyGrowthBytes</code></td><td><code>Int64?</code></td><td><code>DiskHistoryStore</code> (7-day delta)</td></tr>
+  <tr><td><code>thermal</code></td><td><code>ThermalLevel</code></td><td><code>ProcessInfo.thermalState</code></td></tr>
+  <tr><td><code>sensors</code></td><td><code>SensorReadings</code></td><td><code>SMCSensors</code> (IOKit SMC raw key-value enumeration)</td></tr>
+  <tr><td><code>sleepAssertions</code></td><td><code>[SleepAssertion]</code></td><td><code>IOPMCopyAssertionsByType</code></td></tr>
+  <tr><td><code>topProcesses</code></td><td><code>[ProcessSample]</code></td><td><code>proc_listallpids</code> + <code>proc_pidinfo</code> via CPulse</td></tr>
+  <tr><td><code>uptime</code></td><td><code>TimeInterval</code></td><td><code>ProcessInfo.systemUptime</code></td></tr>
+  <tr><td><code>networkSamples</code> <span class="tag purple">M4</span></td><td><code>[NetworkSample]</code></td><td><code>getifaddrs()</code></td></tr>
+  <tr><td><code>topProcessesExtended</code> <span class="tag purple">M4</span></td><td><code>[ProcessExtendedSample]</code></td><td><code>proc_taskallinfo</code> / <code>proc_bsdinfo</code></td></tr>
+</table>
+
+<h3>6.3 Key Engine Components</h3>
+<table>
+  <tr><th>Actor / Class</th><th>Role &amp; Logic</th></tr>
+  <tr><td><code>PulseEngine</code></td><td>Master actor; coordinates all metrics sampling on a 2-second ticker.</td></tr>
+  <tr><td><code>CPUSampler</code></td><td>Tracks processor ticks delta over interval.</td></tr>
+  <tr><td><code>MemorySampler</code></td><td>Extracts active/inactive/wired memory stats.</td></tr>
+  <tr><td><code>DiskSampler</code></td><td>Queries system filesystem volume keys.</td></tr>
+  <tr><td><code>ProcessSampler</code></td><td>Computes per-PID CPU usage from delta timestamps.</td></tr>
+  <tr><td><code>SMCSensors</code></td><td>Enumerates <code>#KEY</code> and averages chip/fan/wattage data.</td></tr>
+  <tr><td><code>SleepAssertionReader</code></td><td>Tracks active power assertions preventing idle sleep.</td></tr>
+  <tr><td><code>DiskHistoryStore</code></td><td>Binary journal of disk capacity at 6-hour cadences.</td></tr>
+  <tr><td><code>MinuteHistoryStore</code></td><td>Binary journal of 24h CPU history and 60-day battery capacity.</td></tr>
+  <tr><td><code>SmartScanner</code></td><td>Walks folders recursively using <code>fts/getattrlistbulk</code>.</td></tr>
+  <tr><td><code>SafetyVault</code></td><td>Handles staging and expiration of APFS-staged directories.</td></tr>
+  <tr><td><code>AlertsEngine</code></td><td>Calculates warning and critical status indicators.</td></tr>
+</table>
+
+<h3>6.4 UI State Router &amp; Navigation</h3>
+<p>The navigation is managed via <code>SidebarItem</code> state enum:</p>
+<table>
+  <tr><th>Sidebar Item</th><th>Milestone Status</th><th>Target Route View</th></tr>
+  <tr><td><code>dashboard</code></td><td><span class="tag green">shipped v0.2</span></td><td><code>DashboardView</code></td></tr>
+  <tr><td><code>storage</code></td><td><span class="tag green">shipped v0.5</span></td><td><code>StorageView</code> (Map + SmartClean)</td></tr>
+  <tr><td><code>vault</code></td><td><span class="tag green">shipped v0.5</span></td><td><code>VaultPanel</code></td></tr>
+  <tr><td><code>clean</code></td><td><span class="tag purple">M3</span></td><td><code>CleanView</code></td></tr>
+  <tr><td><code>monitor</code></td><td><span class="tag purple">M4</span></td><td><code>MonitorView</code></td></tr>
+  <tr><td><code>health</code></td><td><span class="tag green">v0.8</span></td><td><code>HealthView</code></td></tr>
+  <tr><td><code>devMode</code></td><td><span class="tag purple">M6</span></td><td><code>DevModeView</code></td></tr>
+</table>
+<p>All core engines are initialized in <code>PulseApp</code> and shared via Environment objects rather than view-local instantiation. Closed windows or locked screen pause notifications automatically.</p>
+
+<h3>6.5 HALO Color Palettes</h3>
+<table>
+  <tr><th>Token</th><th>Hex Value</th><th>UI Intent</th></tr>
+  <tr><td><code>void</code></td><td><code>#06090F</code></td><td>Window frame, sidebar background</td></tr>
+  <tr><td><code>surface1</code></td><td><code>#0E1520</code></td><td>Card borders, dashboard grid panels</td></tr>
+  <tr><td><code>surface2</code></td><td><code>#141D2C</code></td><td>Rows, selection highlights</td></tr>
+  <tr><td><code>ion</code></td><td><code>#00E5FF</code></td><td>Live stats, action buttons (cyan-glow)</td></tr>
+  <tr><td><code>volt</code></td><td><code>#7C5CFF</code></td><td>History lines, secondary accents (purple-glow)</td></tr>
+  <tr><td><code>pulseGreen</code></td><td><code>#2EE6A8</code></td><td>Healthy states, successful tasks</td></tr>
+  <tr><td><code>amber</code></td><td><code>#FFB02E</code></td><td>Warning, elevated alerts</td></tr>
+  <tr><td><code>flare</code></td><td><code>#FF4D6A</code></td><td>Critical issues, hogging resources</td></tr>
+</table>
+
+<h3>6.6 Active Alert Rules</h3>
+<table>
+  <tr><th>Alert ID</th><th>Trigger Condition</th><th>Severity</th><th>Action Link</th></tr>
+  <tr><td><code>cpu-hog</code></td><td>Top process &ge; 80% CPU for two cycles</td><td>warning</td><td>Quit Process</td></tr>
+  <tr><td><code>low-disk</code></td><td>Free space &lt; 20 GB</td><td>critical</td><td>Go to Storage Clean</td></tr>
+  <tr><td><code>memory-pressure</code></td><td>Pressure level &ne; normal OR swap &ge; 4 GB</td><td>warning/critical</td><td>Go to Dashboard</td></tr>
+  <tr><td><code>thermal</code></td><td>State &ge; serious</td><td>critical</td><td>Go to SMC / Fans</td></tr>
+  <tr><td><code>sleep-blockers</code></td><td>Non-allowlisted app holds sleep assertion</td><td>info</td><td>Reveal App Details</td></tr>
+  <tr><td><code>network-spike</code> <span class="tag purple">M4</span></td><td>Interface throughput &gt; 50 MB/s</td><td>info</td><td>Go to Monitor</td></tr>
+  <tr><td><code>battery-low</code> <span class="tag purple">M5</span></td><td>Battery &lt; 10% and not charging</td><td>warning</td><td>Go to Health</td></tr>
+  <tr><td><code>battery-degraded</code> <span class="tag purple">M5</span></td><td>Health capacity &lt; 80% of design</td><td>info</td><td>Go to Health</td></tr>
+  <tr><td><code>high-thread-count</code> <span class="tag purple">M6</span></td><td>Process thread count &gt; 500</td><td>info</td><td>Go to Dev Mode</td></tr>
+</table>
+
+<h2 id="permissions"><span class="sec">7 ·</span> Permissions &amp; sandboxing strategy</h2>
+<table>
+  <tr><th>Capability</th><th>Requirement</th><th>Strategy</th></tr>
+  <tr><td>Scan full home incl. ~/Library, Trash sizing</td><td>Full Disk Access (TCC)</td><td>Honest onboarding ask; degraded mode without (per-folder grants via NSOpenPanel); FDA detection + guided settings deep-link — solves the mac-monitor TCC pain properly</td></tr>
+  <tr><td>Temps, fans, power</td><td>SMC/IOKit (no special perms on user-level keys)</td><td>Read-only; no fan <em>control</em> in v1 (needs privileged helper — defer)</td></tr>
+  <tr><td>Per-process network</td><td>NE transparent proxy is overkill</td><td>Use libproc/nettop-style APIs (read-only, sufficient for attribution)</td></tr>
+  <tr><td>Distribution</td><td>Direct (Developer ID) primary</td><td>Notarized DMG + Sparkle. App Store edition later as separate sandboxed SKU with reduced cleaning (the DaisyDisk dual-edition playbook). Setapp as third channel post-launch.</td></tr>
+</table>
+
+<h2 id="pricing"><span class="sec">8 ·</span> Pricing &amp; packaging</h2>
+<div class="price-cards">
+  <div class="price-card"><h3>Trial</h3><div class="price">Free</div><div class="per">14 days, full-featured</div>
+    <ul><li>Everything unlocked</li><li>After trial: monitoring stays free forever (menu bar + dashboard)</li><li>Cleaning requires license — the monitor is the permanent funnel</li></ul></div>
+  <div class="price-card hero"><h3>Pulse</h3><div class="price">$34</div><div class="per">one-time · 1 Mac · minor updates free</div>
+    <ul><li>All modules</li><li>Safety KB updates included</li><li>Undercuts CleanMyMac year-1 (~$40/yr) while feeling premium vs $10 utilities</li></ul></div>
+  <div class="price-card"><h3>Pulse Family</h3><div class="price">$49</div><div class="per">one-time · 3 Macs</div>
+    <ul><li>Household standard</li><li>Major versions (≈ every 2 yrs): paid upgrade ~50% off</li><li>Launch promo: $24 first two weeks (HN/Product Hunt)</li></ul></div>
+</div>
+<div class="callout"><b>Why this works:</b> “No subscription” is the single most repeated complaint about CleanMyMac — it goes on the homepage. Free-forever monitoring keeps the app installed (distribution + habit), cleaning is the monetized moment of acute need. Revenue sanity check: 2,000 sales/yr × $34 ≈ $68K (side income); 10,000 × $34 ≈ $340K (real business). Both plausible within the 100–300K-reach funnel from the market report.</div>
+
+<h2 id="roadmap"><span class="sec">9 ·</span> Build plan &amp; milestones</h2>
+<div class="roadmap">
+  <div class="step done"><h3>M0 — Validated prototype ✓</h3><p>mac-monitor TUI was the working proof: collectors, scan engine semantics, safety taxonomy, trash education, performance discipline. It is the spec-by-example for PulseKit.</p></div>
+  <div class="step done"><h3>M1 — PulseKit core (v0.2/v0.5) ✓</h3><p>Core engines: CPU, memory, SMC sensors (CPU/GPU/battery temps, fan RPM, system watts), and sleep-assertion readers are complete, verified by unit test suites.</p></div>
+  <div class="step done"><h3>M2 — Menu bar &amp; dashboard (v0.2) ✓</h3><p>MenuBarExtra sampling loop, popover, and the full Halo dashboard window with vital cards, charts, and Cause→Fix actions are complete.</p></div>
+  <div class="step done"><h3>M3 — Storage map &amp; Smart Clean (v0.5) ✓</h3><p>SmartScanner recursing folder sizes, safety grades (.safe, .careful, .review), APFS-rename SafetyVault, and smart clean detail flows are complete and verified.</p></div>
+  <div class="step done"><h3>M4 — Clean Module (Scheduled deep clean) ✓</h3><ul>
+    <li>Scheduler actor with NSBackgroundActivityScheduler and UserNotifications.</li>
+    <li>Clean history JSONL logs, automatic .safe tier cleans.</li>
+    <li>UI: CleanView with schedule controls, historic logs, and dry-run previews.</li>
+  </ul></div>
+  <div class="step done"><h3>M5 — Monitor Module (Process tree &amp; network) ✓</h3><ul>
+    <li>MonitorEngine for process tree (parent-child linkage) and per-interface network throughput.</li>
+    <li>Process list tree UI with filter/sort, detailed process card, and interactive thread/fault monitoring.</li>
+  </ul></div>
+  <div class="step done"><h3>M6 — Health Module (Battery, Startup items &amp; Benchmarks) ✓</h3><ul>
+    <li>IOKit smart battery sampler (2ms reads) and SMAppService Login Item helper.</li>
+    <li>Battery capacity 60-day historical trend, startup plist toggling, and light CPU/disk/RAM speed benchmarks.</li>
+  </ul></div>
+  <div class="step done"><h3>M7 — Dev Mode (Diagnostics Console) ✓</h3><ul>
+    <li>SMC raw key dump, sysctl interactive browser, and process open-file descriptor list.</li>
+  </ul></div>
+</div>
+
+<h2 id="metrics"><span class="sec">10 ·</span> Success metrics</h2>
+<table>
+  <tr><th>Metric</th><th>Target</th><th>Why</th></tr>
+  <tr><td>Trial → paid conversion</td><td>≥ 5% (good Mac-utility benchmark 3–8%)</td><td>Core economics</td></tr>
+  <tr><td>First-run: time to first safe clean</td><td>&lt; 5 min, ≥ 60% of trials</td><td>The aha moment</td></tr>
+  <tr><td>Vault restores used</td><td>&gt; 0 and celebrated</td><td>Every restore = a CleanMyMac horror story avoided; ask those users for reviews</td></tr>
+  <tr><td>Safety incidents (wrongly graded SAFE)</td><td>0, ever</td><td>One viral incident kills the brand; regression suite + staged KB rollout</td></tr>
+  <tr><td>Menu bar daily-active among licensees</td><td>≥ 50% at 90 days</td><td>Retention → word of mouth → upgrade revenue</td></tr>
+  <tr><td>Launch: Product Hunt top-5 / HN front page</td><td>either</td><td>Primary distribution event</td></tr>
+</table>
+
+<h2 id="risks"><span class="sec">11 ·</span> Risks &amp; mitigations</h2>
+<table>
+  <tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr>
+  <tr><td>A bad deletion goes viral</td><td><span class="tag red">Existential</span></td><td>Vault-by-default, safety regression suite in CI, staged KB rollouts, conservative grades, no system-domain cleaning</td></tr>
+  <tr><td>macOS update breaks collectors (TCC/SMC churn)</td><td><span class="tag yellow">High</span></td><td>User-level APIs only, beta-OS CI runners each June, degrade gracefully per-collector</td></tr>
+  <tr><td>Free competition (Mole, OnyX, Stats) undercuts</td><td><span class="tag yellow">Medium</span></td><td>Compete on safety system + timeline + polish — the parts OSS rarely sustains; free-forever monitor neutralizes “why pay for graphs”</td></tr>
+  <tr><td>MacPaw responds</td><td><span class="tag blue">Low</span></td><td>They can’t drop subscriptions without cannibalizing; positioning is structurally hard to copy</td></tr>
+  <tr><td>Solo-dev scope creep</td><td><span class="tag yellow">High</span></td><td>Milestone exits above are contractual; v1 cut-list pre-agreed (Timeline first to go, Vault never)</td></tr>
+  <tr><td>SwiftUI ramp-up time</td><td><span class="tag blue">Medium</span></td><td>PulseKit-first build order = logic before UI; mac-monitor remains the behavioral spec to test against</td></tr>
+</table>
+
+<h2 id="competition"><span class="sec">12 ·</span> Competitive scorecard</h2>
+<table>
+  <tr><th>Capability</th><th>CleanMyMac</th><th>DaisyDisk</th><th>iStat Menus</th><th>Sensei</th><th><b>Pulse</b></th></tr>
+  <tr><td>Disk map</td><td>basic</td><td>★ best</td><td>—</td><td>—</td><td>treemap+sunburst+lenses</td></tr>
+  <tr><td>Map explains safety/age/owner</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="tag purple">UNIQUE</span></td></tr>
+  <tr><td>Storage over time</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="tag purple">UNIQUE</span></td></tr>
+  <tr><td>Smart cleanup</td><td>★ broad, opaque</td><td>—</td><td>—</td><td>manual</td><td>broad + evidence-based</td></tr>
+  <tr><td>Undo / staging vault</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="tag purple">UNIQUE</span></td></tr>
+  <tr><td>Menu bar monitoring</td><td>basic</td><td>—</td><td>★ best</td><td>basic</td><td>full + actionable</td></tr>
+  <tr><td>Metric → cause → one-click fix</td><td>—</td><td>—</td><td>—</td><td>partial</td><td><span class="tag purple">UNIQUE</span></td></tr>
+  <tr><td>Developer junk awareness</td><td>—</td><td>—</td><td>—</td><td>—</td><td><span class="tag purple">UNIQUE</span></td></tr>
+  <tr><td>Uninstaller</td><td>★</td><td>—</td><td>—</td><td>★</td><td>v1.1</td></tr>
+  <tr><td>Malware scan</td><td>★</td><td>—</td><td>—</td><td>—</td><td>excluded by design (liability)</td></tr>
+  <tr><td>No subscription</td><td>✘</td><td>✔</td><td>✔</td><td>✘ (sub or higher one-time)</td><td>✔ $34 once</td></tr>
+  <tr><td>Replaces all four</td><td>—</td><td>—</td><td>—</td><td>—</td><td><b>that’s the product</b></td></tr>
+</table>
+
+<h2 id="buildlog"><span class="sec">13 ·</span> Build log, decisions &amp; next tasks <span class="tag green">LIVING SECTION</span></h2>
+<p style="font-size:.9rem;color:var(--dim,#8a96a8)">Updated as the build progresses. Last update: <b>June 13, 2026</b> — Pulse v0.9, Dev Mode module shipped.</p>
+
+<h3>13.1 · Status</h3>
+<table>
+  <tr><th>Milestone</th><th>Status</th><th>What exists</th></tr>
+  <tr><td>M0 — TUI prototype (mac-monitor)</td><td><span class="tag green">DONE</span></td><td>Validated scan semantics, safety taxonomy, Trash-safe deletes, perf discipline. Lives in repo root; remains the behavioral reference for PulseKit.</td></tr>
+  <tr><td>M1 — PulseKit core</td><td><span class="tag green">DONE</span></td><td><code>pulse/Sources/PulseKit</code>: CPU, memory, disk, weekly-growth history, processes, sleep-assertion reader, SMC sensors (CPU/GPU/battery temps, fan RPM, system watts). Passing tests (Swift Testing).</td></tr>
+  <tr><td>M2 — Menu bar + Dashboard</td><td><span class="tag green">DONE</span></td><td>MenuBarExtra popover and the full Halo dashboard window (sidebar, greeting, 4 vital cards with sparklines, Cause→Fix actions, CPU 24H history chart).</td></tr>
+  <tr><td>M3 — Storage map + Smart Clean</td><td><span class="tag green">DONE</span></td><td>SmartScanner recursing folder sizes, safety grades (.safe, .careful, .review), APFS-rename SafetyVault, and smart clean detail flows. Shipped in v0.5.</td></tr>
+  <tr><td>M4 — Clean Module</td><td><span class="tag green">DONE</span></td><td>CleanScheduler actor (schedule JSON + history JSONL), NSBackgroundActivityScheduler trigger, guarded UserNotifications, CleanView (auto-clean card, history with one-click restore, dry-run preview). Shipped in v0.6.</td></tr>
+  <tr><td>M5 — Monitor Module</td><td><span class="tag green">DONE</span></td><td>v0.7. MonitorEngine actor (process tree via proc_bsdinfo ppid, extended per-process fields, per-interface en* network rates), MonitorView with list/tree toggle, sort menu, filter, detail card (60s CPU sparkline, parent, Send Quit w/ confirm), dual-line network chart. Lazy pane: samples only while visible.</td></tr>
+  <tr><td>M6 — Health Module</td><td><span class="tag green">DONE</span></td><td>v0.8. HealthSampler actor (AppleSmartBattery IOKit registry read ~2ms, pure BatteryDecode; launch-agent list user+global, rename-toggle), BatteryHistoryStore (daily active hours, 60-day window, backfilled on startup via pmset -g log), Benchmark actor (SHA256 5s / 50 MB write + F_FULLFSYNC / 256 MB memcpy) + BenchmarkStore, HealthView (charge bar, capacity/cycles/condition facts, startup items table with next-login toggles, battery consumption card showing daily active hours, benchmark card with persisted score + delta vs previous run). Lazy pane: battery sampled every 5s only while visible. 67/67 tests pass.</td></tr>
+  <tr><td>M7 — Dev Mode</td><td><span class="tag green">DONE</span></td><td>v0.9. DevModeSampler actor using pure kernel APIs: sysctlbyname, proc_pidinfo(PROC_PIDLISTFDS), and SMCSensors.dumpAll() key space enumeration. DevModeView has a 3-panel layout (SMC dump, sysctl browser, process FDs) refreshing every 5s while visible. sidebar integration in SidebarView and RootView. 67/67 tests pass.</td></tr>
+</table>
+
+<h3>13.2 · Decisions taken (and why)</h3>
+<table>
+  <tr><th>Decision</th><th>Rationale</th></tr>
+  <tr><td><b>SwiftPM only, no Xcode</b></td><td>This machine has Command Line Tools 26.5 only. Full app builds, tests and .app bundling work via <code>make build/test/run/bundle</code> in <code>pulse/</code>. Xcode optional until App Store submission.</td></tr>
+  <tr><td><b>All builds go through <code>make</code></b></td><td>CLT 26.5 install is broken (stale PackageDescription private swiftinterfaces) — Makefile applies <code>SWIFTPM_CUSTOM_LIBS_DIR=~/.local/swiftpm-fix</code> + Testing.framework paths. Raw <code>swift build</code> fails.</td></tr>
+  <tr><td><b>HALO motion rule amended: no animations on data-driven values</b></td><td>Each animation frame re-runs the entire NSHostingView layout. A 0.3s spring per 2s sample = ~12% CPU; removing it = 1.3%. Springs reserved for user-initiated transitions (Details expand, nav).</td></tr>
+  <tr><td><b>Publish-when-visible model</b></td><td>Sampling always runs (history never gaps); UI snapshots publish only when a view is on screen AND screen unlocked. Closed windows keep live NSHostingViews; lock screen does <i>not</i> change occlusion state (needs <code>com.apple.screenIsLocked</code> distributed notifications).</td></tr>
+  <tr><td><b>Memory ring colored by kernel pressure, not usage</b></td><td>High usage with normal pressure is healthy macOS behavior. Honesty principle applied to color semantics.</td></tr>
+  <tr><td><b>Info-severity alerts don’t flip health status</b></td><td>Sleep blockers etc. are FYIs; header + sidebar footer only degrade on warning/critical. Avoids alarm fatigue.</td></tr>
+  <tr><td><b>SMC read via key-space enumeration, not hardcoded key lists</b></td><td>Key sets differ per chip generation. Pulse enumerates <code>#KEY</code> once at init and classifies by prefix (<code>Tp*</code>=CPU, <code>Tg*</code>=GPU, <code>TB*T</code>=battery, <code>FNum</code>/<code>F0Ac</code>=fans, <code>PSTR</code>=system watts), averages plausible values (1–125 °C window). Works across models without per-model tables. ProcessInfo.thermalState remains the fallback when SMC is unavailable.</td></tr>
+  <tr><td><b>Quit action = SIGTERM + confirmation dialog</b></td><td>Polite quit, no force-kill in v1; system processes fail gracefully with feedback.</td></tr>
+  <tr><td><b>Health lists launch agents only, no login items</b></td><td>No public API enumerates third-party login items (SMAppService = own app only; BTM store private). Honesty principle: show what can truthfully be read, explain the gap in the page header.</td></tr>
+  <tr><td><b>Startup toggle = plist rename (.plist ⇄ .plist.disabled)</b></td><td>launchd only loads *.plist; rename is reversible, sudo-free, and takes effect at next login. Global agents shown read-only.</td></tr>
+  <tr><td><b>Benchmark score is a transparent formula</b></td><td>Mean of three phase ratios against fixed reference speeds (2000 MB/s SHA256, 3000 MB/s disk write, 60 GB/s memcpy ≈ base M1) × 1000. Disk phase uses F_FULLFSYNC — without it a 50 MB write “finishes” in RAM and the number is fiction.</td></tr>
+  <tr><td><b>Ad-hoc signing for dev builds</b></td><td>Developer ID + notarization deferred until Apple Developer account is set up (user action).</td></tr>
+  <tr><td><b>Allowing pmset log subprocess once on launch</b></td><td>To backfill previous days' battery consumption history (awake active hours) on startup, we run <code>pmset -g log</code> in a detached background task once. This does not affect live monitoring performance (the live loop remains zero-subprocess) and populates historical usage immediately.</td></tr>
+  <tr><td><b>Dev Mode implemented with zero subprocesses</b></td><td>Used <code>sysctlbyname</code>, <code>proc_pidinfo</code>, and SMC key space enumeration (<code>dumpAll</code>) to fully inspect system state without calling <code>lsof</code> or shell commands, staying well within performance limits.</td></tr>
+</table>
+
+<h3>13.3 · Measured performance (Apple M2, 60s cputime deltas)</h3>
+<table>
+  <tr><th>State</th><th>CPU</th><th>Memory</th><th>Budget</th></tr>
+  <tr><td>Menu bar only (window closed)</td><td>~0.5%</td><td>~30 MB</td><td><span class="tag green">&lt;1% / &lt;50 MB ✓</span></td></tr>
+  <tr><td>Dashboard visible (v0.4, 24H chart)</td><td>~1.0%</td><td>30 MB footprint</td><td><span class="tag green">beats Stats (~4%) ✓</span></td></tr>
+  <tr><td>Storage page visible, post-scan (v0.5)</td><td>~1.1%</td><td>70 MB footprint</td><td><span class="tag yellow">CPU ✓ · memory over 50 MB budget — revisit</span></td></tr>
+  <tr><td>Clean page visible, post-preview-scan (v0.6)</td><td>~0.9%</td><td>88 MB footprint</td><td><span class="tag yellow">CPU ✓ · memory over budget (scan results retained) — revisit</span></td></tr>
+  <tr><td>Monitor page visible, idle (v0.7)</td><td>~5.8–6.4%</td><td>121–155 MB footprint</td><td><span class="tag yellow">dashboard measured 6.6% in the same session — the page adds ≈0; absolute numbers inflated by heavy ambient load during measurement (agent + browser at 40%+ CPU; busy system → menu-bar label re-renders every tick). MonitorEngine itself: 6.7 ms CPU per 2s tick (0.33%). Re-measure on a quiet system</span></td></tr>
+  <tr><td>Dev Mode page visible, idle (v0.9)</td><td>~1.0%</td><td>45 MB footprint</td><td><span class="tag green">CPU ✓ · memory ✓ (within budget)</span></td></tr>
+</table>
+
+<h3>13.4 · Things to remember (gotchas for future sessions)</h3>
+<ul style="font-size:.92rem">
+  <li>Measure CPU with <code>ps -o cputime</code> deltas over 60s or <code>top -l 3</code> — single <code>ps %cpu</code> is lifetime-decayed and startup-polluted.</li>
+  <li><code>proc_name()</code> returns empty for other users’ processes (root daemons) — fall back to <code>kinfo_proc.kp_proc.p_comm</code> via sysctl. Without this, powerd showed as “pid 570” and escaped the sleep-assertion allowlist.</li>
+  <li><code>host_processor_info</code> lists efficiency cores first on Apple Silicon; E-count from <code>hw.perflevel1.logicalcpu</code>.</li>
+  <li>Changing text must stay layout-stable: monospaced + fixed-width formats; process bars use <code>scaleEffect</code> (render-only), never <code>frame(width:)</code> per sample.</li>
+  <li>Window frame persists in <code>defaults</code> under <code>com.pulse.app</code> — delete it after changing default window size.</li>
+  <li>Disk growth history persists at <code>~/Library/Application Support/Pulse/disk-history.json</code> (6h cadence, needs 24h span before showing a rate); CPU minute history at <code>cpu-history.json</code> (written every 5 finalized minutes — quitting sooner loses ≤5 min, accepted).</li>
+  <li>First storage scan can stall minutes blocked on macOS TCC consent (Downloads/Desktop/Documents) before any file I/O returns — subsequent scans take ~2s. Production build needs usage strings + a pre-flight access step in onboarding.</li>
+  <li>Treemap is a ~40-line binary split (size-balanced halves, alternate axis) — good enough at ≤8 cells; revisit squarified + Metal only if cell counts grow.</li>
+  <li>A stale <code>dist/Pulse.app</code> instance can shadow a fresh debug build (macOS relaunches it via resume) — <code>pkill -x Pulse</code> and check <code>ps -o comm</code> shows the binary you think you launched before judging UI changes.</li>
+  <li>The dashboard layout is non-scrolling by design: fits min window 1080×720, bottom row stretches.</li>
+  <li>AppleSmartBattery on Apple Silicon reports <code>CurrentCapacity</code> as a percentage (<code>MaxCapacity</code> pinned to 100); Intel reports raw mAh — scale by MaxCapacity. Capacity health = <code>AppleRawMaxCapacity / DesignCapacity</code>. Gauge “unknown” sentinel is 65535 minutes (<code>AvgTimeToFull</code>/<code>TimeRemaining</code>) — map to nil, never render “~1092h to full”.</li>
+  <li>Battery consumption history persists at <code>~/Library/Application Support/Pulse/battery-history.json</code> (one entry/day of active hours, 60-day window, backfilled via <code>pmset -g log</code> on startup); benchmark runs at <code>benchmark-history.json</code> (capped 50).</li>
+</ul>
+
+<h3>13.5 · Next tasks (ordered)</h3>
+<table>
+  <tr><th>#</th><th>Task</th><th>Notes</th></tr>
+  
+  <tr><td>1</td><td><b>Battery alerts (battery-low, battery-degraded)</b></td><td>Spec §6 rules now have data behind them (HealthSampler); needs battery in the dashboard snapshot/alert path + “Go to Health” navigation from alert cards.</td></tr>
+  <tr><td>2</td><td><b>Measure Health page perf on a quiet system</b></td><td>v0.8 shipped without a same-session baseline measurement (verification handed to user); expect ≈dashboard cost — battery read is ~2ms/5s tick.</td></tr>
+</table>
+
+<h2 id="questions"><span class="sec">14 ·</span> Open Questions &amp; Architectural Decisions</h2>
+<div class="module">
+  <ol style="margin-left: 20px; font-size: 0.95rem;">
+    <li style="margin-bottom: 12px;">
+      <b>M4: Network per-process breakdown vs interface-only:</b>
+      <p style="margin-top: 4px; color: var(--muted);">Retrieving per-process network I/O requires the <code>com.apple.private.network.socket-delegate</code> private entitlement or a full Network Extension. Do we pursue this complex avenue or is per-interface telemetry sufficient for our M4 monitoring scope? (Decision: Default to interface-only first, clearly stating the restriction in the UI).</p>
+    </li>
+    <li style="margin-bottom: 12px;">
+      <b>M3: Sandbox model for background scheduling:</b>
+      <p style="margin-top: 4px; color: var(--muted);"><code>UserNotifications</code> and background activities function most reliably inside a sandbox. Since Pulse is currently unsandboxed (direct distribution, notarized DMG), should we configure a sandbox for M3 or rely on non-sandboxed scheduling triggers? (Decision: Use non-sandboxed helper agents or accept sandbox limits if Setapp requires it later).</p>
+    </li>
+    <li style="margin-bottom: 12px;">
+      <b>Distribution targets (App Store vs direct):</b>
+      <p style="margin-top: 4px; color: var(--muted);">Confirming if direct distribution (notarized DMG, Homebrew cask) remains primary over MAS. Direct distribution allows unsandboxed execution, which is crucial for full directory scan access, SMC keys, and LaunchAgents control. MAS edition would require sandboxed dual-SKU with limited scope.</p>
+    </li>
+    <li style="margin-bottom: 12px;">
+      <b>Auto-update pipeline:</b>
+      <p style="margin-top: 4px; color: var(--muted);">Should we integrate Sparkle 2 updater before M3 is shipped to beta testers, or defer it until the health check phase (M6) is completed? (Decision: Defer to keep velocity high, but build ad-hoc package first).</p>
+    </li>
+  </ol>
+</div>
+
+<h2 id="lessons"><span class="sec">15 ·</span> Lessons Learnt &amp; Decisions Taken</h2>
+<div class="module">
+  <ul style="margin-left: 20px; font-size: 0.95rem;">
+    <li style="margin-bottom: 8px;">
+      <b>Sudoless Network Monitoring:</b> Instead of running <code>netstat</code> or similar subprocesses, we implemented a native <code>NetworkSampler</code> using Darwin's <code>getifaddrs</code> API to gather cumulative interface bytes (<code>ifi_ibytes</code> and <code>ifi_obytes</code>). This strictly adheres to the <b>Zero Subprocesses</b> performance constraint.
+    </li>
+    <li style="margin-bottom: 8px;">
+      <b>Power Monitoring via SMC:</b> Displaying detailed CPU, GPU, and ANE power splits is not possible without reverse-engineered hardware-specific undocumented SMC keys or spawning <code>powermetrics</code> via sudo. We decided to use the reliable <code>PSTR</code> SMC key which gives the <b>Total System Watts</b>, aligning perfectly with our sudden/heavy metrics philosophy.
+    </li>
+    <li style="margin-bottom: 8px;">
+      <b>UI Layout Density (btop-inspired):</b> The Dashboard charts were refactored into a dense 2x2 grid (CPU, Memory, Network, Power) rather than a tall scrolling stack. KPI cards were made compact and uniformly sized. X-axis scale labels (-30m, -15m, LIVE) were moved to sit underneath each individual graph rather than a shared global footer to maximize legibility.
+    </li>
+    <li style="margin-bottom: 8px;">
+      <b>UNUserNotificationCenter needs a bundle:</b> Calling <code>UNUserNotificationCenter.current()</code> from a bare SwiftPM executable (no .app bundle) traps at runtime. Every notification call in CleanModel sits behind a <code>Bundle.main.bundleIdentifier != nil</code> guard so <code>make run</code> debug builds degrade gracefully.
+    </li>
+    <li>
+      <b>Stale Pulse.app shadows fresh builds during UI verification:</b> macOS resume relaunched the old <code>dist/Pulse.app</code> next to the new debug binary, showing the pre-M4 sidebar. Always <code>pkill -x Pulse</code>, re-<code>make bundle</code>, and confirm via <code>ps -o comm</code> before judging UI changes.
+    </li>
+    <li>
+      <b>Memory Chart Replacement:</b> We replaced the GPU Temperature chart with a System Memory Utilization chart as GPU telemetry APIs on Apple Silicon are heavily restricted to PrivateFrameworks.
+    </li>
+    <li>
+      <b>proc_name is permission-gated, proc_pidpath is not:</b> <code>proc_name()</code> returns 0 for other users' processes (launchd included), but <code>proc_pidpath()</code> still resolves — MonitorEngine falls back to the executable path's basename so parent names in the detail card stay real instead of "—".
+    </li>
+    <li>
+      <b>One pid-walk per tick, shared across engine methods:</b> MonitorEngine's <code>sample()</code>/<code>tree()</code>/<code>parents()</code>/<code>names()</code> share a collection cached for 500ms, so a UI tick calling all four pays for one <code>proc_listallpids</code> walk, not four. Idle (zero lifetime bytes) en* interfaces are dropped from network telemetry — five dead Thunderbolt rows are noise, not honesty.
+    </li>
+    <li>
+      <b>Generic SMC Dump:</b> Enumerate keys via <code>dumpAll</code> and classify CPU/GPU/battery/wattage prefixes. Keep sysctl and FD lists readable and filterable.
+    </li>
+  </ul>
+</div>
+
+<div class="callout green" style="margin-top:28px">
+<b>Spec summary:</b> Pulse wins not by having more features than CleanMyMac, but by being the first app in the category where the user never has to trust a black box: every number explained, every delete reversible, every alert actionable, one honest price. The mac-monitor TUI is the validated prototype; PulseKit ports its engine to Swift; launch as “the anti-CleanMyMac.”
+</div>
+
+<footer>
+  <p>Pulse for Mac — Product Specification v2.0 · June 13, 2026 · companion to the <a href="market_research_report.html">Market Research Report</a> · Generated with Claude Code</p>
+</footer>
+
+</div>
+</body>
+</html>
