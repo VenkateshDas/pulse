@@ -21,8 +21,9 @@ let package = Package(
         // UI-independent system data collection core.
         .target(name: "PulseKit", dependencies: ["CPulse"]),
         // SwiftUI app: menu bar extra + dashboard window.
-        // To enable Sparkle: add .product(name: "Sparkle", package: "Sparkle").
-        .executableTarget(name: "Pulse", dependencies: ["PulseKit"]),
+        .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [
+            .process("Resources")
+        ]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
     ]
 )

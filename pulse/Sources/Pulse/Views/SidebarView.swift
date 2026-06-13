@@ -62,18 +62,26 @@ struct SidebarView: View {
 
     private var logo: some View {
         HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(
-                        LinearGradient(
-                            colors: [Halo.ion.opacity(0.9), Halo.volt],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
-                    )
+            if let image = Bundle.module.image(forResource: "Logo") ?? NSImage(named: "Logo") {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
                     .frame(width: 34, height: 34)
-                Image(systemName: "waveform.path.ecg")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Halo.void)
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(
+                            LinearGradient(
+                                colors: [Halo.ion.opacity(0.9), Halo.volt],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 34, height: 34)
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Halo.void)
+                }
             }
             Text("PULSE")
                 .font(.system(size: 17, weight: .bold, design: .monospaced))

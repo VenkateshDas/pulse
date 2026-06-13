@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="pulse/Sources/Pulse/Resources/Logo.png" width="120" alt="Pulse logo" />
+
 # Pulse
 
 **Native macOS system monitor — CPU, memory, disk, network & battery in one menu bar app.**
