@@ -17,7 +17,7 @@ SWIFT := SWIFTPM_CUSTOM_LIBS_DIR=$(FIX_DIR) swift
 TEST_FLAGS := -Xswiftc -F$(FW) -Xlinker -F$(FW) \
 	-Xlinker -rpath -Xlinker $(FW) -Xlinker -rpath -Xlinker $(TESTLIB)
 
-.PHONY: build test run release bundle sign notarize clean fix-toolchain
+.PHONY: build test run release bundle sign notarize dmg beta-release clean fix-toolchain
 
 build: fix-toolchain
 	$(SWIFT) build
@@ -49,6 +49,20 @@ notarize:
 	xcrun notarytool submit dist/Pulse.zip --keychain-profile "$(NOTARY_PROFILE)" --wait
 	xcrun stapler staple dist/Pulse.app
 	@echo "Notarized + stapled: dist/Pulse.app"
+
+# Create a distributable DMG. Optional: VERSION=x.y.z make dmg
+dmg: bundle
+	scripts/dmg.sh $(VERSION)
+
+# Tag + push a GitHub pre-release with the DMG attached.
+# Usage: VERSION=0.1.0-beta.1 make beta-release
+beta-release: dmg
+	@test -n "$(VERSION)" || { echo "set VERSION=x.y.z-beta.N"; exit 1; }
+	gh release create "v$(VERSION)" \
+		--title "Pulse v$(VERSION)" \
+		--notes-file scripts/beta-release-notes.md \
+		--prerelease \
+		dist/Pulse-$(VERSION).dmg
 
 clean:
 	swift package clean 2>/dev/null || rm -rf .build
