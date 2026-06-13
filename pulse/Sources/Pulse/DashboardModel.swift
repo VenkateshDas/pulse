@@ -2,6 +2,47 @@ import Darwin
 import Foundation
 import Observation
 import PulseKit
+import UserNotifications
+
+/// Configurable menu-bar label metrics. Order here is display order.
+enum MenuBarMetric: String, CaseIterable, Identifiable {
+    case cpu, memory, diskFree, temperature, battery
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .cpu: "CPU"
+        case .memory: "Memory"
+        case .diskFree: "Disk free"
+        case .temperature: "Temperature"
+        case .battery: "Battery"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .cpu: "cpu"
+        case .memory: "memorychip"
+        case .diskFree: "internaldrive"
+        case .temperature: "thermometer.medium"
+        case .battery: "battery.100"
+        }
+    }
+
+    private static let key = "PulseMenuBarMetrics"
+
+    static func loadVisible() -> Set<MenuBarMetric> {
+        guard let raw = UserDefaults.standard.array(forKey: key) as? [String] else {
+            return [.cpu]  // default: CPU only, matching prior behavior
+        }
+        let metrics = raw.compactMap(MenuBarMetric.init(rawValue:))
+        return metrics.isEmpty ? [.cpu] : Set(metrics)
+    }
+
+    static func saveVisible(_ metrics: Set<MenuBarMetric>) {
+        UserDefaults.standard.set(metrics.map(\.rawValue), forKey: key)
+    }
+}
 
 /// Owns the sampling loop and publishes the latest snapshot to the UI.
 /// One loop for the whole app (menu bar + dashboard share it) — sampling
@@ -27,6 +68,16 @@ final class DashboardModel {
     /// item only re-renders when the displayed integer actually changes —
     /// re-rendering it every sample costs measurable CPU.
     private(set) var menuBarCPUPercent: Int = 0
+    /// Companion gated integers for the other configurable menu-bar metrics.
+    /// Each updates only when its displayed value changes (no jitter).
+    private(set) var menuBarMemPercent: Int = 0
+    private(set) var menuBarDiskFreeGB: Int = 0
+    private(set) var menuBarTempC: Int = 0
+    private(set) var menuBarBatteryPercent: Int = 0
+    /// Which metrics the menu-bar label shows, in display order. Persisted.
+    var menuBarMetrics: Set<MenuBarMetric> = MenuBarMetric.loadVisible() {
+        didSet { MenuBarMetric.saveVisible(menuBarMetrics) }
+    }
     /// Feedback from the last alert action ("Sent Quit to Chrome Helper").
     var actionFeedback: String?
 
@@ -58,6 +109,21 @@ final class DashboardModel {
     @ObservationIgnored private var latestAlerts: [PulseAlert] = []
     @ObservationIgnored private let batteryHistory = BatteryHistoryStore()
     @ObservationIgnored private var lastIngestUptime: TimeInterval?
+    /// Per-alert-id last fire time — enforces the 30-min notification cooldown
+    /// so a sustained condition notifies once, not every 2s.
+    @ObservationIgnored private var lastNotified: [String: Date] = [:]
+    @ObservationIgnored private static let notificationCooldown: TimeInterval = 30 * 60
+    /// Alert ids the user dismissed — hidden and not re-notified until the
+    /// condition clears and recurs. Persisted across launches.
+    @ObservationIgnored private var dismissedAlerts: Set<String> =
+        Set(UserDefaults.standard.stringArray(forKey: "PulseDismissedAlerts") ?? [])
+
+    /// Hides an alert card and silences its notifications until it recurs.
+    func dismissAlert(id: String) {
+        dismissedAlerts.insert(id)
+        UserDefaults.standard.set(Array(dismissedAlerts), forKey: "PulseDismissedAlerts")
+        alerts = latestAlerts.filter { !dismissedAlerts.contains($0.id) }
+    }
 
     func viewAppeared() {
         visibleViews += 1
@@ -71,6 +137,7 @@ final class DashboardModel {
     func start() {
         guard loop == nil else { return }
         observeScreenLock()
+        requestNotificationAuthorization()
         
         // Trigger background backfill on launch
         Task { [weak self] in
@@ -105,6 +172,15 @@ final class DashboardModel {
     private func ingest(_ snapshot: SystemSnapshot) {
         latest = snapshot
         latestAlerts = AlertsEngine.evaluate(snapshot, ownPID: getpid())
+        // A dismissed alert resets once its condition clears, so a fresh
+        // occurrence shows (and notifies) again.
+        let activeIDs = Set(latestAlerts.map(\.id))
+        let cleared = dismissedAlerts.subtracting(activeIDs)
+        if !cleared.isEmpty {
+            dismissedAlerts.subtract(cleared)
+            UserDefaults.standard.set(Array(dismissedAlerts), forKey: "PulseDismissedAlerts")
+        }
+        fireCriticalNotifications(latestAlerts)
 
         append(snapshot.cpuTotalPercent, to: &cpuBuffer)
         cpuDayStore.record(snapshot.cpuTotalPercent, at: snapshot.timestamp)
@@ -124,14 +200,16 @@ final class DashboardModel {
             append(watts, to: &powerBuffer)
         }
 
-        if let battery = snapshot.battery, !battery.isOnAC {
-            if let lastUptime = lastIngestUptime {
+        if let battery = snapshot.battery {
+            if !battery.isOnAC, let lastUptime = lastIngestUptime {
                 let duration = snapshot.uptime - lastUptime
                 // Filter out sleep gaps (>10s between 2s samples)
                 if duration > 0 && duration < 10 {
                     batteryHistory.addTimeOnBattery(duration, at: snapshot.timestamp)
                 }
             }
+            // One capacity reading per day feeds the 60-day degradation chart.
+            batteryHistory.recordCapacity(battery.capacityPercent, at: snapshot.timestamp)
         }
         lastIngestUptime = snapshot.uptime
 
@@ -139,8 +217,47 @@ final class DashboardModel {
         if rounded != menuBarCPUPercent {
             menuBarCPUPercent = rounded
         }
+        let mem = Int((snapshot.memoryUsedFraction * 100).rounded())
+        if mem != menuBarMemPercent { menuBarMemPercent = mem }
+        let diskGB = Int(snapshot.diskFreeBytes / 1_000_000_000)
+        if diskGB != menuBarDiskFreeGB { menuBarDiskFreeGB = diskGB }
+        let temp = Int(([snapshot.sensors.cpuTempC, snapshot.sensors.gpuTempC]
+            .compactMap { $0 }.max() ?? 0).rounded())
+        if temp != menuBarTempC { menuBarTempC = temp }
+        let batt = snapshot.battery?.currentChargePercent ?? 0
+        if batt != menuBarBatteryPercent { menuBarBatteryPercent = batt }
         if visibleViews > 0 && !screenLocked {
             publishLatest()
+        }
+    }
+
+    /// UNUserNotificationCenter traps when the process has no bundle (bare
+    /// SwiftPM `make run`) — every call stays behind this guard.
+    private var notificationsAvailable: Bool { Bundle.main.bundleIdentifier != nil }
+
+    private func requestNotificationAuthorization() {
+        guard notificationsAvailable else { return }
+        UNUserNotificationCenter.current()
+            .requestAuthorization(options: [.alert, .badge]) { _, _ in }
+    }
+
+    /// Posts a system notification for each critical alert, rate-limited to
+    /// once per 30 min per alert id so a sustained condition doesn't spam.
+    private func fireCriticalNotifications(_ alerts: [PulseAlert]) {
+        guard notificationsAvailable else { return }
+        let now = Date.now
+        for alert in alerts where alert.severity == .critical && !dismissedAlerts.contains(alert.id) {
+            if let last = lastNotified[alert.id], now.timeIntervalSince(last) < Self.notificationCooldown {
+                continue
+            }
+            lastNotified[alert.id] = now
+            let content = UNMutableNotificationContent()
+            content.title = alert.title
+            content.body = alert.subtitle
+            content.sound = .default
+            UNUserNotificationCenter.current().add(
+                UNNotificationRequest(
+                    identifier: "alert-\(alert.id)", content: content, trigger: nil))
         }
     }
 
@@ -164,7 +281,7 @@ final class DashboardModel {
 
     private func publishLatest() {
         snapshot = latest
-        alerts = latestAlerts
+        alerts = latestAlerts.filter { !dismissedAlerts.contains($0.id) }
         cpuHistory = cpuBuffer
         cpuDayHistory = cpuDayStore.series()
         memoryHistory = memoryBuffer

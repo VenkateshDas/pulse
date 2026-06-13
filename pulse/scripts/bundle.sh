@@ -30,11 +30,34 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSSupportsAutomaticTermination</key><false/>
+    <!-- Menu-bar-primary app: no dock icon (mirrors .accessory policy). -->
+    <key>LSUIElement</key><true/>
+    <!-- TCC pre-flight: shown when Pulse first reads these locations. -->
+    <key>NSDesktopFolderUsageDescription</key><string>Pulse scans your Desktop to map large files and find safe-to-clean space.</string>
+    <key>NSDocumentsFolderUsageDescription</key><string>Pulse scans Documents to map large files and find safe-to-clean space.</string>
+    <key>NSDownloadsFolderUsageDescription</key><string>Pulse scans Downloads to map large files and find safe-to-clean space.</string>
+    <!-- Sparkle auto-update (P0-8): set the appcast URL + public EdDSA key when
+         the Sparkle dependency is enabled in Package.swift. -->
+    <key>SUFeedURL</key><string>https://pulse.app/appcast.xml</string>
+    <key>SUEnableAutomaticChecks</key><true/>
 </dict>
 </plist>
 PLIST
 
-# Ad-hoc signature so Gatekeeper allows local launches.
-codesign --force --sign - "$APP"
+# Signing. Set SIGN_IDENTITY to a Developer ID Application identity for a
+# distributable, notarizable build (hardened runtime); otherwise ad-hoc sign
+# for local launches only (Gatekeeper blocks ad-hoc apps on other machines).
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+    codesign --force --options runtime --timestamp \
+        --sign "$SIGN_IDENTITY" "$APP"
+    echo "Signed with Developer ID: $SIGN_IDENTITY"
+    echo "To notarize:"
+    echo "  ditto -c -k --keepParent \"$APP\" Pulse.zip"
+    echo "  xcrun notarytool submit Pulse.zip --keychain-profile <profile> --wait"
+    echo "  xcrun stapler staple \"$APP\""
+else
+    codesign --force --sign - "$APP"
+    echo "Ad-hoc signed (local launches only — set SIGN_IDENTITY for distribution)."
+fi
 
 echo "Built: $APP"

@@ -1,13 +1,18 @@
 # Graph Report - pulse  (2026-06-13)
 
 ## Corpus Check
-- 79 files · ~314,710 words
+- 74 files · ~43,148 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 918 nodes · 1818 edges · 56 communities (53 shown, 3 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 63 edges (avg confidence: 0.8)
+- 1048 nodes · 2067 edges · 59 communities (55 shown, 4 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 59 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `6fb8e902`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - [[_COMMUNITY_Community 0|Community 0]]
@@ -64,55 +69,56 @@
 - [[_COMMUNITY_Community 53|Community 53]]
 - [[_COMMUNITY_Community 54|Community 54]]
 - [[_COMMUNITY_Community 55|Community 55]]
+- [[_COMMUNITY_Community 56|Community 56]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `View` - 62 edges
-2. `SmartScanner` - 29 edges
-3. `CleanModel` - 27 edges
-4. `CleanScheduler` - 22 edges
-5. `DashboardModel` - 21 edges
-6. `MonitorModel` - 21 edges
-7. `HealthModel` - 18 edges
-8. `StorageModel` - 18 edges
-9. `SafetyVault` - 18 edges
+1. `View` - 52 edges
+2. `StorageModel` - 42 edges
+3. `CleanModel` - 29 edges
+4. `SmartScanner` - 29 edges
+5. `DashboardModel` - 28 edges
+6. `MonitorModel` - 22 edges
+7. `CleanScheduler` - 22 edges
+8. `SafetyVault` - 22 edges
+9. `HealthModel` - 19 edges
 10. `makeSnapshot()` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `writeFile()` --calls--> `Data`  [INFERRED]
-  Tests/PulseKitTests/CleanTests.swift → .build/arm64-apple-macosx/debug/PulsePackageTests.derived/runner.swift
-- `writeFile()` --calls--> `Data`  [INFERRED]
-  Tests/PulseKitTests/StorageTests.swift → .build/arm64-apple-macosx/debug/PulsePackageTests.derived/runner.swift
+- `AlertCard` --references--> `View`  [EXTRACTED]
+  Sources/Pulse/Views/AlertsSection.swift → Sources/Pulse/PulseApp.swift
 - `AlertsSection` --references--> `View`  [EXTRACTED]
   Sources/Pulse/Views/AlertsSection.swift → Sources/Pulse/PulseApp.swift
-- `CleanView` --references--> `View`  [EXTRACTED]
+- `AutoCleanCard` --references--> `View`  [EXTRACTED]
   Sources/Pulse/Views/CleanView.swift → Sources/Pulse/PulseApp.swift
-- `MonitorView` --references--> `View`  [EXTRACTED]
-  Sources/Pulse/Views/MonitorView.swift → Sources/Pulse/PulseApp.swift
+- `CleanHistoryCard` --references--> `View`  [EXTRACTED]
+  Sources/Pulse/Views/CleanView.swift → Sources/Pulse/PulseApp.swift
+- `CleanPreviewCard` --references--> `View`  [EXTRACTED]
+  Sources/Pulse/Views/CleanView.swift → Sources/Pulse/PulseApp.swift
 
 ## Import Cycles
 - None detected.
 
-## Communities (56 total, 3 thin omitted)
+## Communities (59 total, 4 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.20
-Nodes (11): Bundle, Encodable, NSObject, SwiftPMXCTestObserver, TestBundleEventRecord, TestCaseEventRecord, TestSuiteEventRecord, TestEvent (+3 more)
+Cohesion: 0.13
+Nodes (18): AsyncStream, StorageNode, StorageScanner, Bool, CleanRecord, Color, Int, String (+10 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.18
-Nodes (17): CleanItem, FolderUsage, SafetyGrade, careful, review, safe, SmartScanner, StorageScan (+9 more)
+Cohesion: 0.15
+Nodes (25): Equatable, CleanItem, FolderUsage, SafetyGrade, careful, review, safe, SmartScanner (+17 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (17): SafetyVault, VaultItem, VaultSession, makeTempDir(), SafetyVaultTests, setModified(), SmartScannerTests, writeFile() (+9 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.07
-Nodes (18): PulseEngine, AlertsEngineTests, ByteFormatTests, EngineTests, makeSnapshot(), SMCDecodeTests, SMCSensorsLiveTests, SnapshotTests (+10 more)
+Cohesion: 0.05
+Nodes (27): Entry, MinuteHistoryStore, PulseEngine, AlertsEngineTests, ByteFormatTests, EngineTests, makeSnapshot(), MinuteHistoryTests (+19 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.15
-Nodes (14): CChar, io_connect_t, String, SensorReadings, SMCDecode, SMCSensors, PulseSMCKeyData, PulseSMCKeyInfo (+6 more)
+Nodes (14): io_connect_t, String, SensorReadings, SMCDecode, SMCSensors, PulseSMCKeyData, PulseSMCKeyInfo, CChar (+6 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.14
@@ -123,39 +129,39 @@ Cohesion: 0.43
 Nodes (4): LinearGradient, Double, ProcessSample, TopProcessesPanel
 
 ### Community 7 - "Community 7"
-Cohesion: 0.17
-Nodes (11): ScanState, done, idle, scanning, StorageModel, CleanItem, Set, String (+3 more)
+Cohesion: 0.09
+Nodes (20): Hashable, Hasher, FlatVaultItem, ScanState, done, idle, scanning, StorageModel (+12 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.19
-Nodes (9): Entry, MinuteHistoryStore, MinuteHistoryTests, Date, Double, Int, String, URL (+1 more)
+Cohesion: 0.18
+Nodes (11): CleanItem, Color, SafetyGrade, String, Color, SafetyGrade, String, SmartCleanCard (+3 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.15
-Nodes (11): CleanSchedule, NSBackgroundActivityScheduler, CleanModel, Bool, CleanItem, CleanRecord, Set, String (+3 more)
+Cohesion: 0.14
+Nodes (11): NSBackgroundActivityScheduler, CleanModel, Bool, CleanItem, CleanRecord, CleanSchedule, Set, String (+3 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.08
-Nodes (23): Calendar, CleanRecord, CleanSchedule, CleanScheduler, Frequency, daily, monthly, weekly (+15 more)
+Cohesion: 0.06
+Nodes (38): Calendar, CaseIterable, Codable, CodingKey, Decoder, CleanRecord, CleanSchedule, CleanScheduler (+30 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.20
-Nodes (11): Bool, CleanItem, Date, String, VaultSession, CleanFooter, CleanRow, SmartCleanPanel (+3 more)
+Cohesion: 0.17
+Nodes (11): Color, Int, SafetyGrade, StorageNode, String, TreemapCell, Void, StorageLens (+3 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.09
-Nodes (22): CaseIterable, Identifiable, MonitorEngine, NetworkSample, ProcessExtendedSample, ProcessNode, SortKey, cpu (+14 more)
+Cohesion: 0.10
+Nodes (21): Identifiable, MonitorEngine, NetworkSample, ProcessExtendedSample, ProcessNode, SortKey, cpu, memory (+13 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.27
-Nodes (5): URL, CInt, HANDLE, FileLock, T
+Cohesion: 0.26
+Nodes (8): TimelineSnapshot, TimelineStore, Date, Int64, String, TimeInterval, UInt64, URL
 
 ### Community 14 - "Community 14"
-Cohesion: 0.09
-Nodes (20): Color, Double, String, CGPoint, CGSize, Color, Double, Path (+12 more)
+Cohesion: 0.13
+Nodes (13): CGPoint, CGSize, Color, Double, Path, CGPoint, CGSize, Double (+5 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (13): ProcessNode, MonitorModel, Bool, Double, Duration, Int32, MonitorEngine, NetworkSample (+5 more)
 
 ### Community 16 - "Community 16"
@@ -167,8 +173,8 @@ Cohesion: 0.32
 Nodes (5): SleepAssertionReader, Int32, Set, SleepAssertion, String
 
 ### Community 18 - "Community 18"
-Cohesion: 0.25
-Nodes (7): CGRect, FolderUsage, SafetyGrade, Color, Double, gradeColor(), TreemapView
+Cohesion: 0.18
+Nodes (13): CGRect, Color, Double, Int, SafetyGrade, StorageNode, Void, StorageLens (+5 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.29
@@ -191,36 +197,36 @@ Cohesion: 0.53
 Nodes (3): SystemInfo, Int, String
 
 ### Community 24 - "Community 24"
-Cohesion: 0.20
-Nodes (11): Bool, Color, SidebarItem, clean, dashboard, devMode, health, monitor (+3 more)
+Cohesion: 0.18
+Nodes (12): Bool, Color, SidebarItem, clean, dashboard, diagnostics, health, monitor (+4 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.40
-Nodes (3): App, PulseApp, Scene
+Cohesion: 0.22
+Nodes (5): App, MenuBarMetric, PulseApp, Scene, String
 
 ### Community 26 - "Community 26"
 Cohesion: 0.40
 Nodes (3): ByteFormat, String, UInt64
 
 ### Community 27 - "Community 27"
-Cohesion: 0.40
-Nodes (3): Double, String, MenuBarContent
+Cohesion: 0.36
+Nodes (4): Double, String, SystemSnapshot, MenuBarContent
 
 ### Community 29 - "Community 29"
-Cohesion: 0.34
-Nodes (17): String, UInt64, Codable, CustomStringConvertible, TestAttachment, TestCaseFailureRecord, TestErrorInfo, TestLocation (+9 more)
+Cohesion: 0.22
+Nodes (6): TimelineModel, Date, Int64, StorageScan, UInt64, TimelineSnapshot
 
 ### Community 31 - "Community 31"
-Cohesion: 0.12
-Nodes (17): DisplayRow, Bool, Color, Int, Int32, MonitorEngine, NetworkSample, ProcessExtendedSample (+9 more)
+Cohesion: 0.09
+Nodes (25): DisplayRow, View, Bool, Color, Int, Int32, MonitorEngine, NetworkSample (+17 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.20
-Nodes (9): Binding, Bool, CleanRecord, Color, Date, String, AutoCleanCard, CleanHistoryCard (+1 more)
+Cohesion: 0.14
+Nodes (12): Binding, Bool, CleanItem, CleanRecord, CleanSchedule, Color, Date, String (+4 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.14
-Nodes (13): DashboardModel, BatteryHistoryStore, Double, Duration, Int, Int32, Never, PulseAlert (+5 more)
+Cohesion: 0.08
+Nodes (21): DashboardModel, MenuBarMetric, battery, cpu, diskFree, memory, temperature, BatteryHistoryStore (+13 more)
 
 ### Community 36 - "Community 36"
 Cohesion: 0.40
@@ -235,19 +241,19 @@ Cohesion: 0.19
 Nodes (8): DiskHistoryStore, Entry, DiskHistoryTests, Date, Int64, TimeInterval, UInt64, URL
 
 ### Community 39 - "Community 39"
-Cohesion: 0.12
-Nodes (19): Action, quitProcess, showDetails, AlertsEngine, PulseAlert, Severity, critical, info (+11 more)
+Cohesion: 0.07
+Nodes (27): AnyView, Content, Action, quitProcess, showDetails, AlertsEngine, PulseAlert, Severity (+19 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.10
-Nodes (27): Equatable, Error, BatteryDecode, BatteryHealth, HealthSampler, Kind, globalAgent, userAgent (+19 more)
+Cohesion: 0.12
+Nodes (19): Error, BatteryDecode, BatteryHealth, HealthSampler, Kind, globalAgent, userAgent, StartupItem (+11 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.15
-Nodes (12): Data, Benchmark, BenchmarkResult, BenchmarkStore, Config, Duration, BenchmarkTests, Date (+4 more)
+Nodes (11): Benchmark, BenchmarkResult, BenchmarkStore, Config, Duration, BenchmarkTests, Date, Double (+3 more)
 
 ### Community 42 - "Community 42"
-Cohesion: 0.15
+Cohesion: 0.16
 Nodes (10): HealthModel, BatteryHealth, BenchmarkResult, Bool, Duration, Never, StartupItem, String (+2 more)
 
 ### Community 43 - "Community 43"
@@ -255,68 +261,68 @@ Cohesion: 0.17
 Nodes (6): BatteryDecodeTests, BatteryHistoryStoreTests, Any, Bool, Int, String
 
 ### Community 44 - "Community 44"
-Cohesion: 0.30
-Nodes (9): backfillBatteryHistoryFromSystemLog(), BatteryHistoryStore, Entry, parseLogContent(), splitBatterySession(), Date, String, TimeInterval (+1 more)
+Cohesion: 0.26
+Nodes (11): backfillBatteryHistoryFromSystemLog(), BatteryHistoryStore, Entry, parseLogContent(), splitBatterySession(), Date, Int, String (+3 more)
 
 ### Community 45 - "Community 45"
 Cohesion: 0.24
 Nodes (7): BatteryHealth, BenchmarkResult, Color, Int, String, BatteryCard, BenchmarkCard
 
 ### Community 46 - "Community 46"
-Cohesion: 0.12
-Nodes (16): SidebarItem, View, CleanItem, BatteryHistoryStore, Date, StartupItem, Void, Timer (+8 more)
+Cohesion: 0.13
+Nodes (17): BatteryHistoryStore, Date, StartupItem, Void, String, VaultSession, StorageModel, View (+9 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.12
-Nodes (6): Swift, XCTAttachment, XCTSourceCodeContext, XCTSourceCodeFrame, XCTSourceCodeLocation, XCTSourceCodeSymbolInfo
+Cohesion: 0.31
+Nodes (6): Bool, SidebarItem, String, Void, Command, CommandPaletteView
 
 ### Community 48 - "Community 48"
 Cohesion: 0.26
 Nodes (7): DevModeSampler, ProcessFDSample, SysctlProperty, Int, Int32, Int64, String
 
 ### Community 49 - "Community 49"
-Cohesion: 0.25
-Nodes (8): assertionFailure, performanceRegression, system, thrownError, uncaughtException, unknown, unmatchedExpectedFailure, TestIssueType
+Cohesion: 0.38
+Nodes (4): Color, Double, String, DashboardView
 
 ### Community 50 - "Community 50"
-Cohesion: 0.52
-Nodes (6): TestEventRecord, TestBundleEventRecord, TestCaseEventRecord, TestCaseFailureRecord, TestSuiteEventRecord, TestSuiteFailureRecord
+Cohesion: 0.33
+Nodes (5): StorageNode, String, TreemapCell, Void, StorageDetailPanel
 
 ### Community 51 - "Community 51"
-Cohesion: 0.40
-Nodes (3): Int, XCTExpectedFailure, XCTIssue
+Cohesion: 0.38
+Nodes (4): Date, Int64, String, TimelineView
 
 ### Community 52 - "Community 52"
 Cohesion: 0.33
 Nodes (4): ProcessFDSample, DevModeModel, String, SysctlProperty
 
-### Community 53 - "Community 53"
+### Community 54 - "Community 54"
 Cohesion: 0.50
-Nodes (4): Bool, TestFailureKind, expected, unexpected
+Nodes (3): parsePMSetLog(), Date, TimeInterval
 
 ### Community 55 - "Community 55"
 Cohesion: 0.67
-Nodes (3): TestEvent, finish, start
+Nodes (3): purgeableBytes(), rawFreeBytes(), UInt64
 
 ## Knowledge Gaps
-- **179 isolated node(s):** `Encodable`, `HANDLE`, `CInt`, `T`, `start` (+174 more)
+- **218 isolated node(s):** `CleanItem`, `VaultSession`, `Set`, `UInt64`, `cpu` (+213 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `View` connect `Community 46` to `Community 32`, `Community 37`, `Community 6`, `Community 40`, `Community 11`, `Community 45`, `Community 14`, `Community 18`, `Community 21`, `Community 24`, `Community 25`, `Community 27`, `Community 31`?**
-  _High betweenness centrality (0.245) - this node is a cross-community bridge._
-- **Why does `VitalCard` connect `Community 40` to `Community 46`?**
-  _High betweenness centrality (0.105) - this node is a cross-community bridge._
-- **Why does `SidebarView` connect `Community 24` to `Community 1`, `Community 46`?**
-  _High betweenness centrality (0.080) - this node is a cross-community bridge._
-- **Are the 8 inferred relationships involving `SmartScanner` (e.g. with `.runScan()` and `.preview()`) actually correct?**
-  _`SmartScanner` has 8 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Encodable`, `HANDLE`, `CInt` to the rest of the system?**
-  _179 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `View` connect `Community 31` to `Community 32`, `Community 1`, `Community 37`, `Community 6`, `Community 11`, `Community 45`, `Community 46`, `Community 14`, `Community 49`, `Community 21`, `Community 24`, `Community 25`, `Community 27`?**
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
+- **Why does `Action` connect `Community 39` to `Community 1`?**
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **What connects `CleanItem`, `VaultSession`, `Set` to the rest of the system?**
+  _218 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Community 0` be split into smaller, more focused modules?**
+  _Cohesion score 0.12873563218390804 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.12550607287449392 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.12311265969802555 - nodes in this community are weakly interconnected._
 - **Should `Community 3` be split into smaller, more focused modules?**
-  _Cohesion score 0.06747638326585695 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05245901639344262 - nodes in this community are weakly interconnected._
+- **Should `Community 5` be split into smaller, more focused modules?**
+  _Cohesion score 0.14039408866995073 - nodes in this community are weakly interconnected._

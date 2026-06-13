@@ -12,7 +12,7 @@ The main application: a native macOS command center for performance and storage 
   - [graph.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/pulse/graphify-out/graph.html)
 
 ### [Specifications & Research](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs)
-- **Product Spec (v2.0):** [product_spec.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/product_spec.html) — authoritative implementation specification containing the v0.2 shipped state, design system tokens, and M3–M7 milestone details.
+- **Product Spec (v3.0):** [product_spec.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/product_spec.html) — authoritative implementation specification containing the full v1.0 (launch prep complete) state, design system tokens, and detailed feature specifications.
 - **Design Mockups:** [design_mockups.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/design_mockups.html)
 - **Market Research:** [market_research_report.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/market_research_report.html)
 

@@ -8,12 +8,20 @@ let package = Package(
         .library(name: "PulseKit", targets: ["PulseKit"]),
         .executable(name: "Pulse", targets: ["Pulse"]),
     ],
+    // Sparkle auto-updates (P0-8): Updater.swift wires it up behind
+    // `#if canImport(Sparkle)`, so enabling is a two-line change here —
+    // uncomment the dependency and add the product to the Pulse target.
+    // Left off by default so the patched-CLT build resolves with no network.
+    // dependencies: [
+    //     .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
+    // ],
     targets: [
         // C shim exposing libproc (per-process CPU/memory) to Swift.
         .target(name: "CPulse"),
         // UI-independent system data collection core.
         .target(name: "PulseKit", dependencies: ["CPulse"]),
         // SwiftUI app: menu bar extra + dashboard window.
+        // To enable Sparkle: add .product(name: "Sparkle", package: "Sparkle").
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
     ]

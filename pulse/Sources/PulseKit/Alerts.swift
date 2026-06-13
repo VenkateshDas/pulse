@@ -40,6 +40,10 @@ public enum AlertsEngine {
     static let cpuHogThreshold = 80.0
     static let lowDiskThreshold: UInt64 = 20_000_000_000
     static let heavySwapThreshold: UInt64 = 4_000_000_000
+    /// Apple flags a battery for service below this maximum-capacity ratio.
+    static let batteryDegradedThreshold = 80
+    /// Charge level (on battery) that warrants a low-battery nudge.
+    static let batteryLowThreshold = 10
 
     /// Processes that legitimately hold sleep assertions all day.
     static let sleepAssertionAllowlist: Set<String> = [
@@ -121,6 +125,42 @@ public enum AlertsEngine {
                         )
                     ]
                 ))
+        }
+
+        if let battery = snapshot.battery {
+            if battery.capacityPercent > 0, battery.capacityPercent < batteryDegradedThreshold {
+                alerts.append(
+                    PulseAlert(
+                        id: "battery-degraded",
+                        severity: .warning,
+                        symbol: "battery.25",
+                        title: "Battery health is at \(battery.capacityPercent)% of original capacity",
+                        subtitle:
+                            "\(battery.cycleCount) cycles · condition: \(battery.condition) — Apple recommends service below 80%",
+                        actions: [
+                            .showDetails(
+                                "Maximum capacity has dropped below 80%. Runtime per charge is reduced; a battery replacement restores it."
+                            )
+                        ]
+                    ))
+            }
+            if !battery.isOnAC, battery.currentChargePercent > 0,
+                battery.currentChargePercent <= batteryLowThreshold
+            {
+                alerts.append(
+                    PulseAlert(
+                        id: "battery-low",
+                        severity: .warning,
+                        symbol: "battery.0",
+                        title: "Battery low — \(battery.currentChargePercent)% remaining",
+                        subtitle: "Running on battery — connect power to avoid an unexpected shutdown",
+                        actions: [
+                            .showDetails(
+                                "Close heavy apps in Top Processes to extend the remaining runtime until you can charge."
+                            )
+                        ]
+                    ))
+            }
         }
 
         let blockers = snapshot.sleepAssertions.filter {

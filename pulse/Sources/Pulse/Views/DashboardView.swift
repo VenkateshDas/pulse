@@ -277,7 +277,7 @@ struct DashboardView: View {
             
             HStack(spacing: 16) {
                 networkChartRow
-                
+
                 let maxPower = max(model.powerHistory.compactMap { $0 }.max() ?? 50, 10)
                 let powerScale = maxPower * 1.2
                 chartRow(
@@ -286,12 +286,55 @@ struct DashboardView: View {
                     color: Halo.amber, maxValue: powerScale
                 )
             }
+
+            cpuDayChartRow
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
     }
     
+    /// 24-hour CPU history — gap-honest (nil minutes render as gaps, never
+    /// interpolated), persisted across launches via MinuteHistoryStore.
+    private var cpuDayChartRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 4) {
+                Text("CPU · 24H")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                Image(systemName: "info.circle")
+                    .font(.system(size: 9))
+                    .help("Minute-averaged CPU over the last 24 hours. Gaps (sleep, app closed) are shown honestly — never interpolated.")
+            }
+            .foregroundStyle(Halo.textDim)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .trailing) {
+                    Text("100%")
+                    Spacer()
+                    Text("0%")
+                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 50, alignment: .trailing)
+                HistoryChart(values: model.cpuDayHistory, color: Halo.ion, maxValue: 100)
+            }
+            .frame(height: 70)
+
+            HStack {
+                Text("-24h")
+                Spacer()
+                Text("-12h")
+                Spacer()
+                HStack(spacing: 5) {
+                    Circle().fill(Halo.pulseGreen).frame(width: 5, height: 5)
+                    Text("LIVE").foregroundStyle(Halo.pulseGreen)
+                }
+            }
+            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .foregroundStyle(Halo.textDim)
+        }
+    }
+
     private var xAxis: some View {
         HStack {
             Text("-30m")

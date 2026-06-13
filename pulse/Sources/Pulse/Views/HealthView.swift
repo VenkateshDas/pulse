@@ -12,6 +12,10 @@ struct HealthView: View {
             header
             BatteryCard()
                 .frame(height: 120)
+            if !model.batteryUnavailable {
+                CapacityTrendCard()
+                    .frame(height: 130)
+            }
             HStack(alignment: .top, spacing: 16) {
                 StartupItemsCard()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -160,6 +164,63 @@ private struct BatteryCard: View {
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
         }
+    }
+}
+
+// MARK: - Capacity Trend Card
+
+/// 60-day battery capacity (% of design) degradation trend — one reading per
+/// day from BatteryHistoryStore. The y-axis is a tight band around the data so
+/// a few points of drift are visible; gaps render honestly (no interpolation).
+private struct CapacityTrendCard: View {
+    @Environment(DashboardModel.self) private var dashboardModel
+
+    var body: some View {
+        let readings = dashboardModel.batteryTrend.compactMap { $0.capacityPercent }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("BATTERY CAPACITY · 60-DAY TREND")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Halo.textDim)
+                Spacer()
+                if let latest = readings.last {
+                    Text("\(latest)% of design")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(latest >= 80 ? Halo.pulseGreen : Halo.amber)
+                }
+            }
+
+            if readings.count < 2 {
+                Text("Collecting — one reading per day builds the trend over time.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Halo.textDim)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Tight band: floor a few points below the minimum so small
+                // degradation is legible without distorting the zero baseline.
+                let minReading = readings.min() ?? 0
+                let floorValue = Double(max(0, minReading - 3))
+                let scale = 100.0 - floorValue
+                let series: [Double?] = dashboardModel.batteryTrend.map { entry in
+                    entry.capacityPercent.map { Double($0) - floorValue }
+                }
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .trailing) {
+                        Text("100%")
+                        Spacer()
+                        Text("\(Int(floorValue))%")
+                    }
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
+                    .frame(width: 44, alignment: .trailing)
+                    HistoryChart(values: series, color: Halo.volt, maxValue: scale)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 

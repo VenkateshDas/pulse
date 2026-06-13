@@ -12,9 +12,9 @@ struct CleanView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    SmartCleanCard()
                     AutoCleanCard()
                     CleanHistoryCard()
-                    CleanPreviewCard()
                 }
                 .padding(.bottom, 8)
             }
@@ -24,6 +24,7 @@ struct CleanView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Halo.void)
         .onAppear { model.appeared() }
+        .onDisappear { model.releasePreview() }
     }
 
     private var header: some View {
@@ -44,6 +45,9 @@ struct CleanView: View {
 
 struct AutoCleanCard: View {
     @Environment(CleanModel.self) private var model
+    /// Developer Junk Mode — adds Homebrew/Docker/Xcode-simulator locations to
+    /// the scan. Persisted; SmartScanner reads the same UserDefaults key.
+    @AppStorage(SmartScanner.developerModeKey) private var developerMode = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -69,6 +73,15 @@ struct AutoCleanCard: View {
                 runButton
             }
 
+            HStack(spacing: 10) {
+                Text("WHEN")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(Halo.textDim)
+                timePreferencePicker
+                Spacer()
+            }
+
             Divider().overlay(Halo.surface2)
 
             HStack(spacing: 24) {
@@ -85,6 +98,13 @@ struct AutoCleanCard: View {
                     isOn: Binding(
                         get: { model.schedule.notifyOnCompletion },
                         set: { model.setNotify($0) }
+                    ))
+                toggleRow(
+                    title: "Developer Junk Mode",
+                    subtitle: "scan Homebrew, Docker & Xcode simulator caches too",
+                    isOn: Binding(
+                        get: { developerMode },
+                        set: { developerMode = $0; model.loadPreview(force: true) }
                     ))
                 Spacer()
             }
@@ -119,6 +139,45 @@ struct AutoCleanCard: View {
                 .buttonStyle(.plain)
                 .help("Run the scheduled clean \(frequency.rawValue)")
             }
+        }
+    }
+
+    private var timePreferencePicker: some View {
+        HStack(spacing: 4) {
+            ForEach(CleanSchedule.TimePreference.allCases, id: \.self) { preference in
+                let selected = model.schedule.timePreference == preference
+                Button {
+                    model.setTimePreference(preference)
+                } label: {
+                    Text(Self.timeLabel(preference))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(selected ? Halo.void : Halo.textDim)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            selected ? AnyShapeStyle(Halo.volt) : AnyShapeStyle(Halo.surface2),
+                            in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(Self.timeHelp(preference))
+            }
+        }
+    }
+
+    static func timeLabel(_ preference: CleanSchedule.TimePreference) -> String {
+        switch preference {
+        case .night: "NIGHT · 3AM"
+        case .morning: "MORNING · 9AM"
+        case .anytime: "ANYTIME"
+        }
+    }
+
+    static func timeHelp(_ preference: CleanSchedule.TimePreference) -> String {
+        switch preference {
+        case .night: "Run around 3:00 AM, when the Mac is usually idle"
+        case .morning: "Run around 9:00 AM"
+        case .anytime: "Run whenever the system is idle (background-scheduled)"
         }
     }
 

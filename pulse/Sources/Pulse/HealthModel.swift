@@ -27,10 +27,27 @@ final class HealthModel {
     private var loop: Task<Void, Never>?
     @ObservationIgnored private var pageVisible = false
     @ObservationIgnored private var windowVisible = true
+    /// Lock screen does NOT change NSWindow occlusion — gate on it directly.
+    @ObservationIgnored private var screenLocked = false
 
     init() {
         latestBenchmark = benchmarkStore.latest
         previousBenchmark = benchmarkStore.previous
+        observeScreenLock()
+    }
+
+    private func observeScreenLock() {
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(
+            forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.screenLocked = true; self?.updateLoop() }
+        }
+        center.addObserver(
+            forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.screenLocked = false; self?.updateLoop() }
+        }
     }
 
     // MARK: - Visibility
@@ -52,7 +69,7 @@ final class HealthModel {
     }
 
     private func updateLoop() {
-        let shouldRun = pageVisible && windowVisible
+        let shouldRun = pageVisible && windowVisible && !screenLocked
         if shouldRun, loop == nil {
             loop = Task { [weak self] in
                 while !Task.isCancelled {

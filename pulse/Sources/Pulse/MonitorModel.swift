@@ -34,6 +34,10 @@ final class MonitorModel {
     private var loop: Task<Void, Never>?
     @ObservationIgnored private var pageVisible = false
     @ObservationIgnored private var windowVisible = true
+    /// Lock screen does NOT change NSWindow occlusion, so it needs its own
+    /// signal — otherwise this pane keeps sampling all night while locked.
+    @ObservationIgnored private var screenLocked = false
+    @ObservationIgnored private var observingLock = false
     @ObservationIgnored private var byPID: [Int32: ProcessExtendedSample] = [:]
     @ObservationIgnored private var parents: [Int32: Int32] = [:]
     @ObservationIgnored private var names: [Int32: String] = [:]
@@ -41,6 +45,7 @@ final class MonitorModel {
     // MARK: - Visibility
 
     func appeared() {
+        observeScreenLock()
         pageVisible = true
         updateLoop()
     }
@@ -57,8 +62,24 @@ final class MonitorModel {
         updateLoop()
     }
 
+    private func observeScreenLock() {
+        guard !observingLock else { return }
+        observingLock = true
+        let center = DistributedNotificationCenter.default()
+        center.addObserver(
+            forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.screenLocked = true; self?.updateLoop() }
+        }
+        center.addObserver(
+            forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.screenLocked = false; self?.updateLoop() }
+        }
+    }
+
     private func updateLoop() {
-        let shouldRun = pageVisible && windowVisible
+        let shouldRun = pageVisible && windowVisible && !screenLocked
         if shouldRun, loop == nil {
             loop = Task { [weak self] in
                 while !Task.isCancelled {

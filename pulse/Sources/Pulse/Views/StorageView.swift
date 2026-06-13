@@ -2,620 +2,371 @@ import AppKit
 import PulseKit
 import SwiftUI
 
-/// Storage module (mockup 02 + 03): volume header, safety-tinted storage
-/// map, evidence-based Smart Clean rows, and the Vault — every delete is
-/// staged, nothing is silently destroyed.
+/// Storage Map (spec §3.3): a squarified treemap of any volume/folder with
+/// Safety / Age / Owner lenses, APFS-correct purgeable explanation, and a
+/// click-to-detail panel. Replaces the old file-browser; the SmartScanner
+/// grades enrich each cell so the Safety lens is actionable, not just pretty.
 struct StorageView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(StorageModel.self) private var storage
 
+    @State private var lens: StorageLens = .safety
+    @State private var selectedID: String?
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    storageMap
-                    SmartCleanPanel()
-                    VaultPanel()
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 220)
+                .background(Halo.surface1)
+            Rectangle().fill(Halo.surface2).frame(width: 1)
+
+            VStack(spacing: 0) {
+                topBar
+                Rectangle().fill(Halo.surface2).frame(height: 1)
+                HStack(spacing: 0) {
+                    mapArea
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if selectedID != nil {
+                        Rectangle().fill(Halo.surface2).frame(width: 1)
+                        detailArea
+                            .frame(width: 280)
+                    }
                 }
-                .padding(.bottom, 8)
+                Rectangle().fill(Halo.surface2).frame(height: 1)
+                bottomBar
             }
-            .scrollIndicators(.never)
-            CleanFooter()
+            .background(Halo.void)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { storage.appeared() }
     }
 
-    // MARK: Header
+    // MARK: Sidebar — real volumes + favorite folders (AR-3)
 
-    private var header: some View {
-        let snapshot = model.snapshot
-        let total = snapshot?.diskTotalBytes ?? 0
-        let free = snapshot?.diskFreeBytes ?? 0
-        let used = total > free ? total - free : 0
-
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("Macintosh HD")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text("\(ByteFormat.string(used)) / \(ByteFormat.string(total))")
-                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.statusColor(snapshot?.diskUsedFraction ?? 0))
-                if storage.purgeableBytes > 0 {
-                    Text("· \(ByteFormat.string(storage.purgeableBytes)) purgeable")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Halo.textDim)
-                }
-                Spacer()
-                scanStatus
-            }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Halo.surface2)
-                    Capsule()
-                        .fill(Halo.statusColor(snapshot?.diskUsedFraction ?? 0))
-                        .frame(width: geo.size.width * (snapshot?.diskUsedFraction ?? 0))
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("VOLUMES")
+                .font(.system(size: 10, weight: .bold)).tracking(1.5)
+                .foregroundStyle(Halo.textDim)
+            ForEach(Self.mountedVolumes(), id: \.path) { vol in
+                sidebarRow(icon: "internaldrive", title: vol.name, subtitle: vol.capacity) {
+                    storage.navigateToPath(vol.path, name: vol.name)
+                    selectedID = nil
                 }
             }
-            .frame(height: 5)
-        }
-    }
 
-    @ViewBuilder
-    private var scanStatus: some View {
-        switch storage.scanState {
-        case .scanning:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("SCANNING…")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
-            }
-        case .done(let date):
-            HStack(spacing: 8) {
-                Text(
-                    "● SCAN FRESH · \(scannedFilesText) files · \(relativeText(date))"
-                )
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.pulseGreen)
-                Button("Rescan") { storage.runScan() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Halo.ion)
-            }
-        case .idle:
-            EmptyView()
-        }
-    }
-
-    private var scannedFilesText: String {
-        let count = storage.scan?.scannedFiles ?? 0
-        return count >= 1_000_000
-            ? String(format: "%.1fM", Double(count) / 1_000_000)
-            : (count >= 1000 ? String(format: "%dK", count / 1000) : "\(count)")
-    }
-
-    private func relativeText(_ date: Date) -> String {
-        let minutes = Int(Date.now.timeIntervalSince(date) / 60)
-        return minutes < 1 ? "just now" : "indexed \(minutes)m ago"
-    }
-
-    // MARK: Storage map
-
-    @ViewBuilder
-    private var storageMap: some View {
-        if let folders = storage.scan?.topFolders, !folders.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("STORAGE MAP · HOME FOLDER")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(2)
-                        .foregroundStyle(Halo.textDim)
-                    Spacer()
-                    Text("safety lens — green is pre-vetted reclaim, red is never bulk-touched")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim)
-                }
-                TreemapView(folders: Array(folders.prefix(8)))
-                    .frame(height: 190)
-            }
-            .padding(16)
-            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
-        }
-    }
-}
-
-// MARK: - Treemap
-
-/// Binary treemap: recursively split items into two size-balanced halves,
-/// dividing the rect along its longer axis. Good enough aspect ratios for
-/// ≤8 cells, ~40 lines, no GPU drama.
-struct TreemapView: View {
-    let folders: [FolderUsage]
-
-    var body: some View {
-        GeometryReader { geo in
-            let rects = Self.layout(
-                weights: folders.map { Double($0.sizeBytes) },
-                in: CGRect(origin: .zero, size: geo.size))
-            ZStack(alignment: .topLeading) {
-                ForEach(Array(folders.enumerated()), id: \.element.id) { index, folder in
-                    if index < rects.count {
-                        cell(folder)
-                            .frame(width: rects[index].width - 4, height: rects[index].height - 4)
-                            .offset(x: rects[index].minX + 2, y: rects[index].minY + 2)
-                    }
+            Text("FAVORITE FOLDERS")
+                .font(.system(size: 10, weight: .bold)).tracking(1.5)
+                .foregroundStyle(Halo.textDim).padding(.top, 8)
+            ForEach(Self.favoriteFolders(), id: \.path) { fav in
+                sidebarRow(icon: fav.icon, title: fav.name, subtitle: nil) {
+                    storage.navigateToPath(fav.path, name: fav.name)
+                    selectedID = nil
                 }
             }
-        }
-    }
-
-    private func cell(_ folder: FolderUsage) -> some View {
-        let tint = gradeColor(folder.grade)
-        return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(
-                    LinearGradient(
-                        colors: [tint.opacity(0.18), tint.opacity(0.05)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(folder.name)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text(ByteFormat.string(folder.sizeBytes))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
-            }
-            .padding(8)
-        }
-        .clipped()
-        .help("\(folder.path) — \(ByteFormat.string(folder.sizeBytes))")
-        .onTapGesture {
-            NSWorkspace.shared.activateFileViewerSelecting([
-                URL(fileURLWithPath: folder.path)
-            ])
-        }
-    }
-
-    static func layout(weights: [Double], in rect: CGRect) -> [CGRect] {
-        guard !weights.isEmpty else { return [] }
-        guard weights.count > 1 else { return [rect] }
-        let total = weights.reduce(0, +)
-        guard total > 0 else {
-            return Array(repeating: rect, count: weights.count)
-        }
-        // Split into a prefix/suffix whose sums are as balanced as possible.
-        // Items arrive sorted descending, so the prefix stays small.
-        var prefixSum = 0.0
-        var splitIndex = 1
-        for (index, weight) in weights.enumerated() {
-            prefixSum += weight
-            if prefixSum >= total / 2 || index == weights.count - 2 {
-                splitIndex = index + 1
-                break
-            }
-        }
-        let fraction = weights[..<splitIndex].reduce(0, +) / total
-        let first: CGRect
-        let second: CGRect
-        if rect.width >= rect.height {
-            let w = rect.width * fraction
-            first = CGRect(x: rect.minX, y: rect.minY, width: w, height: rect.height)
-            second = CGRect(
-                x: rect.minX + w, y: rect.minY, width: rect.width - w, height: rect.height)
-        } else {
-            let h = rect.height * fraction
-            first = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: h)
-            second = CGRect(
-                x: rect.minX, y: rect.minY + h, width: rect.width, height: rect.height - h)
-        }
-        return layout(weights: Array(weights[..<splitIndex]), in: first)
-            + layout(weights: Array(weights[splitIndex...]), in: second)
-    }
-}
-
-// MARK: - Smart Clean
-
-struct SmartCleanPanel: View {
-    @Environment(StorageModel.self) private var storage
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("SMART CLEAN")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Halo.textDim)
-                Text("every item explained · everything undoable for 7 days")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-                Spacer()
-                legend
-            }
-            if let items = storage.scan?.items, !items.isEmpty {
-                VStack(spacing: 4) {
-                    ForEach(items) { item in
-                        CleanRow(item: item)
-                    }
-                }
-            } else if storage.scanState == .scanning {
-                Text("Scanning your home folder and app caches…")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .padding(.vertical, 20)
-                    .frame(maxWidth: .infinity)
-            } else {
-                Text("Nothing to clean — your Mac is already tidy.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .padding(.vertical, 20)
-                    .frame(maxWidth: .infinity)
-            }
+            Spacer()
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func sidebarRow(icon: String, title: String, subtitle: String?, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).frame(width: 20).foregroundStyle(Halo.ion)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Halo.textPrimary).lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle).font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Top bar — breadcrumb + lens switcher
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            if storage.navigationPath.count > 1 {
+                Button {
+                    storage.popDirectory()
+                    selectedID = nil
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Halo.textPrimary)
+                }
+                .buttonStyle(.plain)
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(storage.navigationPath.enumerated()), id: \.offset) { index, node in
+                        Button {
+                            storage.navigateTo(index: index)
+                            selectedID = nil
+                        } label: {
+                            Text(node.name)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(index == storage.navigationPath.count - 1 ? Halo.textPrimary : Halo.textDim)
+                        }
+                        .buttonStyle(.plain)
+                        if index < storage.navigationPath.count - 1 {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Halo.surface2)
+                        }
+                    }
+                }
+            }
+            Spacer()
+            lensSwitcher
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 50)
+        .background(Halo.surface1)
+    }
+
+    private var lensSwitcher: some View {
+        HStack(spacing: 2) {
+            ForEach(StorageLens.allCases) { option in
+                let on = lens == option
+                Button { lens = option } label: {
+                    Text(option.rawValue)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(on ? Halo.void : Halo.textDim)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(on ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("\(option.rawValue) lens")
+            }
+        }
+    }
+
+    // MARK: Map
+
+    private var mapArea: some View {
+        ZStack {
+            if storage.scanState == .scanning && currentChildren.isEmpty {
+                VStack(spacing: 10) {
+                    ProgressView()
+                    Text("Scanning \(storage.navigationPath.last?.name ?? "disk")…")
+                        .font(.system(size: 12)).foregroundStyle(Halo.textDim)
+                }
+            } else if currentCells.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "folder.badge.questionmark")
+                        .font(.system(size: 32)).foregroundStyle(Halo.surface2)
+                    Text("Folder is empty or restricted.")
+                        .font(.system(size: 13)).foregroundStyle(Halo.textDim)
+                }
+            } else {
+                TreemapView(cells: currentCells, lens: lens, selectedID: $selectedID) { node in
+                    storage.pushDirectory(node)
+                    selectedID = nil
+                }
+                .padding(10)
+            }
+            legend
+        }
     }
 
     private var legend: some View {
-        HStack(spacing: 8) {
-            GradePill(grade: .safe)
-            Text("auto-selected ·")
-            GradePill(grade: .careful)
-            Text("needs your tick ·")
-            GradePill(grade: .review)
-            Text("never bulk-selected")
-        }
-        .font(.system(size: 9))
-        .foregroundStyle(Halo.textDim)
-    }
-}
-
-struct CleanRow: View {
-    @Environment(StorageModel.self) private var storage
-    let item: CleanItem
-
-    private var isSelected: Bool { storage.selection.contains(item.id) }
-    private var isExpanded: Bool { storage.expandedItem == item.id }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                checkbox
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(symbol(item.category))  \(item.label)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Halo.textPrimary)
-                        .lineLimit(1)
-                    Text(item.detail)
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim)
-                        .lineLimit(1)
+        VStack {
+            Spacer()
+            HStack(spacing: 14) {
+                ForEach(legendItems, id: \.0) { item in
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2).fill(item.1).frame(width: 10, height: 10)
+                        Text(item.0).font(.system(size: 9, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                    }
                 }
-                Spacer()
-                GradePill(grade: item.grade)
-                Text(idleText)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
-                    .frame(width: 64, alignment: .trailing)
-                Text(ByteFormat.string(item.sizeBytes))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.textPrimary)
-                    .frame(width: 76, alignment: .trailing)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-            .background(
-                isSelected ? Halo.surface2 : Halo.surface2.opacity(0.4),
-                in: RoundedRectangle(cornerRadius: 10)
-            )
-            .opacity(item.grade == .review ? 0.75 : 1)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                storage.expandedItem = isExpanded ? nil : item.id
-            }
-
-            if isExpanded {
-                evidence
-            }
+            .padding(.vertical, 8)
+            .background(Halo.surface1, in: Capsule())
+            .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
+            .padding(10)
         }
     }
 
-    private var checkbox: some View {
-        Button { storage.toggle(item) } label: {
-            RoundedRectangle(cornerRadius: 5)
-                .strokeBorder(
-                    isSelected ? Halo.ion : Halo.textDim.opacity(0.6),
-                    style: StrokeStyle(lineWidth: 1.5, dash: item.grade == .review ? [3] : [])
-                )
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isSelected ? Halo.ion.opacity(0.9) : .clear)
-                )
-                .overlay {
-                    if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Halo.void)
-                    }
+    private var legendItems: [(String, Color)] {
+        switch lens {
+        case .safety:
+            return [("Safe", Halo.pulseGreen), ("Careful", Halo.amber), ("Review", Halo.flare)]
+        case .age:
+            return [("<30d", Halo.pulseGreen), ("30–180d", Halo.amber), (">180d", Halo.flare), ("unknown", Halo.textDim)]
+        case .owner:
+            var categories = [String]()
+            for cell in currentCells {
+                if !categories.contains(cell.category) {
+                    categories.append(cell.category)
                 }
-                .frame(width: 16, height: 16)
+            }
+            let palette = [Halo.ion, Halo.volt, Halo.amber, Halo.pulseGreen, Halo.flare]
+            return categories.prefix(5).map { cat in
+                (cat, palette[abs(cat.hashValue) % palette.count])
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(item.grade == .review)
-        .help(
-            item.grade == .review
-                ? "Real data — Pulse never bulk-selects this tier" : "Include in clean")
     }
 
-    private var evidence: some View {
-        HStack(spacing: 8) {
-            Text("Why \(item.grade.rawValue.uppercased()):")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(gradeColor(item.grade))
-            Text(item.detail)
-                .font(.system(size: 10))
+    // MARK: Detail
+
+    @ViewBuilder
+    private var detailArea: some View {
+        if let id = selectedID, let cell = currentCells.first(where: { $0.id == id }) {
+            StorageDetailPanel(cell: cell) { node in
+                storage.pushDirectory(node)
+                selectedID = nil
+            }
+            .padding(12)
+        }
+    }
+
+    // MARK: Bottom bar — purgeable explanation (SM-2) + total
+
+    private var bottomBar: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Image(systemName: "internaldrive.fill").foregroundStyle(Halo.ion)
+                Text(storage.navigationPath.last?.name ?? "Disk")
+                    .font(.system(size: 13, weight: .semibold))
+                
+                Button(action: {
+                    storage.refreshAll()
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.plain)
                 .foregroundStyle(Halo.textDim)
-                .lineLimit(1)
-            Text(item.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(Halo.textDim.opacity(0.8))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            Button("Reveal in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([
-                    URL(fileURLWithPath: item.path)
-                ])
-            }
-            .buttonStyle(.plain)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Halo.ion)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Halo.surface2.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
-        .padding(.leading, 24)
-        .padding(.top, 2)
-    }
-
-    private var idleText: String {
-        guard let days = item.idleDays else { return "—" }
-        if days < 1 { return "live" }
-        if days >= 30 { return "\(days / 30)mo idle" }
-        return "\(days)d idle"
-    }
-
-    private func symbol(_ category: String) -> String {
-        switch category {
-        case "App caches": "🌐"
-        case "App logs": "📋"
-        case "Developer junk", "Stale dev junk": "🧑‍💻"
-        case "Old installers": "📦"
-        case "iOS backups": "📱"
-        case "Trash": "🗑"
-        case "Large & old": "🎥"
-        default: "📁"
-        }
-    }
-}
-
-struct GradePill: View {
-    let grade: SafetyGrade
-
-    var body: some View {
-        Text(grade.rawValue.uppercased())
-            .font(.system(size: 8.5, weight: .bold))
-            .tracking(0.5)
-            .foregroundStyle(gradeColor(grade))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2.5)
-            .background(gradeColor(grade).opacity(0.14), in: Capsule())
-            .fixedSize()
-    }
-}
-
-func gradeColor(_ grade: SafetyGrade) -> Color {
-    switch grade {
-    case .safe: Halo.pulseGreen
-    case .careful: Halo.amber
-    case .review: Halo.flare
-    }
-}
-
-// MARK: - Clean footer
-
-struct CleanFooter: View {
-    @Environment(StorageModel.self) private var storage
-
-    var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("SELECTED")
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(Halo.textDim)
-                Text(ByteFormat.string(storage.selectedBytes))
-                    .font(.system(size: 19, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Halo.textPrimary)
-            }
-            Text(footerNote)
-                .font(.system(size: 10))
-                .foregroundStyle(storage.cleanReport == nil ? Halo.textDim : Halo.pulseGreen)
-                .lineLimit(2)
-            Spacer()
-            Button {
-                storage.cleanSelected()
-            } label: {
-                HStack(spacing: 6) {
-                    if storage.isCleaning {
-                        ProgressView().controlSize(.small)
-                    }
-                    Text("⚡ Clean \(ByteFormat.string(storage.selectedBytes))")
-                        .font(.system(size: 13, weight: .bold))
+                .padding(.leading, 4)
+                .help("Rescan storage map and free space")
+                
+                if storage.isStreamingSizes || storage.scanState == .scanning {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.7)
+                        .padding(.leading, 8)
+                    Text("Scanning sizes…").font(.system(size: 11)).foregroundStyle(Halo.textDim)
+                } else if let report = storage.cleanReport {
+                    Text(report).font(.system(size: 12)).foregroundStyle(Halo.pulseGreen)
+                        .padding(.leading, 12)
                 }
-                .foregroundStyle(Halo.void)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 10)
-                .background(
-                    storage.selectedBytes == 0 ? AnyShapeStyle(Halo.textDim) : AnyShapeStyle(Halo.ion),
-                    in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .disabled(storage.selectedBytes == 0 || storage.isCleaning)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private var footerNote: String {
-        storage.cleanReport
-            ?? "→ staged in Vault for 7 days · restore anytime · space frees when the Vault purges, never silently"
-    }
-}
-
-// MARK: - Vault
-
-struct VaultPanel: View {
-    @Environment(StorageModel.self) private var storage
-    @State private var purgeCandidate: VaultSession?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("SAFETY VAULT")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Halo.textDim)
-                Text("everything Pulse removes lands here first · restore is always one click")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
+                
                 Spacer()
-                if storage.vaultTotalBytes > 0 {
-                    Text("● \(ByteFormat.string(storage.vaultTotalBytes)) STAGED")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Halo.pulseGreen)
+                
+                let finderFree = model.snapshot?.diskFreeBytes ?? 0
+                let total = model.snapshot?.diskTotalBytes ?? 0
+                let purgeable = storage.purgeableBytes
+                let rawFree = finderFree > purgeable ? finderFree - purgeable : 0
+                let used = total > finderFree ? total - finderFree : 0
+                
+                HStack(spacing: 12) {
+                    Group {
+                        Text("Used: ").foregroundStyle(Halo.textDim) +
+                        Text(ByteFormat.string(used)).foregroundStyle(Halo.textPrimary)
+                    }
+                    if purgeable > 0 {
+                        Group {
+                            Text("Purgeable: ").foregroundStyle(Halo.textDim) +
+                            Text(ByteFormat.string(purgeable)).foregroundStyle(Halo.amber)
+                        }
+                    }
+                    Group {
+                        Text("Free: ").foregroundStyle(Halo.textDim) +
+                        Text(ByteFormat.string(rawFree)).foregroundStyle(Halo.pulseGreen)
+                    }
+                    Text("•").foregroundStyle(Halo.surface2)
+                    Group {
+                        Text("Total: ").foregroundStyle(Halo.textDim) +
+                        Text(ByteFormat.string(total)).foregroundStyle(Halo.textPrimary)
+                    }
                 }
-            }
-            if storage.vaultSessions.isEmpty {
-                Text("Vault is empty — nothing staged for deletion.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-            } else {
-                ForEach(storage.vaultSessions) { session in
-                    sessionRow(session)
-                }
-            }
-        }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
-        .confirmationDialog(
-            "Permanently delete this Vault session?",
-            isPresented: Binding(
-                get: { purgeCandidate != nil },
-                set: { if !$0 { purgeCandidate = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete \(ByteFormat.string(purgeCandidate?.totalBytes ?? 0)) forever", role: .destructive) {
-                if let session = purgeCandidate { storage.purge(session) }
-                purgeCandidate = nil
-            }
-            Button("Cancel", role: .cancel) { purgeCandidate = nil }
-        } message: {
-            Text(
-                "This is the only irreversible action in Pulse. "
-                    + "\(purgeCandidate?.items.count ?? 0) items will be gone for good."
-            )
-        }
-    }
-
-    private func sessionRow(_ session: VaultSession) -> some View {
-        HStack(spacing: 12) {
-            Text("✦")
-                .font(.system(size: 14))
-                .foregroundStyle(Halo.volt)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text("\(session.items.count) items · staged \(dateText(session.date))")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-            }
-            Spacer()
-            Text(countdownText(session))
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.amber)
-            Text(ByteFormat.string(session.totalBytes))
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundStyle(Halo.textPrimary)
-                .frame(width: 76, alignment: .trailing)
-            Button("↺ Restore all") { storage.restore(session) }
-                .buttonStyle(.plain)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Halo.pulseGreen)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Halo.pulseGreen.opacity(0.12), in: Capsule())
-            Button("Purge now") { purgeCandidate = session }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Halo.flare)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Halo.flare.opacity(0.10), in: Capsule())
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Halo.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func countdownText(_ session: VaultSession) -> String {
-        let remaining = session.expiry().timeIntervalSince(.now)
-        guard remaining > 0 else { return "purging…" }
-        let days = Int(remaining) / 86400
-        let hours = (Int(remaining) % 86400) / 3600
-        return days > 0 ? "purges in \(days)d \(String(format: "%02d", hours))h" : "purges in \(hours)h"
-    }
-
-    private func dateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, HH:mm"
-        return formatter.string(from: date)
-    }
-}
-
-/// Dedicated Vault page for the sidebar — same panel, page chrome.
-struct VaultView: View {
-    @Environment(StorageModel.self) private var storage
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Safety Vault")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text(
-                    "Everything Pulse removes lands here first. Same-volume staging is instant — no copy. Restore is always one click."
-                )
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textDim)
             }
-            ScrollView {
-                VaultPanel()
-            }
-            .scrollIndicators(.never)
+            .padding(16)
+            .background(Halo.surface1)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
-        .onAppear { storage.appeared() }
+    }
+
+    // MARK: Cell building
+
+    private var currentChildren: [StorageNode] {
+        storage.navigationPath.last?.children ?? []
+    }
+
+    private var currentCells: [TreemapCell] {
+        let items = storage.scanItemsByPath
+        // Children arrive size-sorted; cap to the largest so the map stays
+        // readable and per-cell mtime lookups stay cheap.
+        return currentChildren.prefix(60).map { node in
+            let item = items[node.path]
+            return TreemapCell(
+                node: node,
+                grade: item?.grade ?? Self.heuristicGrade(node),
+                idleDays: item?.idleDays ?? Self.mtimeDays(node.path),
+                category: item?.category ?? Self.heuristicCategory(node))
+        }
+    }
+
+    // MARK: Heuristics + helpers
+
+    private static func heuristicGrade(_ node: StorageNode) -> SafetyGrade {
+        let lower = node.path.lowercased()
+        if lower.contains("/caches") || node.name.lowercased().contains("cache") { return .safe }
+        if ["documents", "pictures", "movies", "music", "desktop"].contains(node.name.lowercased()) {
+            return .review
+        }
+        return .careful
+    }
+
+    private static func heuristicCategory(_ node: StorageNode) -> String {
+        if node.path.lowercased().contains("/caches") { return "Caches" }
+        if !node.isDirectory { return "File" }
+        return node.name
+    }
+
+    private nonisolated static func mtimeDays(_ path: String) -> Int? {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+            let modified = attrs[.modificationDate] as? Date
+        else { return nil }
+        return max(0, Int(Date.now.timeIntervalSince(modified) / 86400))
+    }
+
+    private struct Volume { let name: String; let path: String; let capacity: String }
+    private struct Favorite { let name: String; let path: String; let icon: String }
+
+    private static func mountedVolumes() -> [Volume] {
+        let keys: [URLResourceKey] = [.volumeNameKey, .volumeTotalCapacityKey, .volumeIsBrowsableKey]
+        let urls = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
+        return urls.compactMap { url in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)),
+                values.volumeIsBrowsable == true
+            else { return nil }
+            let name = values.volumeName ?? url.lastPathComponent
+            let cap = values.volumeTotalCapacity.map { ByteFormat.string(UInt64($0)) } ?? ""
+            return Volume(name: name, path: url.path, capacity: cap)
+        }
+    }
+
+    private static func favoriteFolders() -> [Favorite] {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let specs: [(String, String)] = [
+            ("Downloads", "arrow.down.circle"), ("Desktop", "menubar.dock.rectangle"),
+            ("Documents", "doc"), ("Pictures", "photo"),
+        ]
+        return specs.compactMap { name, icon in
+            let path = home.appendingPathComponent(name).path
+            guard FileManager.default.fileExists(atPath: path) else { return nil }
+            return Favorite(name: name, path: path, icon: icon)
+        }
     }
 }

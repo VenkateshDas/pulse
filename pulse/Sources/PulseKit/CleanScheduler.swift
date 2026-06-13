@@ -6,14 +6,14 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
     public enum Frequency: String, Codable, Sendable, CaseIterable {
         case daily, weekly, monthly
 
-        /// Anchor hour for scheduled runs — 03:00, when the Mac is idle.
-        static let runHour = 3
-
         /// First occurrence strictly after `date` at the anchor hour:
         /// daily → tomorrow, weekly → next Sunday, monthly → 1st of next month.
-        public func nextRun(after date: Date, calendar: Calendar = .current) -> Date {
+        public func nextRun(
+            after date: Date, hour: Int = TimePreference.night.runHour,
+            calendar: Calendar = .current
+        ) -> Date {
             var components = DateComponents()
-            components.hour = Self.runHour
+            components.hour = hour
             components.minute = 0
             switch self {
             case .daily:
@@ -29,7 +29,23 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
         }
     }
 
+    /// When during the day a scheduled run is anchored.
+    public enum TimePreference: String, Codable, Sendable, CaseIterable {
+        case night, morning, anytime
+
+        /// Anchor hour for the run. `.anytime` is idle-based but still needs a
+        /// fallback hour for the computed next slot — reuse the quiet 03:00.
+        public var runHour: Int {
+            switch self {
+            case .night: return 3
+            case .morning: return 9
+            case .anytime: return 3
+            }
+        }
+    }
+
     public var frequency: Frequency
+    public var timePreference: TimePreference
     public var lastRun: Date?
     public var nextRun: Date
     /// If true, due runs clean the safe tier without user confirmation.
@@ -37,21 +53,39 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
     public var notifyOnCompletion: Bool
 
     public init(
-        frequency: Frequency, lastRun: Date? = nil, nextRun: Date,
+        frequency: Frequency, timePreference: TimePreference = .night,
+        lastRun: Date? = nil, nextRun: Date,
         autoCleanSafeTier: Bool, notifyOnCompletion: Bool
     ) {
         self.frequency = frequency
+        self.timePreference = timePreference
         self.lastRun = lastRun
         self.nextRun = nextRun
         self.autoCleanSafeTier = autoCleanSafeTier
         self.notifyOnCompletion = notifyOnCompletion
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case frequency, timePreference, lastRun, nextRun, autoCleanSafeTier, notifyOnCompletion
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        frequency = try c.decode(Frequency.self, forKey: .frequency)
+        // Schedules written before time preference existed default to night.
+        timePreference = try c.decodeIfPresent(TimePreference.self, forKey: .timePreference) ?? .night
+        lastRun = try c.decodeIfPresent(Date.self, forKey: .lastRun)
+        nextRun = try c.decode(Date.self, forKey: .nextRun)
+        autoCleanSafeTier = try c.decode(Bool.self, forKey: .autoCleanSafeTier)
+        notifyOnCompletion = try c.decode(Bool.self, forKey: .notifyOnCompletion)
+    }
+
     /// Conservative default: weekly, auto-clean off until the user opts in.
     public static func `default`(now: Date = .now) -> CleanSchedule {
         CleanSchedule(
             frequency: .weekly,
-            nextRun: Frequency.weekly.nextRun(after: now),
+            timePreference: .night,
+            nextRun: Frequency.weekly.nextRun(after: now, hour: TimePreference.night.runHour),
             autoCleanSafeTier: false,
             notifyOnCompletion: true
         )
@@ -115,9 +149,14 @@ public actor CleanScheduler {
 
     public func setSchedule(_ newSchedule: CleanSchedule) {
         var updated = newSchedule
-        // Frequency change recomputes the next slot; never keep a stale date.
-        if updated.frequency != schedule.frequency || updated.nextRun <= .now {
-            updated.nextRun = updated.frequency.nextRun(after: .now)
+        // Frequency or time-preference change recomputes the next slot; never
+        // keep a stale date.
+        if updated.frequency != schedule.frequency
+            || updated.timePreference != schedule.timePreference
+            || updated.nextRun <= .now
+        {
+            updated.nextRun = updated.frequency.nextRun(
+                after: .now, hour: updated.timePreference.runHour)
         }
         schedule = updated
         saveSchedule()
@@ -161,7 +200,8 @@ public actor CleanScheduler {
         }
         appendHistory(record)
         schedule.lastRun = now
-        schedule.nextRun = schedule.frequency.nextRun(after: now)
+        schedule.nextRun = schedule.frequency.nextRun(
+            after: now, hour: schedule.timePreference.runHour)
         saveSchedule()
         return record
     }

@@ -61,6 +61,12 @@ final class CleanModel {
         apply(updated)
     }
 
+    func setTimePreference(_ preference: CleanSchedule.TimePreference) {
+        var updated = schedule
+        updated.timePreference = preference
+        apply(updated)
+    }
+
     func setAutoClean(_ enabled: Bool) {
         var updated = schedule
         updated.autoCleanSafeTier = enabled
@@ -140,6 +146,12 @@ final class CleanModel {
 
     var previewTotalBytes: UInt64 {
         preview.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    /// Frees the dry-run preview results when the Clean page goes off screen —
+    /// lazy eviction keeps the resident footprint down (P0-6).
+    func releasePreview() {
+        preview = []
     }
 
     // MARK: - History restore

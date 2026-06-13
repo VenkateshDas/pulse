@@ -2,6 +2,13 @@
 
 This is a chronological, append-only record of significant changes, updates, and maintenance tasks performed by AI agents on this repository.
 
+## [2026-06-13] fix | Resolved Swift 6 String(cString:) deprecation warnings
+- Modified `StorageScanner.swift` to use `.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }` instead of the deprecated array overload for `String(cString:)`, clearing all compiler warnings.
+
+## [2026-06-13] fix | Fixed storage map sizing and legend visibility
+- Modified `StorageScanner.scanLevel` to compute the sizes of subdirectories using `fastDirectorySize` so the Storage view displays proper squarified sizes instead of 0 bytes.
+- Wrapped the Storage view legend in a semi-opaque background capsule to ensure color contrast over the dense treemap.
+
 ## [2026-06-12] ingest | Transitioned repository to Pulse
 - Archived the old Python TUI app (`mac-monitor`) into the `legacy_tui/` directory.
 - Established the LLM Wiki structure (`index.md`, `log.md`, `AGENTS.md`).
@@ -102,3 +109,13 @@ This is a chronological, append-only record of significant changes, updates, and
 - **Sidebar Integration**: Unlocked the Dev Mode tab in `SidebarView` and `RootView`. Silenced an unneeded `default` case warning in the Sidebar exhaustive switch.
 - **Verification**: Built using `make build` and ran 67 tests successfully in under 1.5s using `make test`.
 
+## [2026-06-13] feature | Async Progressive Storage Scanning
+- Refactored `StorageScanner.swift` to use an `AsyncStream` and `TaskGroup` to lazily compute directory sizes in parallel.
+- Updated `StorageModel.swift` to decouple the blocking `SmartScanner` run and consume the `scanSizesStream` to progressively update the UI.
+- Treemap blocks now draw instantly and organically resize as true sizes are resolved, eliminating the long "Scanning disk..." spinner UX.
+
+## [2026-06-13] feature | Safety Vault flat file-viewer redesign
+- **Flat UI**: Removed rigid `VaultSession` grouping in favor of a modern flat file-viewer list.
+- **Granular Restores**: Rewrote `SafetyVault.swift` to support item-level purge and restore without touching the rest of a session's files.
+- **Multi-select**: Added custom checkboxes, "Select All", and a dynamic morphing header bar.
+- **Bottom Bar**: Added explicit `Used / Purgeable / Free / Total` breakdown to clear up Apple's free space math mystery. Reverted dummy file hacks to maintain pure APFS semantics.

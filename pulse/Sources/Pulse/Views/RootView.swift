@@ -10,23 +10,46 @@ struct RootView: View {
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
     @State private var windowVisible = true
+    @State private var showPalette = false
+    @State private var showOnboarding = !OnboardingView.isComplete
+    @State private var showReport = false
 
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selection: $selection)
             switch selection {
             case .storage: StorageView()
+            case .timeline: TimelineView()
             case .clean: CleanView()
             case .monitor: MonitorView()
             case .health: HealthView()
             case .vault: VaultView()
-            case .devMode: DevModeView()
+            case .diagnostics: DevModeView()
             default: DashboardView()
             }
         }
         .frame(minWidth: 1080, minHeight: 720)
         .background(Halo.void)
         .preferredColorScheme(.dark)
+        .background {
+            // Hidden ⌘K hotkey for the command palette (no visible chrome).
+            Button("") { showPalette = true }
+                .keyboardShortcut("k", modifiers: .command)
+                .opacity(0)
+        }
+        .overlay { commandPaletteOverlay }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(isPresented: $showOnboarding)
+        }
+        .sheet(isPresented: $showReport) {
+            WeeklyReportView(isPresented: $showReport)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: WeeklyReportView.showNotification)) { _ in
+            showReport = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
+            selection = .clean
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)
@@ -42,6 +65,22 @@ struct RootView: View {
             visible ? model.viewAppeared() : model.viewDisappeared()
             monitorModel.windowVisibilityChanged(visible)
             healthModel.windowVisibilityChanged(visible)
+        }
+    }
+
+    @ViewBuilder
+    private var commandPaletteOverlay: some View {
+        if showPalette {
+            ZStack {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .onTapGesture { showPalette = false }
+                CommandPaletteView(isPresented: $showPalette, selection: $selection)
+                    .padding(.top, 80)
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
+            .onExitCommand { showPalette = false }
+            .transition(.opacity)
         }
     }
 }

@@ -7,11 +7,15 @@ public final class BatteryHistoryStore {
     public struct Entry: Codable, Equatable, Sendable, Identifiable {
         public let date: Date
         public var timeOnBattery: TimeInterval
+        /// Maximum-capacity ratio (% of design) on this day. nil until a
+        /// reading is recorded — older entries decode to nil.
+        public var capacityPercent: Int?
         public var id: Date { date }
 
-        public init(date: Date, timeOnBattery: TimeInterval) {
+        public init(date: Date, timeOnBattery: TimeInterval, capacityPercent: Int? = nil) {
             self.date = Calendar.current.startOfDay(for: date)
             self.timeOnBattery = timeOnBattery
+            self.capacityPercent = capacityPercent
         }
     }
 
@@ -38,6 +42,23 @@ public final class BatteryHistoryStore {
         updateEntry(for: date, duration: duration, maxAgeDate: date) { current, new in
             current += new
         }
+        persist()
+    }
+
+    /// Records the day's battery capacity once — overwrites if already set so
+    /// the latest reading wins. Persists only when the value changes, keeping
+    /// the 60-day degradation series at one point per day.
+    public func recordCapacity(_ capacityPercent: Int, at date: Date = .now) {
+        guard capacityPercent > 0 else { return }
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        if let index = entries.firstIndex(where: { $0.date == startOfDay }) {
+            guard entries[index].capacityPercent != capacityPercent else { return }
+            entries[index].capacityPercent = capacityPercent
+        } else {
+            entries.append(Entry(date: startOfDay, timeOnBattery: 0, capacityPercent: capacityPercent))
+            entries.sort { $0.date < $1.date }
+        }
+        entries.removeAll { date.timeIntervalSince($0.date) > Self.maxAge }
         persist()
     }
 

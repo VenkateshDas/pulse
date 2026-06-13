@@ -6,11 +6,12 @@ import SwiftUI
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case storage = "Storage"
+    case timeline = "Timeline"
     case clean = "Clean"
     case monitor = "Monitor"
     case health = "Health"
     case vault = "Vault"
-    case devMode = "Dev Mode"
+    case diagnostics = "Diagnostics"
 
     var id: String { rawValue }
 
@@ -18,17 +19,18 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .dashboard: "circle.circle"
         case .storage: "internaldrive"
+        case .timeline: "chart.xyaxis.line"
         case .clean: "sparkles"
         case .monitor: "waveform.path.ecg"
         case .health: "heart"
         case .vault: "shield"
-        case .devMode: "command"
+        case .diagnostics: "stethoscope"
         }
     }
 
     var isAvailable: Bool {
         switch self {
-        case .dashboard, .storage, .clean, .monitor, .health, .vault, .devMode: true
+        case .dashboard, .storage, .timeline, .clean, .monitor, .health, .vault, .diagnostics: true
         }
     }
 }

@@ -77,6 +77,16 @@ public struct StorageScan: Sendable, Equatable {
 public struct SmartScanner: Sendable {
     public let home: URL
     public let now: Date
+    /// When on, the scan adds the heavier developer-junk locations (Homebrew,
+    /// Docker, Xcode simulators) — the "Developer Junk Mode" Settings toggle.
+    public let developerMode: Bool
+
+    /// Persisted Developer-Junk-Mode toggle (UserDefaults), the default the
+    /// app uses when constructing a scanner without an explicit value.
+    public static let developerModeKey = "PulseDeveloperMode"
+    public static var developerModeDefault: Bool {
+        UserDefaults.standard.bool(forKey: developerModeKey)
+    }
 
     static let devJunkDirs: Set<String> = [
         "node_modules", ".venv", "venv", ".tox", "target", ".gradle",
@@ -92,9 +102,13 @@ public struct SmartScanner: Sendable {
         "Library", ".Trash", "miniforge", "miniconda3", "anaconda3",
     ]
 
-    public init(home: URL = FileManager.default.homeDirectoryForCurrentUser, now: Date = .now) {
+    public init(
+        home: URL = FileManager.default.homeDirectoryForCurrentUser, now: Date = .now,
+        developerMode: Bool = SmartScanner.developerModeDefault
+    ) {
         self.home = home
         self.now = now
+        self.developerMode = developerMode
     }
 
     /// Full scan. Blocking — call from a background task.
@@ -158,9 +172,36 @@ public struct SmartScanner: Sendable {
             ),
         ]
 
+    /// Heavier developer locations, included only in Developer Junk Mode.
+    private static let developerTargets:
+        [(rel: String, category: String, grade: SafetyGrade, detail: String, expand: Bool)] = [
+            (
+                "Library/Caches/Homebrew", "Developer junk", .safe,
+                "Homebrew download cache — refilled on next brew install", false
+            ),
+            (
+                "Library/Developer/CoreSimulator/Caches", "Developer junk", .safe,
+                "Xcode simulator caches — rebuilt by Xcode automatically", false
+            ),
+            (
+                "Library/Developer/CoreSimulator/Devices", "Developer junk", .careful,
+                "simulator devices and their data — recreate from Xcode if removed", false
+            ),
+            (
+                "Library/Containers/com.docker.docker/Data/vms", "Developer junk", .review,
+                "Docker VM disk — deleting loses all containers, images, and volumes", false
+            ),
+        ]
+
+    private var effectiveTargets:
+        [(rel: String, category: String, grade: SafetyGrade, detail: String, expand: Bool)]
+    {
+        developerMode ? Self.knownTargets + Self.developerTargets : Self.knownTargets
+    }
+
     private func scanKnownLocations() -> [CleanItem] {
         var out: [CleanItem] = []
-        for target in Self.knownTargets {
+        for target in effectiveTargets {
             let url = home.appendingPathComponent(target.rel)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
             if target.expand {

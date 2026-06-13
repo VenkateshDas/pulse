@@ -32,10 +32,16 @@ public final class SafetyVault: Sendable {
     public static let defaultTTL: TimeInterval = 7 * 86400
 
     public let rootURL: URL
+    /// How long a staged session lives before auto-purge — configurable 1–30d.
+    public let retentionDays: Int
     private static let manifestName = "manifest.json"
 
-    public init(rootURL: URL) {
+    /// Retention window as a TTL, derived from `retentionDays`.
+    public var ttl: TimeInterval { TimeInterval(retentionDays) * 86400 }
+
+    public init(rootURL: URL, retentionDays: Int = 7) {
         self.rootURL = rootURL
+        self.retentionDays = min(30, max(1, retentionDays))
     }
 
     public static func defaultRootURL() -> URL {
@@ -150,6 +156,74 @@ public final class SafetyVault: Sendable {
         return restored
     }
 
+    public func restoreItem(_ item: VaultItem, from session: VaultSession) throws {
+        let sessionDir = rootURL.appendingPathComponent(session.id.uuidString)
+        let source = sessionDir.appendingPathComponent(item.storedName)
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        let original = URL(fileURLWithPath: item.originalPath)
+        try? FileManager.default.createDirectory(
+            at: original.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let destination =
+            FileManager.default.fileExists(atPath: original.path)
+            ? Self.collisionFreeURL(for: original) : original
+        try FileManager.default.moveItem(at: source, to: destination)
+
+        let remaining = session.items.filter { $0.storedName != item.storedName }
+        if remaining.isEmpty {
+            try? FileManager.default.removeItem(at: sessionDir)
+        } else {
+            let remainder = VaultSession(
+                id: session.id, date: session.date, title: session.title, items: remaining)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            if let data = try? encoder.encode(remainder) {
+                try? data.write(
+                    to: sessionDir.appendingPathComponent(Self.manifestName), options: .atomic)
+            }
+        }
+    }
+
+    /// Permanently deletes a single item from a session and rewrites the manifest.
+    public func purgeItem(_ item: VaultItem, from session: VaultSession) throws {
+        let sessionDir = rootURL.appendingPathComponent(session.id.uuidString)
+        let source = sessionDir.appendingPathComponent(item.storedName)
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        
+        try FileManager.default.removeItem(at: source)
+
+        let remaining = session.items.filter { $0.storedName != item.storedName }
+        if remaining.isEmpty {
+            try? FileManager.default.removeItem(at: sessionDir)
+        } else {
+            let remainder = VaultSession(
+                id: session.id, date: session.date, title: session.title, items: remaining)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            if let data = try? encoder.encode(remainder) {
+                try? data.write(
+                    to: sessionDir.appendingPathComponent(Self.manifestName), options: .atomic)
+            }
+        }
+    }
+
+    /// Under disk pressure, purges oldest sessions first until the vault frees
+    /// at least `targetFreeBytes`. Returns bytes actually freed.
+    @discardableResult
+    public func purgeOldestIfNeeded(targetFreeBytes: UInt64) -> UInt64 {
+        guard targetFreeBytes > 0 else { return 0 }
+        var freed: UInt64 = 0
+        for session in sessions().sorted(by: { $0.date < $1.date }) {
+            if freed >= targetFreeBytes { break }
+            freed += session.totalBytes
+            purge(session)
+        }
+        return freed
+    }
+
     /// Permanently deletes one session — the freed space materializes here.
     public func purge(_ session: VaultSession) {
         try? FileManager.default.removeItem(
@@ -158,7 +232,8 @@ public final class SafetyVault: Sendable {
 
     /// Removes sessions past their TTL. Returns bytes freed.
     @discardableResult
-    public func purgeExpired(ttl: TimeInterval = defaultTTL, now: Date = .now) -> UInt64 {
+    public func purgeExpired(ttl: TimeInterval? = nil, now: Date = .now) -> UInt64 {
+        let ttl = ttl ?? self.ttl
         var freed: UInt64 = 0
         for session in sessions() where session.expiry(ttl: ttl) <= now {
             freed += session.totalBytes

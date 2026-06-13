@@ -85,6 +85,16 @@ private struct AlertCard: View {
                 }
                 Spacer(minLength: 12)
                 actions
+                Button {
+                    model.dismissAlert(id: alert.id)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Halo.textDim)
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .help("Dismiss — hides until this condition clears and recurs")
             }
             if let details = expandedDetails {
                 Text(details)

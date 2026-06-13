@@ -115,8 +115,8 @@
     "semantic_hash": ""
   },
   "pulse/Package.swift": {
-    "mtime": 1781254914.1578321,
-    "ast_hash": "bd7f291343201f4218709bc5845ff09b",
+    "mtime": 1781371116.3266485,
+    "ast_hash": "66b76ede465cbab4c039b2cddb7c57fb",
     "semantic_hash": ""
   },
   "pulse/Sources/CPulse/include/cpulse.h": {
@@ -130,18 +130,18 @@
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/DashboardModel.swift": {
-    "mtime": 1781302403.895608,
-    "ast_hash": "49f1719cc7cee995060b290589270f5f",
+    "mtime": 1781374025.027018,
+    "ast_hash": "569c6797596a2f7188bd7d028c7fa5e6",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/PulseApp.swift": {
-    "mtime": 1781298884.7557888,
-    "ast_hash": "be27c3f53e81f12481ff2cf8012300c2",
+    "mtime": 1781364380.7051592,
+    "ast_hash": "e0863a841ab8647f58039f6a45e27f95",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/StorageModel.swift": {
-    "mtime": 1781278537.150719,
-    "ast_hash": "8b905e5cd920f6cb243f4064bacfcb13",
+    "mtime": 1781386079.1852472,
+    "ast_hash": "e9d1d298e3bda08935e54bfa48b35780",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Theme.swift": {
@@ -150,13 +150,13 @@
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/AlertsSection.swift": {
-    "mtime": 1781293375.8382635,
-    "ast_hash": "9f90c36dbd0bb5636bb4950998ea0a40",
+    "mtime": 1781374031.9196053,
+    "ast_hash": "98bb13b1fd85129b4ead1e51ac73a143",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/DashboardView.swift": {
-    "mtime": 1781294709.2321763,
-    "ast_hash": "265edb1a70742a208d20086a8ca2fbe1",
+    "mtime": 1781363205.7216408,
+    "ast_hash": "2085e6e2a584bc8ae7b4438912c3f760",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/HistoryChart.swift": {
@@ -165,18 +165,18 @@
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/MenuBarContent.swift": {
-    "mtime": 1781255700.5570633,
-    "ast_hash": "90b8f721b40914d7cdd8f28652e8df8a",
+    "mtime": 1781364417.6209638,
+    "ast_hash": "17451ebd99f60dff24f00f89fde0acbf",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/RootView.swift": {
-    "mtime": 1781303091.0038884,
-    "ast_hash": "2e4effd8ceb2dd445814dc07305775a5",
+    "mtime": 1781364372.7802606,
+    "ast_hash": "67ff8d22e4538d165ccc576fd44a7c79",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/SidebarView.swift": {
-    "mtime": 1781303120.7222579,
-    "ast_hash": "c9e2ea969b00b36840b8d3bcb4baa0e8",
+    "mtime": 1781364363.2565813,
+    "ast_hash": "d562bbac33d2e7bcec9fa186389e146a",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/Sparkline.swift": {
@@ -185,8 +185,8 @@
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/StorageView.swift": {
-    "mtime": 1781277629.6001875,
-    "ast_hash": "ef397d6e47bf92426bf545090ba5d5bd",
+    "mtime": 1781385287.1198857,
+    "ast_hash": "08c2bac955b451a2460ffc651637c7a6",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/TopProcessesPanel.swift": {
@@ -200,8 +200,8 @@
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/Alerts.swift": {
-    "mtime": 1781256900.512061,
-    "ast_hash": "5c254d3fd5fa8c4d7d28fec05e9d2873",
+    "mtime": 1781363028.066521,
+    "ast_hash": "a4433f30261f7e352cd85e205d264b3b",
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/ByteFormat.swift": {
@@ -255,8 +255,8 @@
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/SafetyVault.swift": {
-    "mtime": 1781278518.1101496,
-    "ast_hash": "f0ebd0bf9b3fd701268e7700ce6b3c3f",
+    "mtime": 1781386055.870564,
+    "ast_hash": "c268cb6830e29d2658a554dcb881aaf9",
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/SleepAssertionReader.swift": {
@@ -265,8 +265,8 @@
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/SmartScan.swift": {
-    "mtime": 1781278540.0940835,
-    "ast_hash": "88f3570bc0f78621ff225c25b6d5973f",
+    "mtime": 1781363890.7665281,
+    "ast_hash": "cb234cced289bb13362ef76e83ab525f",
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/SystemInfo.swift": {
@@ -290,8 +290,8 @@
     "semantic_hash": ""
   },
   "pulse/scripts/bundle.sh": {
-    "mtime": 1781255157.8329465,
-    "ast_hash": "639f040f35ac020f7edf47522dd81dd2",
+    "mtime": 1781364441.13848,
+    "ast_hash": "a0450df4c1d79d53549b9fa262492950",
     "semantic_hash": ""
   },
   "pulse/.build/arm64-apple-macosx/debug/Pulse.dSYM/Contents/Resources/Relocations/aarch64/Pulse.yml": {
@@ -335,18 +335,18 @@
     "semantic_hash": ""
   },
   "pulse/README.md": {
-    "mtime": 1781258866.0886705,
-    "ast_hash": "cd2d10d8c76600e50dd25bd952d9603d",
+    "mtime": 1781303422.6503918,
+    "ast_hash": "183dcd153fa1f8b7ef50092bdd28441f",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/CleanModel.swift": {
-    "mtime": 1781296374.9685936,
-    "ast_hash": "c6471fa807575533487a8542e9cd6541",
+    "mtime": 1781364477.152276,
+    "ast_hash": "edb68604992d50379514456b86a8a3b8",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/CleanView.swift": {
-    "mtime": 1781296473.8953056,
-    "ast_hash": "a1ac05f85560bb2ee1bbb7c73fbc2776",
+    "mtime": 1781364481.45394,
+    "ast_hash": "20127dba5a8f0c5a89a614e142daac75",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/CoreHeatmap.swift": {
@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/CleanScheduler.swift": {
-    "mtime": 1781300563.9637368,
-    "ast_hash": "38b5bddd56fdfd799b262760e955334d",
+    "mtime": 1781363089.8608603,
+    "ast_hash": "b0f30953c878f03b227f08275aa142a4",
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/NetworkSampler.swift": {
@@ -370,8 +370,8 @@
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/MonitorModel.swift": {
-    "mtime": 1781297553.3788612,
-    "ast_hash": "29d1d6190c3f7ea18cd78a953d7ff79f",
+    "mtime": 1781363585.867894,
+    "ast_hash": "dc6f5fc41118512401d4c287be558e8d",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/MonitorView.swift": {
@@ -390,18 +390,18 @@
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/HealthModel.swift": {
-    "mtime": 1781301970.528818,
-    "ast_hash": "00c16cb5b01d52adfd7d6bb915018d75",
+    "mtime": 1781363597.229462,
+    "ast_hash": "43df973868721ca7577728c54c2de1c7",
     "semantic_hash": ""
   },
   "pulse/Sources/Pulse/Views/HealthView.swift": {
-    "mtime": 1781301981.377681,
-    "ast_hash": "2424f746c28c23e8b6d9a71c87edf26c",
+    "mtime": 1781363298.7388778,
+    "ast_hash": "87d17e9bcc6d669019247b2ed1ed7fda",
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/BatteryHistoryStore.swift": {
-    "mtime": 1781302457.8157182,
-    "ast_hash": "ad24dcd4c575b2f0915f24f023337c3a",
+    "mtime": 1781363043.4884205,
+    "ast_hash": "babc091a1382ed017435c6227ec26fb3",
     "semantic_hash": ""
   },
   "pulse/Sources/PulseKit/Benchmark.swift": {
@@ -432,6 +432,96 @@
   "pulse/Sources/PulseKit/DevModeSampler.swift": {
     "mtime": 1781303023.4359505,
     "ast_hash": "9663c7ca25f3be7ccecadee5387a58a4",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/TimelineModel.swift": {
+    "mtime": 1781364313.9547813,
+    "ast_hash": "97ca4836e45a9c9da4ba016672f76931",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Updater.swift": {
+    "mtime": 1781364412.553182,
+    "ast_hash": "ed1e25a672c8b30b3236aa5ec58fce36",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/CommandPaletteView.swift": {
+    "mtime": 1781364387.6238346,
+    "ast_hash": "6771bfa320a2d50c241e8684f2ee542e",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/OnboardingView.swift": {
+    "mtime": 1781363705.224582,
+    "ast_hash": "0aa7404a8c5110ff8d8fd413d920cffa",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/SmartCleanView.swift": {
+    "mtime": 1781364049.7552423,
+    "ast_hash": "489b6fc8f5debd4f6505e94c51c5d9e4",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/StorageComponents.swift": {
+    "mtime": 1781305310.6312206,
+    "ast_hash": "fe3267a2b7f362a7a4a65a1aa0f5c9b5",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/StorageDetailPanel.swift": {
+    "mtime": 1781381105.1806579,
+    "ast_hash": "39cb88da080d3417b4b504e91297c704",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/TimelineView.swift": {
+    "mtime": 1781364348.6176157,
+    "ast_hash": "cde5ef580c2b1575abec02603f1bb256",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/TreemapView.swift": {
+    "mtime": 1781380175.1004753,
+    "ast_hash": "0f8bf0e82d2c9cc3ecea62fc90d17da2",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/VaultView.swift": {
+    "mtime": 1781386140.9194298,
+    "ast_hash": "ab3544257a3203c1c71e95c3eff47407",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/Pulse/Views/WeeklyReportView.swift": {
+    "mtime": 1781364117.0381758,
+    "ast_hash": "e53c3c4388049b5a4d8d8f640a78d9e6",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/PulseKit/StorageScanner.swift": {
+    "mtime": 1781381098.0730028,
+    "ast_hash": "b2c4c5e9dd64169341429b4b15c3457b",
+    "semantic_hash": ""
+  },
+  "pulse/Sources/PulseKit/TimelineStore.swift": {
+    "mtime": 1781364289.5262613,
+    "ast_hash": "ef8ccbfa627eb78ddef7e527bd8c6c06",
+    "semantic_hash": ""
+  },
+  "pulse/clear_tmp.swift": {
+    "mtime": 1781384734.7582233,
+    "ast_hash": "7e7b3e0f45e14dfc355838eb7695065a",
+    "semantic_hash": ""
+  },
+  "pulse/scripts/oslog_test.swift": {
+    "mtime": 1781301807.0089276,
+    "ast_hash": "bf5d33c3926deee8e9fbf82d47ce035a",
+    "semantic_hash": ""
+  },
+  "pulse/scripts/pmset_test.swift": {
+    "mtime": 1781301759.3824391,
+    "ast_hash": "827efc8d3860c989cbe709e5a980018b",
+    "semantic_hash": ""
+  },
+  "pulse/test_alloc.swift": {
+    "mtime": 1781384227.608647,
+    "ast_hash": "1dc3758c9eb6e628b1250d1ae6bc085b",
+    "semantic_hash": ""
+  },
+  "pulse/test_unlink.swift": {
+    "mtime": 1781384277.3560607,
+    "ast_hash": "3e581eb4dd2ea75d12173bd1cd4bada7",
     "semantic_hash": ""
   }
 }
