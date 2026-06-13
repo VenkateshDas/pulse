@@ -36,6 +36,31 @@ public final class SafetyVault: Sendable {
     public let retentionDays: Int
     private static let manifestName = "manifest.json"
 
+    /// Paths Pulse must never move — defense-in-depth at the delete/restore
+    /// boundary, independent of whether the scanner graded a path correctly.
+    /// Blocks system locations (so a tampered manifest can't turn restore into
+    /// an arbitrary-file-placement primitive) and top-level user-data roots.
+    static func isProtected(_ path: String) -> Bool {
+        let std = (path as NSString).standardizingPath
+        guard !std.isEmpty, std != "/" else { return true }
+        let systemPrefixes = [
+            "/System", "/usr", "/bin", "/sbin", "/etc", "/private/etc",
+            "/Library/LaunchDaemons", "/Library/LaunchAgents", "/Applications",
+        ]
+        for prefix in systemPrefixes where std == prefix || std.hasPrefix(prefix + "/") {
+            return true
+        }
+        let home = NSHomeDirectory()
+        let criticalRoots: Set<String> = [
+            home,
+            home + "/Documents", home + "/Desktop", home + "/Movies",
+            home + "/Pictures", home + "/Music",
+            home + "/Library/Mobile Documents",  // iCloud Drive
+            home + "/Library/CloudStorage",  // Dropbox/OneDrive/etc.
+        ]
+        return criticalRoots.contains(std)
+    }
+
     /// Retention window as a TTL, derived from `retentionDays`.
     public var ttl: TimeInterval { TimeInterval(retentionDays) * 86400 }
 
@@ -87,6 +112,8 @@ public final class SafetyVault: Sendable {
 
         var staged: [VaultItem] = []
         for (index, item) in items.enumerated() {
+            // Never stage a protected root, even if a scanner bug selected it.
+            guard !Self.isProtected(item.path) else { continue }
             let source = URL(fileURLWithPath: item.path)
             // Index prefix keeps same-named items (two "Cache" dirs) apart.
             let storedName = "\(index)-\(source.lastPathComponent)"
@@ -127,6 +154,13 @@ public final class SafetyVault: Sendable {
         for item in session.items {
             let source = sessionDir.appendingPathComponent(item.storedName)
             guard FileManager.default.fileExists(atPath: source.path) else { continue }
+            // Refuse to write back to a path outside the user's home subtree —
+            // guards against a tampered manifest turning restore into an
+            // arbitrary-file-placement primitive.
+            guard !Self.isProtected(item.originalPath) else {
+                stranded.append(item)
+                continue
+            }
             let original = URL(fileURLWithPath: item.originalPath)
             try? FileManager.default.createDirectory(
                 at: original.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -161,6 +195,9 @@ public final class SafetyVault: Sendable {
         let source = sessionDir.appendingPathComponent(item.storedName)
         guard FileManager.default.fileExists(atPath: source.path) else {
             throw CocoaError(.fileNoSuchFile)
+        }
+        guard !Self.isProtected(item.originalPath) else {
+            throw CocoaError(.fileWriteNoPermission)
         }
         let original = URL(fileURLWithPath: item.originalPath)
         try? FileManager.default.createDirectory(
@@ -218,16 +255,25 @@ public final class SafetyVault: Sendable {
         var freed: UInt64 = 0
         for session in sessions().sorted(by: { $0.date < $1.date }) {
             if freed >= targetFreeBytes { break }
-            freed += session.totalBytes
-            purge(session)
+            // Only credit bytes the removal actually reclaimed — a locked /
+            // SIP / read-only-mount file leaves the data on disk.
+            if purge(session) { freed += session.totalBytes }
         }
         return freed
     }
 
     /// Permanently deletes one session — the freed space materializes here.
-    public func purge(_ session: VaultSession) {
-        try? FileManager.default.removeItem(
-            at: rootURL.appendingPathComponent(session.id.uuidString))
+    /// Returns whether the session directory is gone afterward.
+    @discardableResult
+    public func purge(_ session: VaultSession) -> Bool {
+        let url = rootURL.appendingPathComponent(session.id.uuidString)
+        do {
+            try FileManager.default.removeItem(at: url)
+            return true
+        } catch {
+            // Already-gone counts as success; anything still on disk does not.
+            return !FileManager.default.fileExists(atPath: url.path)
+        }
     }
 
     /// Removes sessions past their TTL. Returns bytes freed.
@@ -236,8 +282,7 @@ public final class SafetyVault: Sendable {
         let ttl = ttl ?? self.ttl
         var freed: UInt64 = 0
         for session in sessions() where session.expiry(ttl: ttl) <= now {
-            freed += session.totalBytes
-            purge(session)
+            if purge(session) { freed += session.totalBytes }
         }
         return freed
     }

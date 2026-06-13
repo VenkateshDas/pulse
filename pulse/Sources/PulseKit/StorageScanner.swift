@@ -128,12 +128,17 @@ public struct StorageScanner: Sendable {
                 
                 await withTaskGroup(of: (Int, UInt64, Int).self) { group in
                     for (index, child) in children.enumerated() {
-                        if child.isDirectory && child.sizeBytes == 0 {
-                            group.addTask {
-                                let (size, count) = child.path.withCString { pathPtr in
-                                    self.fastDirectorySize(pathPtr)
+                        if child.isDirectory {
+                            // Directories are summed in the newTotal loop below;
+                            // adding them here too would double-count any that
+                            // already carry a size (e.g. from a deep scan).
+                            if child.sizeBytes == 0 {
+                                group.addTask {
+                                    let (size, count) = child.path.withCString { pathPtr in
+                                        self.fastDirectorySize(pathPtr)
+                                    }
+                                    return (index, size, count)
                                 }
-                                return (index, size, count)
                             }
                         } else {
                             resolvedBytes += child.sizeBytes

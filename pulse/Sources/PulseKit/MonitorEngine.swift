@@ -205,7 +205,14 @@ public actor MonitorEngine {
     // CPU/pagein deltas need previous per-pid readings, like ProcessSampler.
     private var previousTaskTime: [pid_t: UInt64] = [:]
     private var previousPageins: [pid_t: Int32] = [:]
-    private var previousSampleAt: UInt64 = 0  // mach time, matches pti_total_* units
+    private var previousSampleAt: UInt64 = 0  // mach ticks; convert to ns before ratio
+    // pti_total_* are nanoseconds; mach_absolute_time() is mach ticks (≈24MHz on
+    // Apple Silicon), so the wall delta needs timebase conversion to ns.
+    private static let timebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
     private var previousSampleUptime: TimeInterval = 0
 
     /// Re-walks the pid list at most twice per second so `sample`, `tree`,
@@ -219,7 +226,9 @@ public actor MonitorEngine {
 
     private func collect() {
         let now = mach_absolute_time()
-        let wallDelta = now &- previousSampleAt
+        let wallDelta =
+            (now &- previousSampleAt) &* UInt64(Self.timebase.numer)
+            / UInt64(Self.timebase.denom)
         let firstSample = previousSampleAt == 0
         let uptime = ProcessInfo.processInfo.systemUptime
         let seconds = uptime - previousSampleUptime

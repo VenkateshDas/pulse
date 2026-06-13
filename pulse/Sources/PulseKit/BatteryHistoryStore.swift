@@ -141,12 +141,19 @@ func parseLogContent(_ log: String) -> [Date: TimeInterval] {
     var dailyUsage: [Date: TimeInterval] = [:]
     
     let lines = log.components(separatedBy: .newlines)
-    
+    // Match a leading "yyyy-MM-dd HH:mm:ss ±ZZZZ" timestamp rather than slicing
+    // a fixed 25 chars — tolerant of leading whitespace and offset-width drift.
+    let stampRegex = try? NSRegularExpression(
+        pattern: #"^\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4})"#)
+
     for line in lines {
-        guard line.count >= 25 else { continue }
-        let dateStr = String(line.prefix(25))
-        guard let date = dateFormatter.date(from: dateStr) else { continue }
-        
+        guard let regex = stampRegex,
+            let match = regex.firstMatch(
+                in: line, range: NSRange(line.startIndex..., in: line)),
+            let stampRange = Range(match.range(at: 1), in: line),
+            let date = dateFormatter.date(from: String(line[stampRange]))
+        else { continue }
+
         let lowerLine = line.lowercased()
         
         if lowerLine.contains("using ac") {

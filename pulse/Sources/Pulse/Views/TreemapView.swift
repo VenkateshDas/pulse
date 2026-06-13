@@ -1,6 +1,18 @@
 import PulseKit
 import SwiftUI
 
+extension String {
+    /// Stable palette index from a string. `String.hashValue` is seeded per
+    /// process (colors would change every launch) and can be `Int.min`, where
+    /// `abs` overflow-traps — so use a fixed FNV-1a hash instead.
+    func paletteIndex(_ count: Int) -> Int {
+        guard count > 0 else { return 0 }
+        var hash: UInt64 = 1_469_598_103_934_665_603  // FNV-1a offset basis
+        for byte in utf8 { hash = (hash ^ UInt64(byte)) &* 1_099_511_628_211 }
+        return Int(hash % UInt64(count))
+    }
+}
+
 /// Overlay lens applied to the same treemap — switch with no re-scan.
 enum StorageLens: String, CaseIterable, Identifiable {
     case safety = "Safety"
@@ -92,7 +104,7 @@ struct TreemapView: View {
             if idle < 180 { return Halo.amber }
             return Halo.flare
         case .owner:
-            return Self.ownerPalette[abs(cell.category.hashValue) % Self.ownerPalette.count]
+            return Self.ownerPalette[cell.category.paletteIndex(Self.ownerPalette.count)]
         }
     }
 

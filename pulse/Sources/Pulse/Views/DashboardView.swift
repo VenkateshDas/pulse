@@ -92,7 +92,21 @@ struct DashboardView: View {
             split = "\(snapshot?.cpuPerCore.count ?? 0) cores"
         }
         let cpuTooltip = snapshot?.cpuPerCore.enumerated().map { "Core \($0.offset): \(Int($0.element))%" }.joined(separator: "\n")
-        
+
+        // Footer chips: the biggest CPU consumer right now, and how many cores
+        // are actually loaded — the two things you reach for when CPU is high.
+        var cpuStats: [VitalCard.Stat] = []
+        if let top = snapshot?.topProcesses.first, top.cpuPercent >= 1 {
+            let name = top.name.count > 12 ? String(top.name.prefix(11)) + "…" : top.name
+            cpuStats.append(.init(label: "TOP", value: "\(name) \(Int(top.cpuPercent))%"))
+        }
+        if let cores = snapshot?.cpuPerCore, !cores.isEmpty {
+            let busy = cores.filter { $0 >= 20 }.count
+            cpuStats.append(
+                .init(label: "BUSY", value: "\(busy)/\(cores.count)",
+                    color: busy == cores.count ? Halo.amber : nil))
+        }
+
         return VitalCard(
             title: "CPU",
             fraction: total / 100,
@@ -100,7 +114,8 @@ struct DashboardView: View {
             line1: split,
             line2: String(format: "load %5.2f", snapshot?.loadAverage1m ?? 0),
             history: model.cpuHistory,
-            cardTooltip: cpuTooltip
+            cardTooltip: cpuTooltip,
+            stats: cpuStats
         )
     }
 
@@ -178,15 +193,37 @@ struct DashboardView: View {
             "Used Space: \(ByteFormat.string(used))",
             "Free Space: \(ByteFormat.string(free))"
         ].joined(separator: "\n")
-        
+
+        // Footer chips: free space, and — projecting the weekly growth trend
+        // forward — roughly when the disk runs out.
+        var diskStats: [VitalCard.Stat] = [.init(label: "FREE", value: ByteFormat.string(free))]
+        if let weekly = snapshot?.diskWeeklyGrowthBytes {
+            if weekly > 0, free > 0 {
+                let weeks = Double(free) / Double(weekly)
+                diskStats.append(
+                    .init(label: "FULL IN", value: Self.diskETA(weeks),
+                        color: weeks < 8 ? Halo.amber : nil))
+            } else {
+                diskStats.append(.init(label: "TREND", value: "stable"))
+            }
+        }
+
         return VitalCard(
             title: "DISK",
             fraction: snapshot?.diskUsedFraction ?? 0,
             value: String(format: "%2d%%", Int((snapshot?.diskUsedFraction ?? 0) * 100)),
             line1: "\(ByteFormat.string(used)) / \(ByteFormat.string(total))",
             line2: growth,
-            cardTooltip: diskTooltip
+            cardTooltip: diskTooltip,
+            stats: diskStats
         )
+    }
+
+    /// Human-friendly "time until full" from a week count: years / months / weeks.
+    private static func diskETA(_ weeks: Double) -> String {
+        if weeks >= 104 { return "~\(Int((weeks / 52).rounded()))y" }
+        if weeks >= 9 { return "~\(Int((weeks / 4.345).rounded()))mo" }
+        return "~\(max(1, Int(weeks.rounded())))wk"
     }
 
     private var thermalCard: some View {
@@ -245,6 +282,22 @@ struct DashboardView: View {
         if let batt = sensors.batteryTempC { thermalLines.append(String(format: "Battery: %.0f°C", batt)) }
         let thermalTooltip = thermalLines.isEmpty ? nil : thermalLines.joined(separator: "\n")
 
+        // Footer chips: degrees of headroom before throttling (~90 °C on Apple
+        // Silicon) and whether temps are climbing — context a bare number lacks.
+        let headroom = max(0, 90 - hottest)
+        var thermalStats: [VitalCard.Stat] = [
+            .init(
+                label: "HEADROOM", value: String(format: "%.0f°", headroom),
+                color: headroom < 10 ? Halo.flare : (headroom < 25 ? Halo.amber : nil))
+        ]
+        if model.tempHistory.count >= 6 {
+            let recent = model.tempHistory.suffix(6)
+            let delta = (recent.last ?? 0) - (recent.first ?? 0)
+            let trend = delta > 2 ? "rising" : (delta < -2 ? "falling" : "steady")
+            thermalStats.append(
+                .init(label: "TREND", value: trend, color: delta > 2 ? Halo.amber : nil))
+        }
+
         return VitalCard(
             title: "THERMAL",
             fraction: min(max((hottest - 20) / 90, 0), 1),
@@ -254,7 +307,8 @@ struct DashboardView: View {
             line2: parts.joined(separator: " · "),
             history: model.tempHistory,
             historyScale: 110,
-            cardTooltip: thermalTooltip
+            cardTooltip: thermalTooltip,
+            stats: thermalStats
         )
     }
 

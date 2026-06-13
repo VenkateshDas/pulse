@@ -23,6 +23,15 @@ struct VitalCard: View {
     }
     var legend: [LegendItem]? = nil
 
+    /// Optional secondary stat chips (small LABEL value pairs) rendered along
+    /// the card footer — fills the space cards without a legend would waste.
+    struct Stat: Equatable {
+        let label: String
+        let value: String
+        var color: Color? = nil
+    }
+    var stats: [Stat]? = nil
+
     /// Optional segmented ring definition (start and end fractions, and color).
     struct Segment: Equatable {
         let start: Double
@@ -75,6 +84,25 @@ struct VitalCard: View {
                                 .foregroundStyle(Halo.textDim)
                         }
                     }
+                }
+            }
+
+            if let stats = stats {
+                HStack(spacing: 12) {
+                    ForEach(Array(stats.enumerated()), id: \.offset) { _, stat in
+                        HStack(spacing: 4) {
+                            Text(stat.label)
+                                .font(.system(size: 8, weight: .semibold))
+                                .tracking(1)
+                                .foregroundStyle(Halo.textDim.opacity(0.7))
+                            Text(stat.value)
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundStyle(stat.color ?? Halo.textPrimary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                    }
+                    Spacer(minLength: 0)
                 }
             }
         }

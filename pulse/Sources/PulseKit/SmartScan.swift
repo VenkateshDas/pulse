@@ -204,7 +204,12 @@ public struct SmartScanner: Sendable {
         for target in effectiveTargets {
             let url = home.appendingPathComponent(target.rel)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
-            if target.expand {
+            if target.rel == ".Trash" {
+                // Stage individual trashed items, never the ~/.Trash directory
+                // itself — moving the dir wholesale breaks Finder "Put Back"
+                // and buries items the user may still want to recover.
+                out += expandTrash(parent: url, detail: target.detail)
+            } else if target.expand {
                 out += expandPerApp(
                     parent: url, category: target.category,
                     grade: target.grade, detail: target.detail)
@@ -258,6 +263,39 @@ public struct SmartScanner: Sendable {
         }
         out.sort { $0.sizeBytes > $1.sizeBytes }
         return Array(out.prefix(topN))
+    }
+
+    /// Each top-level entry in ~/.Trash as its own row, so cleaning stages the
+    /// trashed items individually instead of moving the .Trash directory whole.
+    private func expandTrash(parent: URL, detail: String) -> [CleanItem] {
+        guard
+            let children = try? FileManager.default.contentsOfDirectory(
+                at: parent, includingPropertiesForKeys: [.isDirectoryKey],
+                options: [])
+        else { return [] }
+        var out: [CleanItem] = []
+        for child in children {
+            let isDir =
+                (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            let size =
+                isDir
+                ? Self.directorySize(child)
+                : UInt64(
+                    (try? child.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?
+                        .totalFileAllocatedSize ?? 0)
+            out.append(
+                CleanItem(
+                    category: "Trash",
+                    label: child.lastPathComponent,
+                    detail: detail,
+                    path: child.path,
+                    sizeBytes: size,
+                    idleDays: idleDays(of: child),
+                    grade: .safe
+                ))
+        }
+        out.sort { $0.sizeBytes > $1.sizeBytes }
+        return out
     }
 
     // MARK: - Home walk

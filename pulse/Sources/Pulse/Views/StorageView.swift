@@ -212,7 +212,7 @@ struct StorageView: View {
             }
             let palette = [Halo.ion, Halo.volt, Halo.amber, Halo.pulseGreen, Halo.flare]
             return categories.prefix(5).map { cat in
-                (cat, palette[abs(cat.hashValue) % palette.count])
+                (cat, palette[cat.paletteIndex(palette.count)])
             }
         }
     }

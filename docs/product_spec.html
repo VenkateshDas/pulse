@@ -1059,7 +1059,7 @@ pulse/
 
 <!-- §12 BUILD LOG -->
 <h2 id="buildlog"><span class="n">12 ·</span> Build Log &amp; Decisions</h2>
-<p style="font-size:.88rem;color:var(--muted)">Living section. Last updated: <b>June 13, 2026</b> — v1.0 launch prep complete. All milestones M0–M8 implemented (notarization pending Apple Developer enrollment).</p>
+<p style="font-size:.88rem;color:var(--muted)">Living section. Last updated: <b>June 14, 2026</b> — v1.0 launch prep complete; codebase-review hardening pass applied (CPU timebase, vault accounting, protected-path guard, treemap colors) + dashboard KPI stat chips. All milestones M0–M8 implemented (notarization pending Apple Developer enrollment).</p>
 
 <h3>Key decisions &amp; rationale</h3>
 <table>
@@ -1086,7 +1086,12 @@ pulse/
   <li>ISO8601 JSON date round-trip truncates sub-second precision — compare struct fields, not whole Codable structs with Date, in tests</li>
   <li>First storage scan stalls minutes blocked on TCC (Downloads/Desktop/Documents) with no visible dialog. Later scans ~2s. Addressed by the onboarding pre-flight (FDA deep-link before the first scan)</li>
   <li><code>UNUserNotificationCenter.current()</code> traps from a bare SwiftPM executable (no bundle). Guard every notification call with <code>Bundle.main.bundleIdentifier != nil</code></li>
-  <li>Dashboard layout is non-scrolling by design — fits min window 1080×720, bottom row stretches. Verify after any card addition</li>
+  <li>Dashboard layout is non-scrolling by design — fits min window 1080×720, bottom row stretches. Verify after any card addition. KPI cards now carry optional footer stat chips (<code>VitalCard.stats</code>) so CPU/Disk/Thermal match the MEMORY card's legend height — keep them single-line + <code>minimumScaleFactor</code></li>
+  <li><b>Per-process CPU% must convert mach ticks to ns.</b> <code>proc_taskinfo.pti_total_user/system</code> are nanoseconds; <code>mach_absolute_time()</code> is mach ticks (≈24 MHz on Apple Silicon, timebase ≈125/3). Dividing task-ns by tick-delta inflates CPU% ~40× on M-series — and looks <em>correct</em> on Intel where the units coincide. Convert the wall delta with <code>mach_timebase_info</code> first (ProcessSampler + MonitorEngine)</li>
+  <li><b>Never credit "freed" bytes before the delete succeeds.</b> SafetyVault purge does <code>try? removeItem</code>; locked/SIP/read-only files fail silently. <code>purge</code> returns whether the dir is actually gone — credit <code>session.totalBytes</code> only then, or the disk-pressure path reports space it never reclaimed</li>
+  <li><b>Defense-in-depth at the delete/restore boundary.</b> <code>SafetyVault.isProtected()</code> refuses system locations + top-level user-data roots regardless of scanner grading — a tampered manifest's <code>originalPath</code> must not become an arbitrary-file-placement primitive. It denylists by path, not "must be under home" (which breaks the temp-home test harness)</li>
+  <li><b>Trash cleans contents, not the directory.</b> Staging <code>~/.Trash</code> wholesale buries items and breaks Finder "Put Back". <code>SmartScan.expandTrash</code> emits one row per trashed item; the <code>.Trash</code> dir itself is never moved</li>
+  <li><b>Don't use <code>abs(String.hashValue)</code> for stable colors.</b> Swift's string hash is per-process seeded (colors churn every launch) and can be <code>Int.min</code> (<code>abs</code> overflow-traps → crash from layout). Use <code>String.paletteIndex</code> (FNV-1a) so the treemap and its legend agree across launches</li>
 </ul>
 
 <h3 style="margin-top:24px">Measured performance (Apple M2, 60s cputime deltas, quiet system)</h3>

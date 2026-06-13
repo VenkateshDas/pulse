@@ -2,6 +2,24 @@
 
 This is a chronological, append-only record of significant changes, updates, and maintenance tasks performed by AI agents on this repository.
 
+## [2026-06-14] update | Dashboard KPI cards: footer stat chips on CPU/Disk/Thermal
+- Added an optional `stats: [Stat]` slot to `VitalCard` (small `LABEL value` pairs styled like the existing MEMORY legend), filling the dead space under cards that lack a legend so all four KPI cards are equal height and information-dense.
+- **CPU**: `TOP <proc> <n>%` (biggest live consumer, name capped 12 chars) + `BUSY <busy>/<total>` cores ≥20% loaded (amber when all pegged).
+- **DISK**: `FREE <bytes>` + `FULL IN ~Xwk/mo/y` — projects `diskWeeklyGrowthBytes` forward to estimate runway (amber under 8 weeks); `TREND stable` when growth ≤ 0. Falls back to FREE-only until a week of growth data accrues.
+- **THERMAL**: `HEADROOM <n>°` to the ~90 °C Apple-Silicon throttle ceiling (amber <25°, red <10°) + `TREND rising/steady/falling` from `tempHistory`.
+- All values reuse existing `SystemSnapshot` fields — no new sampling, no subprocess, hot path untouched. Build clean, 67/67 tests pass.
+
+## [2026-06-14] fix | Codebase review: 7 correctness/security fixes across PulseKit + Views
+- **CPU% timebase (ProcessSampler.swift, MonitorEngine.swift)**: per-process CPU% divided `pti_total_*` (nanoseconds) by a `mach_absolute_time()` delta (mach ticks, ≈24 MHz on Apple Silicon) — inflating every reading ~40× on M-series (correct only on Intel where the units coincide). Now converts the wall delta to ns via a cached `mach_timebase_info` before the busy/wall ratio.
+- **Vault freed-byte accounting (SafetyVault.swift)**: `purgeOldestIfNeeded`/`purgeExpired` credited `session.totalBytes` to "freed" *before* a `try?`-swallowed `removeItem`, overstating reclaimed space (and breaking disk-pressure relief) when a file was locked/SIP/read-only. `purge` now returns whether the dir is actually gone; bytes are credited only on success.
+- **Vault protected-path guard (SafetyVault.swift)**: added `isProtected()` defense-in-depth at the stage/restore boundary — refuses system locations (`/System`, `/usr`, `/etc`, LaunchDaemons/Agents, `/Applications`) and top-level user-data roots (Documents/Desktop/iCloud/CloudStorage), independent of scanner grading. Stops a tampered manifest turning restore into arbitrary file placement.
+- **Trash cleaning (SmartScan.swift)**: `.Trash` was graded `.safe` and pre-selected, so Smart Clean moved the *entire* `~/.Trash` directory into the vault — burying items and breaking Finder "Put Back". New `expandTrash` stages each trashed item individually; the `.Trash` directory itself is never moved.
+- **Storage double-count (StorageScanner.swift)**: `scanSizesStream` added directory children to `resolvedBytes` AND re-summed every directory in the `newTotal` loop, double-counting any pre-sized dir (e.g. from a deep scan) and inflating parent totals. Directories are now summed once.
+- **Treemap color crash/instability (TreemapView.swift, StorageView.swift)**: `abs(String.hashValue) % palette` could trap on `Int.min` and produced different colors every launch (per-process hash seed). Replaced with a stable FNV-1a `String.paletteIndex`, used by both the treemap and its legend so they always agree.
+- **pmset parse robustness (BatteryHistoryStore.swift)**: replaced blind `line.prefix(25)` date slicing with a regex matching a leading `yyyy-MM-dd HH:mm:ss ±ZZZZ` stamp — tolerant of leading whitespace / offset-width drift instead of silently returning an empty 60-day battery chart.
+- **Investigated & refuted**: the CPU-hog "% of total load" math in `Alerts.swift` — `hog/(avgCorePct × cores)×100` is dimensionally correct since `cpuTotalPercent` is a per-core average; its earlier-looking garbage was a symptom of the CPU timebase bug, not Alerts. Left untouched.
+- Verified via `make build` + `make test` (67/67). The protected-path guard initially used real `NSHomeDirectory()` and rejected the test harness's temp home; reworked to a system-prefix + user-root denylist that defends the real attack surface without assuming a fixed home.
+
 ## [2026-06-13] fix | Resolved Swift 6 String(cString:) deprecation warnings
 - Modified `StorageScanner.swift` to use `.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }` instead of the deprecated array overload for `String(cString:)`, clearing all compiler warnings.
 
