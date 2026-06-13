@@ -1,10 +1,32 @@
+# macOS
 .DS_Store
+
+# Swift / Xcode
 .build/
 .swiftpm/
 pulse/.build/
-pulse/dist/
 pulse/.swiftpm/
-legacy_tui/__pycache__/
 *.xcodeproj/
 xcuserdata/
 DerivedData/
+
+# Build output
+pulse/dist/
+
+# Dev tools (local only — not for public repo)
+.agents/
+.claude/
+graphify-out/
+pulse/graphify-out/
+skills-lock.json
+legacy_tui/skills-lock.json
+
+# Internal docs / wiki (dev-only)
+docs/
+index.md
+log.md
+AGENTS.md
+
+# Python legacy
+legacy_tui/__pycache__/
+legacy_tui/.venv/
