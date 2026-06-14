@@ -462,12 +462,6 @@ struct OptimizeEngineTests {
         #expect(Set(ids).count == ids.count)
     }
 
-    @Test func sudoTasksRefuseToRunInProcess() async throws {
-        let task = try #require(OptimizeEngine.tasks.first { $0.needsSudo })
-        let result = try await task.run()
-        #expect(!result.success)
-    }
-
     @Test func dirBytesSumsFileSizes() async throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
@@ -479,10 +473,10 @@ struct OptimizeEngineTests {
     }
 }
 
-// MARK: - Privileged helper contract (F2 helper)
+// MARK: - Privileged operations (F2)
 
-@Suite("PrivilegedHelper")
-struct PrivilegedHelperTests {
+@Suite("PrivilegedOperation")
+struct PrivilegedOperationTests {
     @Test func everyOperationMapsToAbsolutePathCommands() {
         for op in PrivilegedOperation.allCases {
             #expect(!op.commands.isEmpty)
@@ -500,18 +494,18 @@ struct PrivilegedHelperTests {
         #expect(PrivilegedOperation(rawValue: "rm -rf /") == nil)
     }
 
-    @Test func codeSignRequirementPinsIdentifier() {
-        #expect(pulseCodeSignRequirement(identifier: "com.pulse.helper")
-            == "identifier \"com.pulse.helper\"")
+    @Test func shellScriptIsBuiltFromFixedTokensOnly() {
+        // Each token single-quoted; no caller input can enter the string.
+        #expect(PrivilegedOperation.purgeMemory.shellScript == "'/usr/sbin/purge'")
+        #expect(PrivilegedOperation.flushNetworkStack.shellScript
+            == "'/sbin/route' '-n' 'flush' ; '/usr/sbin/arp' '-a' '-d'")
+        // No double quotes → safe to embed in the AppleScript string literal.
+        for op in PrivilegedOperation.allCases {
+            #expect(!op.shellScript.contains("\""))
+        }
     }
 
     @Test func privilegedTasksCoverThreeOperations() {
         #expect(OptimizeEngine.privilegedTasks.count == PrivilegedOperation.allCases.count)
-    }
-
-    @Test func unenabledHelperPerformFailsGracefully() async {
-        // No bundle in the test runner → status .unavailable → never crashes.
-        let result = await PrivilegedHelperClient.shared.perform(.purgeMemory)
-        #expect(!result.success)
     }
 }

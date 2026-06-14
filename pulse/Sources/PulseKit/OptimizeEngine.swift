@@ -15,8 +15,7 @@ public struct OptimizeResult: Sendable, Equatable {
 
 /// A single maintenance operation. Ported from mole's `lib/optimize/tasks.sh`
 /// as a typed, dry-run-aware unit. Safe/non-privileged tasks run in-process;
-/// `needsSudo` tasks are scaffolded but routed to a privileged helper that
-/// does not exist yet — they stay disabled until that lands.
+/// `needsSudo` tasks run as root via an admin password prompt (PrivilegedRunner).
 public struct OptimizeTask: Identifiable, Sendable {
     public enum Risk: String, Sendable, CaseIterable { case safe, careful, review }
 
@@ -144,16 +143,16 @@ public enum OptimizeEngine {
             }),
     ]
 
-    /// Elevation-required. Routed through the SMAppService privileged helper;
-    /// `run` fails gracefully with a clear message when the helper isn't enabled.
+    /// Elevation-required. Routed through Authorization Services (an admin
+    /// password prompt) via PrivilegedRunner — works in any signed/unsigned build.
     static let privilegedTasks: [OptimizeTask] = [
         OptimizeTask(
             id: "memory_pressure_relief",
             label: "Free inactive memory",
             detail: "Run `purge` to release inactive/cached memory back to the OS.",
             risk: .careful, needsSudo: true,
-            preview: { "Would run: sudo purge (via privileged helper)" },
-            run: { await PrivilegedHelperClient.shared.perform(.purgeMemory) }),
+            preview: { "Would run: sudo purge (asks for your password)" },
+            run: { await PrivilegedRunner.run(.purgeMemory) }),
 
         OptimizeTask(
             id: "network_stack_optimize",
@@ -161,8 +160,8 @@ public enum OptimizeEngine {
             detail: "Flush the route table and ARP cache. Skipped while a VPN is active.",
             risk: .careful, needsSudo: true,
             skipCheck: { await vpnActive() ? "VPN active — network reset skipped" : nil },
-            preview: { "Would flush routes + arp -a -d (via privileged helper)" },
-            run: { await PrivilegedHelperClient.shared.perform(.flushNetworkStack) }),
+            preview: { "Would flush routes + arp -a -d (asks for your password)" },
+            run: { await PrivilegedRunner.run(.flushNetworkStack) }),
 
         OptimizeTask(
             id: "spotlight_index_optimize",
@@ -174,8 +173,8 @@ public enum OptimizeEngine {
                 // "Indexing enabled." means healthy → skip.
                 return out.stdout.contains("Indexing enabled") ? "Spotlight already healthy" : nil
             },
-            preview: { "Would run: sudo mdutil -E / (via privileged helper)" },
-            run: { await PrivilegedHelperClient.shared.perform(.rebuildSpotlightIndex) }),
+            preview: { "Would run: sudo mdutil -E / (asks for your password)" },
+            run: { await PrivilegedRunner.run(.rebuildSpotlightIndex) }),
     ]
 
     // MARK: Helpers

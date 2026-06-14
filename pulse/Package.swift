@@ -7,7 +7,6 @@ let package = Package(
     products: [
         .library(name: "PulseKit", targets: ["PulseKit"]),
         .executable(name: "Pulse", targets: ["Pulse"]),
-        .executable(name: "PulseHelper", targets: ["PulseHelper"]),
     ],
     // Sparkle auto-updates (P0-8): Updater.swift wires it up behind
     // `#if canImport(Sparkle)`, so enabling is a two-line change here —
@@ -25,9 +24,6 @@ let package = Package(
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [
             .process("Resources")
         ]),
-        // Privileged root daemon (SMAppService). Runs the fixed maintenance
-        // ops in PrivilegedOperation on behalf of the sandboxed GUI app.
-        .executableTarget(name: "PulseHelper", dependencies: ["PulseKit"]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
     ]
 )
