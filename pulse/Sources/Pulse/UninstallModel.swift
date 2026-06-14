@@ -198,25 +198,32 @@ final class UninstallModel {
         }
         let reviewLeft = plan.leftovers.filter { $0.grade == .review }.count
 
-        Task.detached(priority: .userInitiated) { [vault] in
-            // 1. App bundle → system Trash (Finder "Put Back" restores it).
+        Task { [vault] in
+            // 1. App bundle → system Trash. Runs on the main actor: the Finder
+            //    fallback uses Apple Events, which must be sent from the main
+            //    thread to present its consent/auth prompts.
             let trashed = Self.moveAppToTrash(appURL)
 
-            // 2. Ticked leftovers → one Vault session (instant APFS rename).
-            //    The session's items are the *real* staged contents — a row only
-            //    exists if its move truly succeeded.
-            var session: VaultSession?
-            if !leftovers.isEmpty {
-                session = try? vault.stage(
-                    items: leftovers, title: "Uninstall \(appName) — \(leftovers.count) leftovers")
-            }
+            // 2. Ticked leftovers → one Vault session (instant APFS rename) on a
+            //    background task. The session's items are the *real* staged
+            //    contents — a row only exists if its move truly succeeded.
+            let session: VaultSession? =
+                leftovers.isEmpty
+                ? nil
+                : await Task.detached(priority: .userInitiated) {
+                    try? vault.stage(
+                        items: leftovers,
+                        title: "Uninstall \(appName) — \(leftovers.count) leftovers")
+                }.value
+
             let stagedItems = session?.items ?? []
             let stagedPaths = Set(stagedItems.map(\.originalPath))
             let failed = leftovers
                 .filter { !stagedPaths.contains($0.path) }
                 .map { PendingItem(path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes) }
 
-            let receipt = UninstallResult(
+            self.isUninstalling = false
+            self.result = UninstallResult(
                 appName: appName,
                 appBundlePath: appURL.path,
                 appTrashed: trashed,
@@ -225,16 +232,10 @@ final class UninstallModel {
                 failedItems: failed,
                 reviewLeftCount: reviewLeft,
                 sessionIDs: session.map { [$0.id] } ?? [])
-
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.isUninstalling = false
-                self.result = receipt
-                self.plan = nil
-                self.selection = []
-                // The trashed app is gone — drop it from the installed list.
-                if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
-            }
+            self.plan = nil
+            self.selection = []
+            // The trashed app is gone — drop it from the installed list.
+            if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
         }
     }
 
@@ -252,17 +253,20 @@ final class UninstallModel {
             (path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
         }
 
-        Task.detached(priority: .userInitiated) { [vault] in
+        Task { [vault] in
             var trashed = previous.appTrashed
             if needsTrash {
                 trashed = Self.moveAppToTrash(appURL)
             }
 
-            var session: VaultSession?
-            if !failed.isEmpty {
-                session = try? vault.stage(
-                    items: failed, title: "Uninstall \(appName) (retry) — \(failed.count) leftovers")
-            }
+            let session: VaultSession? =
+                failed.isEmpty
+                ? nil
+                : await Task.detached(priority: .userInitiated) {
+                    try? vault.stage(
+                        items: failed,
+                        title: "Uninstall \(appName) (retry) — \(failed.count) leftovers")
+                }.value
             let newlyStaged = session?.items ?? []
             let newlyStagedPaths = Set(newlyStaged.map(\.originalPath))
             let stillFailed = previous.failedItems.filter { !newlyStagedPaths.contains($0.path) }
@@ -277,46 +281,41 @@ final class UninstallModel {
                 reviewLeftCount: previous.reviewLeftCount,
                 sessionIDs: previous.sessionIDs + (session.map { [$0.id] } ?? []))
 
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.isUninstalling = false
-                self.result = merged
-                if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
-                if !merged.needsAttention {
-                    self.report = "All set — \(appName) and its leftovers are fully removed."
-                }
+            self.isUninstalling = false
+            self.result = merged
+            if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
+            if !merged.needsAttention {
+                self.report = "All set — \(appName) and its leftovers are fully removed."
             }
         }
     }
 
-    /// Moves an app bundle to the system Trash. Uses `FileManager.trashItem`
-    /// (not `NSWorkspace.recycle`): recycle silently fails on Mac App Store
-    /// bundles carrying a `com.apple.macl` sandbox xattr, while `trashItem`
-    /// performs the same rename into `~/.Trash` and still records Finder
-    /// "Put Back" metadata. Succeeds whenever the parent dir is writable
-    /// (`/Applications` is writable by admin users), regardless of the
-    /// bundle's own root ownership.
-    nonisolated static func moveAppToTrash(_ url: URL) -> Bool {
-        do {
-            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+    /// Moves an app bundle to the system Trash, handling macOS's protections:
+    ///
+    /// 1. `FileManager.trashItem` — fast, silent, works for ordinary
+    ///    user-writable apps and keeps Finder "Put Back".
+    /// 2. If that fails (Mac App Store bundles with a `com.apple.macl` xattr
+    ///    live under **App Management** protection — a separate gate from Full
+    ///    Disk Access that blocks a GUI app from moving *other* apps' bundles),
+    ///    ask **Finder** to trash it via Apple Events. Finder is exempt from
+    ///    App Management and prompts for admin auth exactly like a manual
+    ///    drag-to-Trash. `NSAppleScript` sends Apple Events in-process — no
+    ///    subprocess — but must run on the main thread to present its prompts.
+    ///
+    /// Returns true only if the bundle actually left its original location.
+    @MainActor
+    static func moveAppToTrash(_ url: URL) -> Bool {
+        if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil {
             return true
-        } catch {
-            // Fallback: if even trashItem refuses, a direct rename into
-            // ~/.Trash works whenever the parent dir is writable (it loses
-            // the Finder "Put Back" anchor, but the app is still recoverable).
-            let trash = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".Trash")
-            var dest = trash.appendingPathComponent(url.lastPathComponent)
-            var counter = 2
-            while FileManager.default.fileExists(atPath: dest.path) {
-                let base = url.deletingPathExtension().lastPathComponent
-                let ext = url.pathExtension
-                dest = trash.appendingPathComponent(
-                    ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)")
-                counter += 1
-            }
-            return (try? FileManager.default.moveItem(at: url, to: dest)) != nil
         }
+        let escaped = url.path
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let source = "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"
+        var scriptError: NSDictionary?
+        NSAppleScript(source: source)?.executeAndReturnError(&scriptError)
+        // Trust the filesystem, not the event result — confirm it's really gone.
+        return !FileManager.default.fileExists(atPath: url.path)
     }
 
     /// Opens System Settings → Privacy & Security → Full Disk Access so the
