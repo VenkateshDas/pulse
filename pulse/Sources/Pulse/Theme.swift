@@ -1,25 +1,51 @@
 import SwiftUI
 
-/// HALO design tokens (see docs/design_mockups.html).
-/// Safety colors are reserved for safety meaning only.
+/// HALO design tokens — Precision Instrument Aesthetic
+/// Dynamic Light/Dark mode support.
 enum Halo {
-    static let void = Color(hex: 0x06090F)
-    static let surface1 = Color(hex: 0x0E1520)
-    static let surface2 = Color(hex: 0x141D2C)
-    static let ion = Color(hex: 0x00E5FF)      // live data + primary action
-    static let volt = Color(hex: 0x7C5CFF)     // history / secondary
-    static let pulseGreen = Color(hex: 0x2EE6A8)
-    static let amber = Color(hex: 0xFFB02E)
-    static let flare = Color(hex: 0xFF4D6A)
-    static let textPrimary = Color(hex: 0xE8F0FA)
-    static let textDim = Color(hex: 0x6C7A90)
+    static let void = Color(nsColor: NSColor(name: "Canvas", dynamicProvider: { appearance in
+        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.08, alpha: 1.0) : NSColor(calibratedWhite: 0.96, alpha: 1.0)
+    }))
 
-    /// Status color for a 0–1 load fraction: calm → warn → critical.
+    static let surface1 = Color(nsColor: NSColor(name: "Surface1", dynamicProvider: { appearance in
+        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.12, alpha: 1.0) : NSColor(calibratedWhite: 1.0, alpha: 1.0)
+    }))
+
+    static let surface2 = Color(nsColor: NSColor(name: "Surface2", dynamicProvider: { appearance in
+        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.18, alpha: 1.0) : NSColor(calibratedWhite: 0.92, alpha: 1.0)
+    }))
+
+    static let border = Color(nsColor: NSColor(name: "Border", dynamicProvider: { appearance in
+        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.25, alpha: 1.0) : NSColor(calibratedWhite: 0.85, alpha: 1.0)
+    }))
+
+    static let textPrimary = Color(nsColor: NSColor(name: "TextPrimary", dynamicProvider: { appearance in
+        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.95, alpha: 1.0) : NSColor(calibratedWhite: 0.10, alpha: 1.0)
+    }))
+
+    static let textDim = Color(nsColor: NSColor(name: "TextDim", dynamicProvider: { appearance in
+        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.60, alpha: 1.0) : NSColor(calibratedWhite: 0.50, alpha: 1.0)
+    }))
+
+    // Semantic Data Colors (Precision Instrument)
+    static let nominal = Color(hex: 0x34C759)   // Apple Green
+    static let warning = Color(hex: 0xFF9F0A)   // Apple Orange
+    static let critical = Color(hex: 0xFF453A)  // Apple Red
+    static let interactive = Color(hex: 0x007AFF) // Apple Blue
+
+    // Legacy names mapped to new semantic colors to prevent breaking other files
+    static let ion = interactive
+    static let volt = Color(hex: 0x5E5CE6) // Indigo
+    static let pulseGreen = nominal
+    static let amber = warning
+    static let flare = critical
+
+    /// Status color for a 0–1 load fraction: nominal → warning → critical.
     static func statusColor(_ fraction: Double) -> Color {
         switch fraction {
-        case ..<0.60: ion
-        case ..<0.85: amber
-        default: flare
+        case ..<0.60: nominal
+        case ..<0.85: warning
+        default: critical
         }
     }
 }

@@ -60,7 +60,7 @@ struct SidebarView: View {
         .frame(width: 216)
         .background(Halo.void)
         .overlay(alignment: .trailing) {
-            Rectangle().fill(Halo.surface2).frame(width: 1)
+            Rectangle().fill(Halo.border).frame(width: 1)
         }
     }
 
@@ -74,17 +74,12 @@ struct SidebarView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 9))
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(
-                            LinearGradient(
-                                colors: [Halo.ion.opacity(0.9), Halo.volt],
-                                startPoint: .topLeading, endPoint: .bottomTrailing
-                            )
-                        )
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Halo.interactive)
                         .frame(width: 34, height: 34)
                     Image(systemName: "waveform.path.ecg")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Halo.void)
+                        .foregroundStyle(.white)
                 }
             }
             Text("PULSE")
@@ -112,7 +107,7 @@ struct SidebarView: View {
             .padding(.vertical, 8)
             .background(
                 selection == item ? Halo.surface2 : .clear,
-                in: RoundedRectangle(cornerRadius: 8)
+                in: RoundedRectangle(cornerRadius: 6)
             )
             .overlay(alignment: .leading) {
                 if selection == item {

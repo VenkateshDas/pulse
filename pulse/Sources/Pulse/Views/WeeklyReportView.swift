@@ -85,7 +85,6 @@ struct WeeklyReportView: View {
         .padding(28)
         .frame(width: 540, height: 560)
         .background(Halo.void)
-        .preferredColorScheme(.dark)
     }
 
     private func stat(_ value: String, _ label: String, _ tint: Color) -> some View {

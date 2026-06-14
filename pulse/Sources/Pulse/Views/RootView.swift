@@ -31,7 +31,6 @@ struct RootView: View {
         }
         .frame(minWidth: 1080, minHeight: 720)
         .background(Halo.void)
-        .preferredColorScheme(.dark)
         .background {
             // Hidden ⌘K hotkey for the command palette (no visible chrome).
             Button("") { showPalette = true }
