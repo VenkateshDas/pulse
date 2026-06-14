@@ -140,6 +140,10 @@ public struct UninstallScanner: Sendable {
         ("PrivilegedHelperTools", "Privileged helper"),
     ]
 
+    /// Categories that live in root-owned `/Library` — removable only with
+    /// admin rights, so they're always surfaced REVIEW (never pre-selected).
+    static let systemOnlyCategories: Set<String> = ["Launch daemon", "Privileged helper"]
+
     // MARK: - Installed apps
 
     /// Every app under the scanned application directories, newest-used first.
@@ -226,15 +230,24 @@ public struct UninstallScanner: Sendable {
                     guard let match = Self.classify(name: name, identity: identity) else { continue }
                     guard !seenPaths.contains(child.path) else { continue }
                     seenPaths.insert(child.path)
+                    // Root-owned system helpers/daemons can't be staged without
+                    // admin, so never pre-select them — surface as REVIEW
+                    // (awareness) instead of dishonestly claiming SAFE.
+                    let systemOwned = Self.systemOnlyCategories.contains(spec.category)
+                    let grade = systemOwned ? .review : match.grade
+                    let detail =
+                        systemOwned
+                        ? match.reason + " — needs admin to remove, review manually"
+                        : match.reason
                     out.append(
                         CleanItem(
                             category: spec.category,
                             label: name,
-                            detail: match.reason,
+                            detail: detail,
                             path: child.path,
                             sizeBytes: Self.itemSize(child),
                             idleDays: idleDays(of: child),
-                            grade: match.grade))
+                            grade: grade))
                 }
             }
         }
@@ -306,16 +319,18 @@ public struct UninstallScanner: Sendable {
         let lower = name.lowercased()
         let bid = identity.bundleID
 
-        // SAFE — the bundle ID appears anywhere in the name. Bundle IDs are
-        // specific enough that containment is unambiguous (covers exact files,
+        // SAFE — the bundle ID appears as a contiguous run of dot components.
+        // Boundary-aware so uninstalling `com.google.Chrome` never matches a
+        // *different* app's `com.google.ChromeCanary` data (covers exact files,
         // `<id>.plist`, `<id>.savedState`, and `group.<id>` containers).
-        if stem.contains(bid) || lower.contains(bid) {
+        if Self.componentRun(name, contains: bid) {
             return (.safe, "matches bundle ID \(bid)")
         }
 
-        // CAREFUL — vendor reverse-DNS prefix (`com.spotify.*`).
+        // CAREFUL — vendor reverse-DNS prefix (`com.spotify.*`), same
+        // component-boundary rule so `com.spotifyx.*` is not swept in.
         if let vendor = identity.vendorPrefix, !vendorDenylist.contains(vendor),
-            stem.contains(vendor + ".") || lower.contains(vendor + ".")
+            Self.componentRun(name, contains: vendor)
         {
             return (.careful, "matches vendor prefix \(vendor)")
         }
@@ -376,6 +391,20 @@ public struct UninstallScanner: Sendable {
             at: dir, includingPropertiesForKeys: nil, options: [])
     }
 
+    /// True when `query`'s dot-delimited components appear as a contiguous
+    /// run inside `name`'s components — the boundary-aware test that stops
+    /// `com.google.chrome` from matching `com.google.chromecanary`.
+    static func componentRun(_ name: String, contains query: String) -> Bool {
+        let comps = name.lowercased().split(separator: ".").map(String.init)
+        let q = query.lowercased().split(separator: ".").map(String.init)
+        guard !q.isEmpty, comps.count >= q.count else { return false }
+        for start in 0...(comps.count - q.count)
+        where Array(comps[start..<start + q.count]) == q {
+            return true
+        }
+        return false
+    }
+
     /// Extracts a reverse-DNS bundle ID from a residue name, or nil when the
     /// name isn't a bundle-ID-shaped string (≥3 dot components, ASCII).
     static func bundleID(fromResidueName name: String) -> String? {
@@ -395,8 +424,11 @@ public struct UninstallScanner: Sendable {
                 !part.isEmpty
             else { return nil }
         }
-        // First component looks like a TLD-ish token (com/org/io/net/...).
-        guard let first = parts.first, first.count >= 2, first.count <= 5 else { return nil }
+        // First component must look like a TLD-ish token (com/org/io/net/...):
+        // 2–5 chars, all letters — rejects numeric cache dirs like `12.34.567`.
+        guard let first = parts.first, first.count >= 2, first.count <= 5,
+            first.allSatisfy(\.isLetter)
+        else { return nil }
         return candidate
     }
 
