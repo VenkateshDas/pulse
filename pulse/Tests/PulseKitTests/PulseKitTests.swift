@@ -438,3 +438,74 @@ struct HealthScoreTests {
         #expect(HealthScore.Band(value: 20) == .poor)
     }
 }
+
+// MARK: - OptimizeEngine (F2)
+
+@Suite("OptimizeEngine")
+struct OptimizeEngineTests {
+    @Test func refusalManifestHasFiveEntries() {
+        #expect(OptimizeEngine.refusals.count == 5)
+        #expect(OptimizeEngine.refusals.allSatisfy { !$0.op.isEmpty && !$0.reason.isEmpty })
+    }
+
+    @Test func inProcessTasksNeverNeedSudo() {
+        #expect(OptimizeEngine.inProcessTasks.allSatisfy { !$0.needsSudo })
+        #expect(!OptimizeEngine.inProcessTasks.isEmpty)
+    }
+
+    @Test func privilegedTasksAllNeedSudo() {
+        #expect(OptimizeEngine.privilegedTasks.allSatisfy { $0.needsSudo })
+    }
+
+    @Test func taskIDsAreUnique() {
+        let ids = OptimizeEngine.tasks.map(\.id)
+        #expect(Set(ids).count == ids.count)
+    }
+
+    @Test func dirBytesSumsFileSizes() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try Data(repeating: 0, count: 10_000).write(to: tmp.appendingPathComponent("a.bin"))
+        let bytes = await OptimizeEngine.dirBytes(tmp)
+        #expect(bytes >= 10_000)
+    }
+}
+
+// MARK: - Privileged operations (F2)
+
+@Suite("PrivilegedOperation")
+struct PrivilegedOperationTests {
+    @Test func everyOperationMapsToAbsolutePathCommands() {
+        for op in PrivilegedOperation.allCases {
+            #expect(!op.commands.isEmpty)
+            for cmd in op.commands {
+                #expect(cmd.path.hasPrefix("/"))   // no PATH lookup, no injection
+                #expect(!op.label.isEmpty)
+            }
+        }
+    }
+
+    @Test func rawValuesRoundTrip() {
+        for op in PrivilegedOperation.allCases {
+            #expect(PrivilegedOperation(rawValue: op.rawValue) == op)
+        }
+        #expect(PrivilegedOperation(rawValue: "rm -rf /") == nil)
+    }
+
+    @Test func shellScriptIsBuiltFromFixedTokensOnly() {
+        // Each token single-quoted; no caller input can enter the string.
+        #expect(PrivilegedOperation.purgeMemory.shellScript == "'/usr/sbin/purge'")
+        #expect(PrivilegedOperation.flushNetworkStack.shellScript
+            == "'/sbin/route' '-n' 'flush' ; '/usr/sbin/arp' '-a' '-d'")
+        // No double quotes → safe to embed in the AppleScript string literal.
+        for op in PrivilegedOperation.allCases {
+            #expect(!op.shellScript.contains("\""))
+        }
+    }
+
+    @Test func privilegedTasksCoverThreeOperations() {
+        #expect(OptimizeEngine.privilegedTasks.count == PrivilegedOperation.allCases.count)
+    }
+}
