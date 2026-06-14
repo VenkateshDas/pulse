@@ -446,6 +446,7 @@ struct UninstallResultCard: View {
                 if !result.stagedItems.isEmpty {
                     stagedSection(result)
                 }
+                failedSection(result)
                 notes(result)
                 actions(result)
             }
@@ -523,9 +524,63 @@ struct UninstallResultCard: View {
                     .foregroundStyle(Halo.textDim)
             }
             .padding(.top, 2)
-            ForEach(result.stagedItems, id: \.storedName) { item in
+            ForEach(result.stagedItems, id: \.originalPath) { item in
                 stagedRow(item)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func failedSection(_ result: UninstallModel.UninstallResult) -> some View {
+        if !result.failedItems.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text("PENDING — NEEDS FULL DISK ACCESS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(Halo.amber)
+                    Spacer()
+                }
+                .padding(.top, 2)
+                ForEach(result.failedItems, id: \.path) { item in
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Halo.amber)
+                            .frame(width: 16)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Halo.textPrimary)
+                                .lineLimit(1)
+                            Text(item.path)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(Halo.textDim)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                        Text(ByteFormat.string(item.sizeBytes))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                            .frame(width: 76, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Halo.amber.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+
+    private func fdaMessage(_ result: UninstallModel.UninstallResult) -> String {
+        switch (result.appTrashed, result.failedItems.isEmpty) {
+        case (false, false):
+            return "\(result.appName) and \(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access."
+        case (false, true):
+            return "\(result.appName) couldn't be moved to Trash — Pulse needs Full Disk Access."
+        default:
+            return "\(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access."
         }
     }
 
@@ -559,13 +614,17 @@ struct UninstallResultCard: View {
 
     @ViewBuilder
     private func notes(_ result: UninstallModel.UninstallResult) -> some View {
-        if result.failedCount > 0 {
-            Label(
-                "\(result.failedCount) selected item\(result.failedCount == 1 ? "" : "s") couldn't be moved — they may need Full Disk Access.",
-                systemImage: "exclamationmark.triangle.fill"
-            )
-            .font(.system(size: 11))
-            .foregroundStyle(Halo.amber)
+        if result.needsAttention {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(fdaMessage(result), systemImage: "lock.shield")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Halo.amber)
+                Text(
+                    "Grant Pulse Full Disk Access, then Retry. In Settings, toggle Pulse on under Full Disk Access (add it with “+” if it isn’t listed)."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+            }
         }
         if result.reviewLeftCount > 0 {
             Label(
@@ -584,7 +643,36 @@ struct UninstallResultCard: View {
 
     private func actions(_ result: UninstallModel.UninstallResult) -> some View {
         HStack(spacing: 10) {
-            if result.sessionID != nil, !result.stagedItems.isEmpty {
+            if result.needsAttention {
+                Button {
+                    model.openFullDiskAccessSettings()
+                } label: {
+                    Text("Grant Full Disk Access")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Halo.void)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Halo.amber, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help("Open System Settings → Privacy & Security → Full Disk Access")
+                Button {
+                    model.retryUninstall()
+                } label: {
+                    HStack(spacing: 6) {
+                        if model.isUninstalling { ProgressView().controlSize(.small) }
+                        Text(model.isUninstalling ? "Retrying…" : "↻ Retry")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Halo.ion)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Halo.ion.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isUninstalling)
+                .help("Re-attempt the parts that failed")
+            } else if !result.sessionIDs.isEmpty, !result.stagedItems.isEmpty {
                 Button {
                     model.restoreLastUninstall()
                 } label: {

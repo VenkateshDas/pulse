@@ -24,6 +24,13 @@ final class UninstallModel {
         var id: String { rawValue }
     }
 
+    /// A removal target awaiting (or retrying) a move into the Vault.
+    struct PendingItem: Equatable, Sendable {
+        let path: String
+        let label: String
+        let sizeBytes: UInt64
+    }
+
     /// Post-uninstall receipt — the "Verify" beat. Every field reflects what
     /// actually happened (real `recycle` result, real Vault session contents),
     /// never an optimistic guess.
@@ -34,13 +41,18 @@ final class UninstallModel {
         /// The leftovers that genuinely made it into the Vault.
         let stagedItems: [VaultItem]
         let stagedBytes: UInt64
-        /// Leftovers requested but not staged (move failed / needs FDA).
-        let failedCount: Int
+        /// Leftovers requested but not staged (move failed / needs FDA) —
+        /// retained so a retry can re-attempt exactly these.
+        let failedItems: [PendingItem]
         /// REVIEW leftovers deliberately left untouched.
         let reviewLeftCount: Int
-        let sessionID: UUID?
+        /// Every Vault session this uninstall (plus retries) produced.
+        let sessionIDs: [UUID]
 
         var stagedCount: Int { stagedItems.count }
+        var failedCount: Int { failedItems.count }
+        /// Something didn't complete — the app stayed put or a leftover failed.
+        var needsAttention: Bool { !appTrashed || !failedItems.isEmpty }
     }
 
     var tab: Tab = .uninstall
@@ -203,6 +215,10 @@ final class UninstallModel {
                     items: leftovers, title: "Uninstall \(appName) — \(leftovers.count) leftovers")
             }
             let stagedItems = session?.items ?? []
+            let stagedPaths = Set(stagedItems.map(\.originalPath))
+            let failed = leftovers
+                .filter { !stagedPaths.contains($0.path) }
+                .map { PendingItem(path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes) }
 
             let receipt = UninstallResult(
                 appName: appName,
@@ -210,9 +226,9 @@ final class UninstallModel {
                 appTrashed: trashed,
                 stagedItems: stagedItems,
                 stagedBytes: session?.totalBytes ?? 0,
-                failedCount: max(0, leftovers.count - stagedItems.count),
+                failedItems: failed,
                 reviewLeftCount: reviewLeft,
-                sessionID: session?.id)
+                sessionIDs: session.map { [$0.id] } ?? [])
 
             await MainActor.run { [weak self] in
                 guard let self else { return }
@@ -226,18 +242,83 @@ final class UninstallModel {
         }
     }
 
+    /// Re-attempts only the parts that failed (the app move and/or unstaged
+    /// leftovers) — used after the user grants Full Disk Access. Merges the new
+    /// outcome into the existing receipt so the list stays cumulative.
+    func retryUninstall() {
+        guard let previous = result, previous.needsAttention, !isUninstalling else { return }
+        isUninstalling = true
+        report = nil
+        let appURL = URL(fileURLWithPath: previous.appBundlePath)
+        let appName = previous.appName
+        let needsTrash = !previous.appTrashed
+        let failed = previous.failedItems.map {
+            (path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
+        }
+
+        Task.detached(priority: .userInitiated) { [vault] in
+            var trashed = previous.appTrashed
+            if needsTrash {
+                trashed = await withCheckedContinuation { continuation in
+                    NSWorkspace.shared.recycle([appURL]) { _, error in
+                        continuation.resume(returning: error == nil)
+                    }
+                }
+            }
+
+            var session: VaultSession?
+            if !failed.isEmpty {
+                session = try? vault.stage(
+                    items: failed, title: "Uninstall \(appName) (retry) — \(failed.count) leftovers")
+            }
+            let newlyStaged = session?.items ?? []
+            let newlyStagedPaths = Set(newlyStaged.map(\.originalPath))
+            let stillFailed = previous.failedItems.filter { !newlyStagedPaths.contains($0.path) }
+
+            let merged = UninstallResult(
+                appName: appName,
+                appBundlePath: previous.appBundlePath,
+                appTrashed: trashed,
+                stagedItems: previous.stagedItems + newlyStaged,
+                stagedBytes: previous.stagedBytes + (session?.totalBytes ?? 0),
+                failedItems: stillFailed,
+                reviewLeftCount: previous.reviewLeftCount,
+                sessionIDs: previous.sessionIDs + (session.map { [$0.id] } ?? []))
+
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isUninstalling = false
+                self.result = merged
+                if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
+                if !merged.needsAttention {
+                    self.report = "All set — \(appName) and its leftovers are fully removed."
+                }
+            }
+        }
+    }
+
+    /// Opens System Settings → Privacy & Security → Full Disk Access so the
+    /// user can grant Pulse the access a system-area move needs.
+    func openFullDiskAccessSettings() {
+        guard
+            let url = URL(
+                string:
+                    "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+        else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     /// Pulls the just-uninstalled app's Vault session back to its original
     /// locations. The `.app` itself is restored by the user via Finder's
     /// "Put Back" — Pulse can't undo a system Trash move programmatically.
     func restoreLastUninstall() {
-        guard let result, let sessionID = result.sessionID, !isRestoringResult else { return }
+        guard let result, !result.sessionIDs.isEmpty, !isRestoringResult else { return }
         isRestoringResult = true
+        let ids = Set(result.sessionIDs)
         Task.detached(priority: .userInitiated) { [vault] in
-            let restored: Int
-            if let session = vault.sessions().first(where: { $0.id == sessionID }) {
-                restored = (try? vault.restore(session)) ?? 0
-            } else {
-                restored = 0
+            var restored = 0
+            for session in vault.sessions() where ids.contains(session.id) {
+                restored += (try? vault.restore(session)) ?? 0
             }
             await MainActor.run { [weak self] in
                 guard let self else { return }
