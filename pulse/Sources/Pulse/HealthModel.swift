@@ -15,6 +15,8 @@ final class HealthModel {
     private(set) var benchmarkRunning = false
     private(set) var latestBenchmark: BenchmarkResult?
     private(set) var previousBenchmark: BenchmarkResult?
+    /// All stored benchmark runs, oldest first. Used by Timeline to annotate days.
+    private(set) var benchmarkHistory: [BenchmarkResult] = []
     /// Feedback from the last action ("Disabled Dropbox — applies at next login").
     var actionFeedback: String?
 
@@ -33,6 +35,7 @@ final class HealthModel {
     init() {
         latestBenchmark = benchmarkStore.latest
         previousBenchmark = benchmarkStore.previous
+        benchmarkHistory = benchmarkStore.results
         observeScreenLock()
     }
 
@@ -121,6 +124,7 @@ final class HealthModel {
             benchmarkStore.record(result)
             latestBenchmark = benchmarkStore.latest
             previousBenchmark = benchmarkStore.previous
+            benchmarkHistory = benchmarkStore.results
             benchmarkRunning = false
         }
     }
