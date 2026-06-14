@@ -57,6 +57,8 @@ final class DashboardModel {
                                            culpritPID: nil, factor: nil)
     /// Weighted 0–100 health score with per-factor breakdown (F1).
     private(set) var healthScore = HealthScore(value: 100, band: .excellent, breakdown: [:])
+    /// Sustained-CPU anomaly history, newest first (F5).
+    private(set) var recentAnomalies: [AnomalyRecord] = []
     private(set) var cpuHistory: [Double] = []
     /// Minute-averaged CPU over the trailing 24h (nil = no data for that
     /// minute); persisted across launches by MinuteHistoryStore.
@@ -116,6 +118,9 @@ final class DashboardModel {
         line: "Sampling…", severity: .clear, culpritPID: nil, factor: nil)
     @ObservationIgnored private var latestHealth = HealthScore(
         value: 100, band: .excellent, breakdown: [:])
+    /// Windowed CPU-anomaly detector (replaces the instant cpu-hog alert).
+    @ObservationIgnored private var processWatcher = ProcessWatcher()
+    @ObservationIgnored private let anomalyStore = AnomalyStore()
     @ObservationIgnored private let batteryHistory = BatteryHistoryStore()
     @ObservationIgnored private var lastIngestUptime: TimeInterval?
     /// Per-alert-id last fire time — enforces the 30-min notification cooldown
@@ -180,7 +185,21 @@ final class DashboardModel {
 
     private func ingest(_ snapshot: SystemSnapshot) {
         latest = snapshot
-        latestAlerts = AlertsEngine.evaluate(snapshot, ownPID: getpid())
+        // Replace AlertsEngine's instantaneous cpu-hog with a windowed one:
+        // a process must stay hot for the full window before it alerts.
+        var evaluated = AlertsEngine.evaluate(snapshot, ownPID: getpid())
+        evaluated.removeAll { $0.id == "cpu-hog" }
+        let sustained = processWatcher.ingest(
+            snapshot.topProcesses.filter { $0.pid != getpid() }, now: snapshot.timestamp)
+        if let hog = sustained.first {
+            evaluated.insert(Self.windowedCPUAlert(hog), at: 0)
+        }
+        for anomaly in sustained where anomaly.isNewlySustained {
+            anomalyStore.record(AnomalyRecord(
+                processName: anomaly.name, pid: anomaly.pid, cpuPercent: anomaly.cpuPercent,
+                date: snapshot.timestamp, sustainedSeconds: anomaly.sustainedSeconds))
+        }
+        latestAlerts = evaluated
         latestDiagnosis = DiagnosisEngine.evaluate(snapshot)
         latestHealth = HealthScore.evaluate(snapshot)
         // A dismissed alert resets once its condition clears, so a fresh
@@ -295,6 +314,7 @@ final class DashboardModel {
         alerts = latestAlerts.filter { !dismissedAlerts.contains($0.id) }
         diagnosis = latestDiagnosis
         healthScore = latestHealth
+        recentAnomalies = anomalyStore.records
         cpuHistory = cpuBuffer
         cpuDayHistory = cpuDayStore.series()
         memoryHistory = memoryBuffer
@@ -305,6 +325,19 @@ final class DashboardModel {
         networkOutHistory = networkOutBuffer
         powerHistory = powerBuffer
         batteryTrend = batteryHistory.entries
+    }
+
+    /// Builds the windowed CPU-hog alert card from a sustained anomaly.
+    static func windowedCPUAlert(_ hog: ProcessAlert) -> PulseAlert {
+        let mins = Int((hog.sustainedSeconds / 60).rounded())
+        let duration = mins >= 1 ? "\(mins) min" : "\(Int(hog.sustainedSeconds))s"
+        return PulseAlert(
+            id: "cpu-hog",
+            severity: .warning,
+            symbol: "thermometer.high",
+            title: "\(hog.name) has held \(Int(hog.cpuPercent))% CPU for \(duration)",
+            subtitle: "pid \(hog.pid) · sustained, not a momentary spike",
+            actions: [.quitProcess(pid: hog.pid, name: hog.name)])
     }
 
     private func append(_ value: Double, to buffer: inout [Double]) {
