@@ -233,7 +233,13 @@ final class UninstallModel {
                 guard let self else { return }
                 self.isUninstalling = false
                 self.result = receipt
-                if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
+                if trashed {
+                    self.installedApps.removeAll { $0.path == appURL.path }
+                    // Self-healing: a removed app may leave launch agents/daemons
+                    // behind, so refresh the Orphans pane right after.
+                    self.hasScannedOrphans = false
+                    self.scanOrphans()
+                }
                 if base != nil, !receipt.needsAttention {
                     self.report = "All set — \(appName) and its leftovers are fully removed."
                 }
@@ -312,6 +318,10 @@ final class UninstallModel {
             var trashedPaths: Set<String> = []
             var trashedBytes: UInt64 = 0
             for item in items {
+                // Unload a running user launch agent before trashing its plist,
+                // so the change takes effect now (not just next login). Daemons
+                // need root to bootout and are left to unload on reboot.
+                await Self.bootoutUserAgentIfNeeded(path: item.path)
                 do {
                     try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
                     trashedPaths.insert(item.id)
@@ -337,5 +347,18 @@ final class UninstallModel {
 
     nonisolated static func isBundleInstalled(_ bundleID: String) -> Bool {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
+    }
+
+    /// `launchctl bootout` for a user LaunchAgent plist (gui domain, no root),
+    /// so disabling it unloads the running job immediately. No-op for system
+    /// `/Library` jobs (need root) and non-agent paths.
+    nonisolated static func bootoutUserAgentIfNeeded(path: String) async {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        guard path.hasPrefix(home), path.contains("/LaunchAgents/"),
+            path.hasSuffix(".plist"),
+            let plist = UninstallScanner.readLaunchPlist(URL(fileURLWithPath: path)),
+            let label = plist["Label"] as? String, !label.isEmpty
+        else { return }
+        _ = try? await Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
     }
 }
