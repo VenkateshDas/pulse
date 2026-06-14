@@ -21,6 +21,7 @@ struct RootView: View {
             case .storage: StorageView()
             case .timeline: TimelineView()
             case .clean: CleanView()
+            case .uninstall: UninstallView()
             case .monitor: MonitorView()
             case .health: HealthView()
             case .vault: VaultView()

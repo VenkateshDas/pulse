@@ -8,6 +8,7 @@ struct CommandPaletteView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
     @Environment(HealthModel.self) private var health
+    @Environment(UninstallModel.self) private var uninstall
 
     @State private var query = ""
     @State private var highlighted = 0
@@ -40,6 +41,16 @@ struct CommandPaletteView: View {
                 title: "Empty Trash", subtitle: "Move Trash into the Vault",
                 symbol: "trash"
             ) { selection = .vault; storage.emptyTrash() })
+        list.append(
+            Command(
+                title: "Scan Orphaned Files",
+                subtitle: "Find leftover files from apps you've already deleted",
+                symbol: "trash.slash"
+            ) {
+                selection = .uninstall
+                uninstall.tab = .orphans
+                uninstall.scanOrphans()
+            })
         list.append(
             Command(
                 title: "Run Benchmark", subtitle: "CPU + disk + memory micro-benchmark",
