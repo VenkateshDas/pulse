@@ -24,6 +24,25 @@ final class UninstallModel {
         var id: String { rawValue }
     }
 
+    /// Post-uninstall receipt — the "Verify" beat. Every field reflects what
+    /// actually happened (real `recycle` result, real Vault session contents),
+    /// never an optimistic guess.
+    struct UninstallResult: Equatable {
+        let appName: String
+        let appBundlePath: String
+        let appTrashed: Bool
+        /// The leftovers that genuinely made it into the Vault.
+        let stagedItems: [VaultItem]
+        let stagedBytes: UInt64
+        /// Leftovers requested but not staged (move failed / needs FDA).
+        let failedCount: Int
+        /// REVIEW leftovers deliberately left untouched.
+        let reviewLeftCount: Int
+        let sessionID: UUID?
+
+        var stagedCount: Int { stagedItems.count }
+    }
+
     var tab: Tab = .uninstall
 
     private(set) var installedApps: [InstalledApp] = []
@@ -41,8 +60,11 @@ final class UninstallModel {
     private(set) var hasScannedOrphans = false
     private(set) var isRemovingOrphans = false
 
-    /// Honest result line after an action.
+    /// Honest result line after an action (orphan tab + transient messages).
     private(set) var report: String?
+    /// Post-uninstall receipt, shown until dismissed.
+    private(set) var result: UninstallResult?
+    private(set) var isRestoringResult = false
 
     private let scanner = UninstallScanner()
     private let vault = SafetyVault(rootURL: SafetyVault.defaultRootURL())
@@ -85,6 +107,7 @@ final class UninstallModel {
         guard !isScanning else { return }
         isScanning = true
         report = nil
+        result = nil
         plan = nil
         selection = []
         let appURL = URL(fileURLWithPath: appPath)
@@ -155,11 +178,13 @@ final class UninstallModel {
         }
         isUninstalling = true
         report = nil
+        result = nil
         let appURL = URL(fileURLWithPath: plan.app.path)
         let appName = plan.app.name
         let leftovers = selectedLeftovers.map {
             (path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
         }
+        let reviewLeft = plan.leftovers.filter { $0.grade == .review }.count
 
         Task.detached(priority: .userInitiated) { [vault] in
             // 1. App bundle → system Trash (Finder "Put Back" restores it).
@@ -170,51 +195,65 @@ final class UninstallModel {
             }
 
             // 2. Ticked leftovers → one Vault session (instant APFS rename).
-            var stagedBytes: UInt64 = 0
-            var stagedCount = 0
+            //    The session's items are the *real* staged contents — a row only
+            //    exists if its move truly succeeded.
+            var session: VaultSession?
             if !leftovers.isEmpty {
-                if let session = try? vault.stage(
+                session = try? vault.stage(
                     items: leftovers, title: "Uninstall \(appName) — \(leftovers.count) leftovers")
-                {
-                    stagedBytes = session.totalBytes
-                    stagedCount = session.items.count
-                }
             }
+            let stagedItems = session?.items ?? []
 
-            let report = Self.uninstallReport(
-                appName: appName, trashed: trashed,
-                stagedCount: stagedCount, stagedBytes: stagedBytes,
-                requested: leftovers.count)
+            let receipt = UninstallResult(
+                appName: appName,
+                appBundlePath: appURL.path,
+                appTrashed: trashed,
+                stagedItems: stagedItems,
+                stagedBytes: session?.totalBytes ?? 0,
+                failedCount: max(0, leftovers.count - stagedItems.count),
+                reviewLeftCount: reviewLeft,
+                sessionID: session?.id)
 
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.isUninstalling = false
-                self.report = report
+                self.result = receipt
                 self.plan = nil
                 self.selection = []
                 // The trashed app is gone — drop it from the installed list.
-                self.installedApps.removeAll { $0.path == appURL.path }
+                if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
             }
         }
     }
 
-    private nonisolated static func uninstallReport(
-        appName: String, trashed: Bool, stagedCount: Int, stagedBytes: UInt64, requested: Int
-    ) -> String {
-        let appPart =
-            trashed
-            ? "\(appName) moved to Trash"
-            : "\(appName) couldn't be trashed (it may need Full Disk Access)"
-        guard requested > 0 else {
-            return "\(appPart) · no leftovers selected"
+    /// Pulls the just-uninstalled app's Vault session back to its original
+    /// locations. The `.app` itself is restored by the user via Finder's
+    /// "Put Back" — Pulse can't undo a system Trash move programmatically.
+    func restoreLastUninstall() {
+        guard let result, let sessionID = result.sessionID, !isRestoringResult else { return }
+        isRestoringResult = true
+        Task.detached(priority: .userInitiated) { [vault] in
+            let restored: Int
+            if let session = vault.sessions().first(where: { $0.id == sessionID }) {
+                restored = (try? vault.restore(session)) ?? 0
+            } else {
+                restored = 0
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isRestoringResult = false
+                self.report =
+                    restored > 0
+                    ? "Restored \(restored) leftover\(restored == 1 ? "" : "s") to original locations. The app is in the Trash — use Finder’s “Put Back” to restore it."
+                    : "Nothing to restore — the Vault session may have already been emptied."
+                self.result = nil
+            }
         }
-        let sizePart = ByteFormat.string(stagedBytes)
-        if stagedCount == requested {
-            return
-                "\(appPart) · \(stagedCount) leftovers (\(sizePart)) staged in Vault — restore anytime for 7 days"
-        }
-        return
-            "\(appPart) · \(stagedCount) of \(requested) leftovers (\(sizePart)) staged in Vault — restore anytime for 7 days"
+    }
+
+    func dismissResult() {
+        result = nil
+        report = nil
     }
 
     // MARK: - Orphans
