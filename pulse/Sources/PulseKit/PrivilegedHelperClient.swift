@@ -17,8 +17,6 @@ public actor PrivilegedHelperClient {
         case unavailable        // no bundle / daemon plist not found
     }
 
-    private var connection: NSXPCConnection?
-
     private var service: SMAppService {
         SMAppService.daemon(plistName: pulseHelperPlistName)
     }
@@ -50,15 +48,24 @@ public actor PrivilegedHelperClient {
 
     public func unregister() async {
         try? await service.unregister()
-        connection?.invalidate()
-        connection = nil
     }
 
+    /// One short-lived connection per call. The admin operations are rare and
+    /// fire-and-forget, so a per-call connection avoids caching mutable XPC
+    /// state across actor hops (and the strict-concurrency hazards that brings).
     public func perform(_ op: PrivilegedOperation) async -> OptimizeResult {
         guard status() == .enabled else {
             return OptimizeResult(success: false, summary: "Privileged helper not enabled")
         }
-        let conn = makeConnection()
+        let conn = NSXPCConnection(
+            machServiceName: pulseHelperMachServiceName, options: .privileged)
+        conn.remoteObjectInterface = NSXPCInterface(with: PulseHelperProtocol.self)
+        // Only talk to a helper signed as our helper identifier.
+        conn.setCodeSigningRequirement(
+            pulseCodeSignRequirement(identifier: pulseHelperBundleIdentifier))
+        conn.resume()
+        defer { conn.invalidate() }
+
         let once = ResumeOnce()
         return await withCheckedContinuation { (cont: CheckedContinuation<OptimizeResult, Never>) in
             let proxy = conn.remoteObjectProxyWithErrorHandler { error in
@@ -75,24 +82,6 @@ public actor PrivilegedHelperClient {
             }
         }
     }
-
-    private func makeConnection() -> NSXPCConnection {
-        if let connection { return connection }
-        let conn = NSXPCConnection(
-            machServiceName: pulseHelperMachServiceName, options: .privileged)
-        conn.remoteObjectInterface = NSXPCInterface(with: PulseHelperProtocol.self)
-        // Only talk to a helper signed as our helper identifier.
-        conn.setCodeSigningRequirement(
-            pulseCodeSignRequirement(identifier: pulseHelperBundleIdentifier))
-        conn.invalidationHandler = { [weak self] in
-            Task { await self?.clearConnection() }
-        }
-        conn.resume()
-        connection = conn
-        return conn
-    }
-
-    private func clearConnection() { connection = nil }
 }
 
 /// Guards an XPC continuation so it resumes exactly once, even though both the
