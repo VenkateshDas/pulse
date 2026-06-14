@@ -8,7 +8,12 @@ OUT="${1:-dist}"
 APP="$OUT/Pulse.app"
 
 # See Makefile: patched ManifestAPI works around a broken CLT 26.5 install.
-export SWIFTPM_CUSTOM_LIBS_DIR="$HOME/.local/swiftpm-fix"
+# Only applied when the patched dir exists (local dev) — CI runners have a
+# healthy toolchain and must not point SwiftPM at a missing libs dir.
+FIX_DIR="$HOME/.local/swiftpm-fix"
+if [ -d "$FIX_DIR/ManifestAPI" ]; then
+    export SWIFTPM_CUSTOM_LIBS_DIR="$FIX_DIR"
+fi
 swift build -c release
 
 rm -rf "$APP"

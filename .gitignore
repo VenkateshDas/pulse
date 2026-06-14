@@ -12,6 +12,7 @@ DerivedData/
 
 # Build output
 pulse/dist/
+pulse/dist-ci/
 
 # Dev tools (local only — not for public repo)
 .agents/
