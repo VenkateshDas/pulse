@@ -6,25 +6,24 @@ struct RootView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(MonitorModel.self) private var monitorModel
     @Environment(HealthModel.self) private var healthModel
+    @Environment(UninstallModel.self) private var uninstall
+    @Environment(CleanModel.self) private var clean
     @State private var selection: SidebarItem = .dashboard
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
     @State private var windowVisible = true
     @State private var showPalette = false
     @State private var showOnboarding = !OnboardingView.isComplete
-    @State private var showReport = false
 
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selection: $selection)
             switch selection {
-            case .storage: StorageView()
+            case .storage: DiskView()
             case .timeline: TimelineView()
-            case .clean: CleanView()
             case .uninstall: UninstallView()
             case .monitor: MonitorView()
             case .health: HealthView()
-            case .vault: VaultView()
             case .diagnostics: DevModeView()
             default: DashboardView()
             }
@@ -41,14 +40,11 @@ struct RootView: View {
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(isPresented: $showOnboarding)
         }
-        .sheet(isPresented: $showReport) {
-            WeeklyReportView(isPresented: $showReport)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: WeeklyReportView.showNotification)) { _ in
-            showReport = true
+        .onAppear {
+            clean.start()
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
-            selection = .clean
+            selection = .storage
         }
         .onReceive(
             NotificationCenter.default.publisher(

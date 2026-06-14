@@ -326,4 +326,14 @@ public struct StorageScanner: Sendable {
             return false
         }
     }
+    
+    public static let protectedRoots = ["/System", "/usr", "/bin", "/sbin", "/private", "/Library"]
+    
+    public static func isProtected(_ path: String) -> Bool {
+        if protectedRoots.contains(where: { path == $0 || path.hasPrefix($0 + "/") }) { return true }
+        var st = stat()
+        if lstat(path, &st) == 0, st.st_uid != getuid() { return true }
+        if (st.st_flags & UInt32(SF_RESTRICTED)) != 0 { return true }
+        return false
+    }
 }

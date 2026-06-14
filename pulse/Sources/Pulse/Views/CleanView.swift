@@ -2,42 +2,138 @@ import AppKit
 import PulseKit
 import SwiftUI
 
-/// Clean module (M4): scheduled deep clean. Auto-clean card, run history
-/// with one-click restore, and an honest dry-run preview of the next run.
+/// Reclaim tab: one flat list of safe + careful items across the disk, bulk action.
 struct CleanView: View {
-    @Environment(CleanModel.self) private var model
+    @Environment(StorageModel.self) private var storage
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    SmartCleanCard()
+                    if storage.scanState == .scanning && storage.scan == nil {
+                        scanning
+                    } else if let scan = storage.scan {
+                        let items = scan.items.filter { $0.grade != .review }
+                        if items.isEmpty {
+                            Text("No safe or careful items found.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Halo.textDim)
+                                .padding(.vertical, 16)
+                                .frame(maxWidth: .infinity)
+                        } else {
+                            LazyVStack(spacing: 4) {
+                                ForEach(items) { item in
+                                    row(item)
+                                }
+                            }
+                        }
+                    } else {
+                        Text("No scan yet.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Halo.textDim)
+                    }
                     AutoCleanCard()
-                    CleanHistoryCard()
                 }
                 .padding(.bottom, 8)
             }
             .scrollIndicators(.never)
+            
+            CleanFooter()
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Halo.void)
-        .onAppear { model.appeared() }
-        .onDisappear { model.releasePreview() }
+        .onAppear { storage.appeared() }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Clean")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text(
-                "Scheduled deep clean of the safe tier — items that regenerate automatically. Every run is staged in the Vault, restorable for 7 days."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(Halo.textDim)
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("RECLAIM")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(2)
+                .foregroundStyle(Halo.textDim)
+            Text("flat list of everything safe to remove")
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+            Spacer()
+            Button("Select All Safe") {
+                storage.selectAllSafe()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(Halo.ion)
+            .disabled(storage.scanState == .scanning)
         }
+    }
+
+    private var scanning: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Scanning for cleanable space…")
+                .font(.system(size: 12))
+                .foregroundStyle(Halo.textDim)
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func row(_ item: CleanItem) -> some View {
+        let selected = storage.selection.contains(item.id)
+        let selectable = item.grade != .review
+        return HStack(spacing: 10) {
+            Button {
+                storage.toggle(item)
+            } label: {
+                Image(systemName: selected ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 13))
+                    .foregroundStyle(
+                        !selectable ? Halo.textDim.opacity(0.4)
+                            : (selected ? Halo.pulseGreen : Halo.textDim))
+            }
+            .buttonStyle(.plain)
+            .disabled(!selectable)
+
+            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+                .resizable()
+                .frame(width: 16, height: 16)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Halo.textPrimary)
+                    .lineLimit(1)
+                Text(detailLine(item))
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+                    .lineLimit(1)
+            }
+            Spacer()
+            GradePill(grade: item.grade)
+            Text(ByteFormat.string(item.sizeBytes))
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Halo.textPrimary)
+                .frame(width: 76, alignment: .trailing)
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.path)])
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+            }
+            .buttonStyle(.plain)
+            .help("Reveal in Finder — \(item.path)")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Halo.surface2.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func detailLine(_ item: CleanItem) -> String {
+        if let idle = item.idleDays {
+            return "\(item.detail) · idle \(idle)d"
+        }
+        return item.detail
     }
 }
 
@@ -45,8 +141,6 @@ struct CleanView: View {
 
 struct AutoCleanCard: View {
     @Environment(CleanModel.self) private var model
-    /// Developer Junk Mode — adds Homebrew/Docker/Xcode-simulator locations to
-    /// the scan. Persisted; SmartScanner reads the same UserDefaults key.
     @AppStorage(SmartScanner.developerModeKey) private var developerMode = false
 
     var body: some View {
@@ -167,17 +261,17 @@ struct AutoCleanCard: View {
 
     static func timeLabel(_ preference: CleanSchedule.TimePreference) -> String {
         switch preference {
-        case .night: "NIGHT · 3AM"
-        case .morning: "MORNING · 9AM"
-        case .anytime: "ANYTIME"
+        case .night: return "NIGHT · 3AM"
+        case .morning: return "MORNING · 9AM"
+        case .anytime: return "ANYTIME"
         }
     }
 
     static func timeHelp(_ preference: CleanSchedule.TimePreference) -> String {
         switch preference {
-        case .night: "Run around 3:00 AM, when the Mac is usually idle"
-        case .morning: "Run around 9:00 AM"
-        case .anytime: "Run whenever the system is idle (background-scheduled)"
+        case .night: return "Run around 3:00 AM, when the Mac is usually idle"
+        case .morning: return "Run around 9:00 AM"
+        case .anytime: return "Run whenever the system is idle (background-scheduled)"
         }
     }
 
@@ -234,12 +328,7 @@ struct AutoCleanCard: View {
 
     private var lastRunText: String {
         guard let last = model.schedule.lastRun else { return "never" }
-        let freed = model.history.first(where: {
-            abs($0.date.timeIntervalSince(last)) < 1
-        })?.bytesFreed
-        let ago = Self.relativeText(last)
-        guard let freed, freed > 0 else { return ago }
-        return "\(ago) · freed \(ByteFormat.string(freed))"
+        return Self.relativeText(last)
     }
 
     static func runDateText(_ date: Date) -> String {
@@ -259,208 +348,4 @@ struct AutoCleanCard: View {
     }
 }
 
-// MARK: - History card
 
-struct CleanHistoryCard: View {
-    @Environment(CleanModel.self) private var model
-    @State private var purgeCandidate: CleanRecord?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("CLEAN HISTORY")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Halo.textDim)
-                Text("every run links to its Vault session — restore is one click")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-                Spacer()
-            }
-            if model.history.isEmpty {
-                Text("No cleans yet — run one above or wait for the schedule.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-            } else {
-                ForEach(model.history.prefix(10)) { record in
-                    historyRow(record)
-                }
-            }
-        }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
-        .confirmationDialog(
-            "Permanently delete this clean's Vault session?",
-            isPresented: Binding(
-                get: { purgeCandidate != nil },
-                set: { if !$0 { purgeCandidate = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(
-                "Delete \(ByteFormat.string(purgeCandidate?.bytesFreed ?? 0)) forever",
-                role: .destructive
-            ) {
-                if let record = purgeCandidate { model.purge(record) }
-                purgeCandidate = nil
-            }
-            Button("Cancel", role: .cancel) { purgeCandidate = nil }
-        } message: {
-            Text(
-                "This is irreversible. \(purgeCandidate?.itemsCleaned ?? 0) items will be gone for good."
-            )
-        }
-    }
-
-    private func historyRow(_ record: CleanRecord) -> some View {
-        let restorable = model.restorableSessions[record.sessionID] != nil
-        return HStack(spacing: 12) {
-            Text(Self.dateText(record.date))
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.textPrimary)
-                .frame(width: 64, alignment: .leading)
-            Text(
-                record.itemsCleaned > 0
-                    ? "\(ByteFormat.string(record.bytesFreed)) · \(record.itemsCleaned) items"
-                    : "nothing to clean"
-            )
-            .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(record.itemsCleaned > 0 ? Halo.textPrimary : Halo.textDim)
-            Spacer()
-            if restorable {
-                Button("↺ Restore") { model.restore(record) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Halo.pulseGreen)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background(Halo.pulseGreen.opacity(0.12), in: Capsule())
-                Button("Purge") { purgeCandidate = record }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Halo.flare)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background(Halo.flare.opacity(0.10), in: Capsule())
-            } else if record.itemsCleaned > 0 {
-                // Post-restart we can't tell restored from expired — say so.
-                Text(
-                    model.restoredSessionIDs.contains(record.sessionID)
-                        ? "↺ restored" : "no longer in Vault"
-                )
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(
-                    model.restoredSessionIDs.contains(record.sessionID)
-                        ? Halo.pulseGreen : Halo.textDim)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Halo.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    static func dateText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM dd"
-        return formatter.string(from: date)
-    }
-}
-
-// MARK: - Preview card
-
-struct CleanPreviewCard: View {
-    @Environment(CleanModel.self) private var model
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("PREVIEW · NEXT SCHEDULED RUN")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Halo.textDim)
-                Text("dry run — nothing here is touched until the clean runs")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-                Spacer()
-                if !model.preview.isEmpty {
-                    Text("● \(ByteFormat.string(model.previewTotalBytes)) RECLAIMABLE")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Halo.pulseGreen)
-                }
-                Button("Refresh") { model.loadPreview(force: true) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Halo.ion)
-                    .disabled(model.isPreviewLoading)
-            }
-            if model.isPreviewLoading && model.preview.isEmpty {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Scanning the safe tier…")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Halo.textDim)
-                }
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity)
-            } else if model.preview.isEmpty {
-                Text("Safe tier is empty — the next run has nothing to do.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .padding(.vertical, 16)
-                    .frame(maxWidth: .infinity)
-            } else {
-                ForEach(model.preview.prefix(8)) { item in
-                    previewRow(item)
-                }
-                if model.preview.count > 8 {
-                    Text("+ \(model.preview.count - 8) more safe items")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim)
-                        .padding(.leading, 12)
-                }
-            }
-        }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func previewRow(_ item: CleanItem) -> some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(Halo.pulseGreen)
-                .frame(width: 5, height: 5)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-                    .lineLimit(1)
-                Text(item.detail)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-                    .lineLimit(1)
-            }
-            Spacer()
-            GradePill(grade: item.grade)
-            Text(ByteFormat.string(item.sizeBytes))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.textPrimary)
-                .frame(width: 76, alignment: .trailing)
-            Button {
-                NSWorkspace.shared.activateFileViewerSelecting([
-                    URL(fileURLWithPath: item.path)
-                ])
-            } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-            }
-            .buttonStyle(.plain)
-            .help("Reveal in Finder — \(item.path)")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(Halo.surface2.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
-    }
-}

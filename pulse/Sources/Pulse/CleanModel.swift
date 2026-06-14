@@ -1,44 +1,26 @@
 import AppKit
-import Foundation
-import Observation
 import PulseKit
+import SwiftUI
 import UserNotifications
 
-/// Owns the scheduled deep clean: schedule state, history, the dry-run
-/// preview, OS background scheduling, and completion notifications.
-/// All blocking work (scan, stage) runs on detached background tasks.
 @MainActor
 @Observable
 final class CleanModel {
     private(set) var schedule: CleanSchedule = .default()
-    private(set) var history: [CleanRecord] = []
-    /// Safe-tier items the next run would clean (dry-run preview).
     private(set) var preview: [CleanItem] = []
     private(set) var isPreviewLoading = false
     private(set) var isRunning = false
-    /// Honesty line after a run ("1.2 GB staged in Vault…").
     private(set) var report: String?
-    /// Vault sessions still restorable, keyed by id — drives history buttons.
-    private(set) var restorableSessions: [UUID: VaultSession] = [:]
-    /// Sessions restored this app run — history rows say "restored", not
-    /// the dishonest "vault expired".
-    private(set) var restoredSessionIDs: Set<UUID> = []
 
     private let scheduler = CleanScheduler()
-    private let vault = SafetyVault(rootURL: SafetyVault.defaultRootURL())
     private var activity: NSBackgroundActivityScheduler?
     private var started = false
 
-    /// Called once at app start: restores persisted schedule, registers the
-    /// OS background activity, and runs any clean that came due while the
-    /// app was closed.
     func start() {
         guard !started else { return }
         started = true
         Task {
             schedule = await scheduler.currentSchedule()
-            history = await scheduler.history()
-            refreshRestorable()
             registerBackgroundActivity()
             await checkDue()
         }
@@ -47,13 +29,9 @@ final class CleanModel {
     func appeared() {
         Task {
             schedule = await scheduler.currentSchedule()
-            history = await scheduler.history()
-            refreshRestorable()
         }
         loadPreview()
     }
-
-    // MARK: - Schedule edits
 
     func setFrequency(_ frequency: CleanSchedule.Frequency) {
         var updated = schedule
@@ -81,7 +59,7 @@ final class CleanModel {
     }
 
     private func apply(_ updated: CleanSchedule) {
-        schedule = updated  // optimistic; actor confirms below
+        schedule = updated
         Task {
             await scheduler.setSchedule(updated)
             schedule = await scheduler.currentSchedule()
@@ -89,58 +67,46 @@ final class CleanModel {
         }
     }
 
-    // MARK: - Running
-
     func runNow() {
         guard !isRunning else { return }
         isRunning = true
         report = nil
-        Task.detached(priority: .userInitiated) { [scheduler] in
-            let record = await scheduler.runNow(autoMode: false)
-            await MainActor.run { [weak self] in
-                self?.finish(record, notify: false)
-            }
+        Task {
+            let result = await scheduler.runNow(autoMode: false)
+            self.finish(itemsCleaned: result.itemsCleaned, bytesFreed: result.bytesFreed, notify: false)
         }
     }
 
-    /// Checks whether a scheduled run came due and executes it (auto mode
-    /// only stages the safe tier — the schedule's own contract).
     private func checkDue() async {
-        guard let record = await scheduler.scheduleIfNeeded() else { return }
-        finish(record, notify: schedule.notifyOnCompletion)
+        guard let result = await scheduler.scheduleIfNeeded() else { return }
+        finish(itemsCleaned: result.itemsCleaned, bytesFreed: result.bytesFreed, notify: schedule.notifyOnCompletion)
     }
 
-    private func finish(_ record: CleanRecord, notify: Bool) {
+    private func finish(itemsCleaned: Int, bytesFreed: UInt64, notify: Bool) {
         isRunning = false
-        history.insert(record, at: 0)
         report =
-            record.itemsCleaned > 0
-            ? "\(ByteFormat.string(record.bytesFreed)) staged in Vault — restore anytime for 7 days"
+            itemsCleaned > 0
+            ? "Moved \(itemsCleaned) items (\(ByteFormat.string(bytesFreed))) to Trash"
             : "Nothing to clean — the safe tier is already empty"
         Task {
             schedule = await scheduler.currentSchedule()
-            refreshRestorable()
         }
         loadPreview(force: true)
-        if notify, record.itemsCleaned > 0 {
+        if notify, itemsCleaned > 0 {
             postNotification(
-                title: "Pulse cleaned \(ByteFormat.string(record.bytesFreed))",
-                body: "\(record.itemsCleaned) safe items staged in the Vault. Restore anytime for 7 days."
+                title: "Pulse cleaned \(ByteFormat.string(bytesFreed))",
+                body: "\(itemsCleaned) safe items moved to Trash."
             )
         }
     }
 
-    // MARK: - Preview
-
     func loadPreview(force: Bool = false) {
         guard !isPreviewLoading, force || preview.isEmpty else { return }
         isPreviewLoading = true
-        Task.detached(priority: .utility) { [scheduler] in
+        Task {
             let items = await scheduler.preview()
-            await MainActor.run { [weak self] in
-                self?.preview = items
-                self?.isPreviewLoading = false
-            }
+            self.preview = items
+            self.isPreviewLoading = false
         }
     }
 
@@ -148,53 +114,10 @@ final class CleanModel {
         preview.reduce(0) { $0 + $1.sizeBytes }
     }
 
-    /// Frees the dry-run preview results when the Clean page goes off screen —
-    /// lazy eviction keeps the resident footprint down (P0-6).
     func releasePreview() {
         preview = []
     }
 
-    // MARK: - History restore
-
-    func restore(_ record: CleanRecord) {
-        guard let session = restorableSessions[record.sessionID] else { return }
-        Task.detached(priority: .userInitiated) { [vault] in
-            let restored = (try? vault.restore(session)) ?? 0
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.report =
-                    restored > 0
-                    ? "Restored \(restored) items to their original locations"
-                    : "Restore failed — vault contents may have been removed"
-                if restored > 0 { self.restoredSessionIDs.insert(record.sessionID) }
-                self.refreshRestorable()
-            }
-        }
-    }
-
-    func purge(_ record: CleanRecord) {
-        guard let session = restorableSessions[record.sessionID] else { return }
-        Task.detached(priority: .userInitiated) { [vault] in
-            vault.purge(session)
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.report = "Vault session purged — \(ByteFormat.string(session.totalBytes)) freed"
-                self.refreshRestorable()
-            }
-        }
-    }
-
-    private func refreshRestorable() {
-        let sessions = vault.sessions()
-        restorableSessions = Dictionary(
-            uniqueKeysWithValues: sessions.map { ($0.id, $0) })
-    }
-
-    // MARK: - OS scheduling
-
-    /// NSBackgroundActivityScheduler survives sleep/wake correctly — the
-    /// spec's chosen trigger. Interval = half the schedule period so a due
-    /// run is caught within hours, not a full period late.
     private func registerBackgroundActivity() {
         activity?.invalidate()
         let scheduler = NSBackgroundActivityScheduler(
@@ -208,7 +131,7 @@ final class CleanModel {
             case .weekly, .monthly: 12 * 3600
             }
         scheduler.schedule { [weak self] completion in
-            Task { @MainActor in
+            Task {
                 await self?.checkDue()
                 completion(.finished)
             }
@@ -216,10 +139,6 @@ final class CleanModel {
         activity = scheduler
     }
 
-    // MARK: - Notifications
-
-    /// UNUserNotificationCenter traps when the process has no bundle (bare
-    /// SwiftPM `make run` builds) — every call must stay behind this guard.
     private var notificationsAvailable: Bool {
         Bundle.main.bundleIdentifier != nil
     }

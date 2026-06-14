@@ -7,11 +7,9 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case storage = "Storage"
     case timeline = "Timeline"
-    case clean = "Clean"
     case uninstall = "Uninstall"
     case monitor = "Monitor"
     case health = "Health"
-    case vault = "Vault"
     case diagnostics = "Diagnostics"
 
     var id: String { rawValue }
@@ -21,18 +19,16 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .dashboard: "circle.circle"
         case .storage: "internaldrive"
         case .timeline: "chart.xyaxis.line"
-        case .clean: "sparkles"
         case .uninstall: "trash.slash"
         case .monitor: "waveform.path.ecg"
         case .health: "heart"
-        case .vault: "shield"
         case .diagnostics: "stethoscope"
         }
     }
 
     var isAvailable: Bool {
         switch self {
-        case .dashboard, .storage, .timeline, .clean, .uninstall, .monitor, .health, .vault,
+        case .dashboard, .storage, .timeline, .uninstall, .monitor, .health,
             .diagnostics:
             true
         }
@@ -127,13 +123,6 @@ struct SidebarView: View {
             Text("\(Int(snapshot.diskUsedFraction * 100))%")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.statusColor(snapshot.diskUsedFraction))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Halo.surface2, in: Capsule())
-        } else if item == .vault, !storage.vaultSessions.isEmpty {
-            Text("\(storage.vaultSessions.count)")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.volt)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(Halo.surface2, in: Capsule())
