@@ -35,9 +35,22 @@ make build      # debug build
 make test       # build + run tests
 make run        # launch the app
 make bundle     # release build wrapped in dist/Pulse.app (ad-hoc signed)
+make dev-cert   # one-time: stable local signing (see below)
 ```
 
 CI runners have a healthy toolchain and invoke SwiftPM directly — no workaround.
+
+### Testing permission-gated features locally
+
+The App Uninstaller needs Full Disk Access / App Management grants. Ad-hoc
+builds get a new code hash on every `make bundle`, which makes macOS silently
+drop those grants (the app still *shows* as toggled on in Settings). Run
+`make dev-cert` **once** to create a stable self-signed identity — `make bundle`
+then signs with it and grants persist across rebuilds. To trash an
+App Store / root-owned bundle, Pulse asks Finder via in-process Apple Events, so
+the first uninstall prompts for "control Finder" and an admin password, like a
+manual drag-to-Trash. If a grant ever looks stuck, reset it:
+`tccutil reset SystemPolicyAllFiles com.pulse.app` (and `SystemPolicyAppBundles`).
 
 ## CI
 

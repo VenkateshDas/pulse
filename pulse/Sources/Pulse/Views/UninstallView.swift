@@ -71,7 +71,9 @@ struct UninstallView: View {
 
     @ViewBuilder
     private var uninstallTab: some View {
-        if model.plan != nil {
+        if model.result != nil {
+            UninstallResultCard()
+        } else if model.plan != nil {
             UninstallPlanCard()
         } else {
             DropZoneCard()
@@ -187,7 +189,7 @@ struct InstalledAppsCard: View {
             model.selectApp(app)
         } label: {
             HStack(spacing: 12) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+                Image(nsImage: model.icon(for: app.path))
                     .resizable()
                     .frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 1) {
@@ -201,10 +203,14 @@ struct InstalledAppsCard: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                Text(ByteFormat.string(app.sizeBytes))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.textPrimary)
-                    .frame(width: 76, alignment: .trailing)
+                // Size is computed lazily on selection, so the list omits it
+                // (0 = not yet computed) to keep the list load fast.
+                if app.sizeBytes > 0 {
+                    Text(ByteFormat.string(app.sizeBytes))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Halo.textPrimary)
+                        .frame(width: 76, alignment: .trailing)
+                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10))
                     .foregroundStyle(Halo.textDim)
@@ -286,7 +292,7 @@ struct UninstallPlanCard: View {
             Image(systemName: "checkmark.square.fill")
                 .font(.system(size: 13))
                 .foregroundStyle(Halo.pulseGreen)
-            Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+            Image(nsImage: model.icon(for: app.path))
                 .resizable()
                 .frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 1) {
@@ -354,7 +360,7 @@ struct UninstallPlanCard: View {
                 selectable
                     ? "" : "REVIEW matches are never bulk-selected — open in Finder and decide yourself")
 
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+            Image(nsImage: model.icon(for: item.path))
                 .resizable()
                 .frame(width: 16, height: 16)
 
@@ -427,6 +433,299 @@ struct UninstallPlanCard: View {
     }
 }
 
+// MARK: - Result receipt
+
+/// The "Verify" beat: a post-uninstall receipt confirming exactly what was
+/// removed. Every row reflects reality — the app's real `recycle` result and
+/// the Vault session's actual contents.
+struct UninstallResultCard: View {
+    @Environment(UninstallModel.self) private var model
+
+    var body: some View {
+        if let result = model.result {
+            VStack(alignment: .leading, spacing: 14) {
+                successHeader(result)
+                Divider().overlay(Halo.surface2)
+                appRow(result)
+                if !result.stagedItems.isEmpty {
+                    stagedSection(result)
+                }
+                failedSection(result)
+                notes(result)
+                actions(result)
+            }
+            .padding(16)
+            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(Halo.pulseGreen.opacity(0.35), lineWidth: 1))
+        }
+    }
+
+    private func successHeader(_ result: UninstallModel.UninstallResult) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: result.appTrashed ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(result.appTrashed ? Halo.pulseGreen : Halo.amber)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(result.appTrashed ? "\(result.appName) uninstalled" : "\(result.appName) — partly removed")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Halo.textPrimary)
+                Text(headline(result))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
+            }
+            Spacer()
+        }
+    }
+
+    private func headline(_ result: UninstallModel.UninstallResult) -> String {
+        let count = result.stagedCount + (result.appTrashed ? 1 : 0)
+        return "\(count) item\(count == 1 ? "" : "s") removed · \(ByteFormat.string(result.stagedBytes)) staged in Vault"
+    }
+
+    private func appRow(_ result: UninstallModel.UninstallResult) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: result.appTrashed ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .font(.system(size: 13))
+                .foregroundStyle(result.appTrashed ? Halo.pulseGreen : Halo.flare)
+            Image(nsImage: model.icon(for: result.appBundlePath))
+                .resizable()
+                .frame(width: 18, height: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(result.appName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Halo.textPrimary)
+                Text(
+                    result.appTrashed
+                        ? "moved to Trash · Finder “Put Back” restores it"
+                        : "couldn't be moved to Trash — Retry and approve the Finder prompt"
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+                .lineLimit(1)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Halo.surface2.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func stagedSection(_ result: UninstallModel.UninstallResult) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text("STAGED IN VAULT")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(Halo.pulseGreen)
+                Text("exactly what was removed — restorable for 7 days")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.textDim)
+                Spacer()
+                Text(ByteFormat.string(result.stagedBytes))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
+            }
+            .padding(.top, 2)
+            ForEach(result.stagedItems, id: \.originalPath) { item in
+                stagedRow(item)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func failedSection(_ result: UninstallModel.UninstallResult) -> some View {
+        if !result.failedItems.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text("PENDING — NEEDS FULL DISK ACCESS")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(Halo.amber)
+                    Spacer()
+                }
+                .padding(.top, 2)
+                ForEach(result.failedItems, id: \.path) { item in
+                    HStack(spacing: 10) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Halo.amber)
+                            .frame(width: 16)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Halo.textPrimary)
+                                .lineLimit(1)
+                            Text(item.path)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(Halo.textDim)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                        Text(ByteFormat.string(item.sizeBytes))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                            .frame(width: 76, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Halo.amber.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+    }
+
+
+    private func stagedRow(_ item: VaultItem) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.to.line.compact")
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.pulseGreen)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Halo.textPrimary)
+                    .lineLimit(1)
+                Text(item.originalPath)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer()
+            Text(ByteFormat.string(item.sizeBytes))
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Halo.textPrimary)
+                .frame(width: 76, alignment: .trailing)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Halo.surface2.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    @ViewBuilder
+    private func notes(_ result: UninstallModel.UninstallResult) -> some View {
+        // App-bundle failure is an App Management / Finder-consent issue —
+        // NOT Full Disk Access. Route it to its real remedy.
+        if result.appNeedsAttention {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(
+                    "\(result.appName) couldn't be moved to the Trash.",
+                    systemImage: "lock.shield"
+                )
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Halo.amber)
+                Text(
+                    "Removing another app needs permission. Click Retry and approve the “control Finder” prompt (and the admin password, if asked) — same as dragging the app to the Trash by hand."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+            }
+        }
+        // Leftover-staging failure is the genuine Full Disk Access case.
+        if result.leftoversNeedAttention {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(
+                    "\(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access.",
+                    systemImage: "externaldrive.badge.xmark"
+                )
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Halo.amber)
+                Text(
+                    "Grant Pulse Full Disk Access, then Retry. In Settings, toggle Pulse on under Full Disk Access (add it with “+” if it isn’t listed)."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+            }
+        }
+        if result.reviewLeftCount > 0 {
+            Label(
+                "\(result.reviewLeftCount) REVIEW match\(result.reviewLeftCount == 1 ? "" : "es") left untouched — open the app again to inspect them in Finder.",
+                systemImage: "eye"
+            )
+            .font(.system(size: 11))
+            .foregroundStyle(Halo.textDim)
+        }
+        if result.stagedItems.isEmpty && result.failedCount == 0 {
+            Text("No leftovers were staged — removing the app fully uninstalled it.")
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+        }
+    }
+
+    private func actions(_ result: UninstallModel.UninstallResult) -> some View {
+        HStack(spacing: 10) {
+            if result.needsAttention {
+                // FDA only helps the leftover (container) failures, so only
+                // surface that button when leftovers actually failed.
+                if result.leftoversNeedAttention {
+                    Button {
+                        model.openFullDiskAccessSettings()
+                    } label: {
+                        Text("Grant Full Disk Access")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Halo.void)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Halo.amber, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open System Settings → Privacy & Security → Full Disk Access")
+                }
+                Button {
+                    model.retryUninstall()
+                } label: {
+                    HStack(spacing: 6) {
+                        if model.isUninstalling { ProgressView().controlSize(.small) }
+                        Text(model.isUninstalling ? "Retrying…" : "↻ Retry")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Halo.ion)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Halo.ion.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isUninstalling)
+                .help("Re-attempt the parts that failed")
+            } else if !result.sessionIDs.isEmpty, !result.stagedItems.isEmpty {
+                Button {
+                    model.restoreLastUninstall()
+                } label: {
+                    HStack(spacing: 6) {
+                        if model.isRestoringResult { ProgressView().controlSize(.small) }
+                        Text(model.isRestoringResult ? "Restoring…" : "↺ Restore everything")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(Halo.pulseGreen)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Halo.pulseGreen.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isRestoringResult)
+                .help("Pull every staged leftover back to its original location")
+            }
+            Spacer()
+            Button {
+                model.dismissResult()
+            } label: {
+                Text("Done")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Halo.void)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Halo.ion, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Dismiss — back to the app list to uninstall another")
+        }
+    }
+}
+
 // MARK: - Orphan scan
 
 struct OrphanScanCard: View {
@@ -494,7 +793,7 @@ struct OrphanScanCard: View {
             }
             .buttonStyle(.plain)
 
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+            Image(nsImage: model.icon(for: item.path))
                 .resizable()
                 .frame(width: 16, height: 16)
 

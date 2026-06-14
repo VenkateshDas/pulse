@@ -17,7 +17,7 @@ SWIFT := SWIFTPM_CUSTOM_LIBS_DIR=$(FIX_DIR) swift
 TEST_FLAGS := -Xswiftc -F$(FW) -Xlinker -F$(FW) \
 	-Xlinker -rpath -Xlinker $(FW) -Xlinker -rpath -Xlinker $(TESTLIB)
 
-.PHONY: build test run release bundle sign notarize dmg beta-release clean fix-toolchain
+.PHONY: build test run release bundle dev-cert sign notarize dmg beta-release clean fix-toolchain
 
 build: fix-toolchain
 	$(SWIFT) build
@@ -33,6 +33,13 @@ release: fix-toolchain
 
 bundle: release
 	scripts/bundle.sh
+
+# One-time: create a stable self-signed code-signing identity so local builds
+# keep their TCC grants (Full Disk Access / App Management) across rebuilds.
+# Without it, ad-hoc builds reset permissions every rebuild and gated features
+# like the App Uninstaller can't be tested.
+dev-cert:
+	scripts/dev-cert.sh
 
 # Developer ID signed, distributable bundle (P0-9). Requires an Apple Developer
 # account: SIGN_IDENTITY="Developer ID Application: Name (TEAMID)".
