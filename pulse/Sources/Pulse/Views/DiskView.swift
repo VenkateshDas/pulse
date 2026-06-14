@@ -27,7 +27,7 @@ struct DiskView: View {
     private var tabBar: some View {
         HStack(spacing: 24) {
             tabBtn("Map", index: 0)
-            tabBtn("Insights", index: 1)
+            tabBtn("Hidden Space", index: 1)
             tabBtn("Reclaim", index: 2)
             tabBtn("Trash", index: 3)
             tabBtn("Optimize", index: 4)

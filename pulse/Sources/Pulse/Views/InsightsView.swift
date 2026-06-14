@@ -30,7 +30,7 @@ struct InsightsView: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Insights")
+                Text("Hidden Space")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(Halo.textPrimary)
                 Text("Big, easy-to-forget locations. Not all safe to delete — read each hint.")
