@@ -36,10 +36,10 @@ struct DashboardView: View {
     private var greeting: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("\(timeGreeting), \(firstName)")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold, design: .default))
                 .foregroundStyle(Halo.textPrimary)
             Text(statusLine)
-                .font(.system(size: 12))
+                .font(.system(size: 13, weight: .medium, design: .default))
                 .foregroundStyle(Halo.textDim)
         }
     }
@@ -345,7 +345,11 @@ struct DashboardView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Halo.border, lineWidth: 1)
+        )
     }
     
     /// 24-hour CPU history — gap-honest (nil minutes render as gaps, never

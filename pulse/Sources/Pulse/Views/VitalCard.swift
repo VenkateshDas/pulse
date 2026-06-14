@@ -108,11 +108,11 @@ struct VitalCard: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 12))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Halo.surface2, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Halo.border, lineWidth: 1)
         )
         .help(cardTooltip ?? "")
     }

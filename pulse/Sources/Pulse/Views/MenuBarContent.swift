@@ -45,7 +45,6 @@ struct MenuBarContent: View {
         .padding(14)
         .frame(width: 280)
         .background(Halo.void)
-        .preferredColorScheme(.dark)
     }
 
     // MARK: Metric rows

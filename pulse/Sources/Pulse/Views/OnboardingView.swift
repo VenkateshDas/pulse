@@ -75,7 +75,6 @@ struct OnboardingView: View {
         .padding(32)
         .frame(width: 560, height: 520)
         .background(Halo.void)
-        .preferredColorScheme(.dark)
     }
 
     private func step<Content: View>(

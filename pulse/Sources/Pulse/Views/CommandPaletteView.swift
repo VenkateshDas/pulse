@@ -118,7 +118,6 @@ struct CommandPaletteView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Halo.surface2, lineWidth: 1))
         .onChange(of: query) { _, _ in highlighted = 0 }
         .onAppear { searchFocused = true }
-        .preferredColorScheme(.dark)
     }
 
     private func row(_ command: Command, active: Bool) -> some View {
