@@ -17,6 +17,9 @@
 
 ---
 
+> [!WARNING]
+> **Work in progress.** Pulse is under active development — expect rough edges, bugs, and breaking changes. Things may be glitchy. Feedback welcome.
+
 > **Beta note:** Pulse is ad-hoc signed. On first launch right-click → **Open** to bypass the Gatekeeper warning.
 
 ---
