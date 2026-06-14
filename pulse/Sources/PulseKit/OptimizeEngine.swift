@@ -144,16 +144,16 @@ public enum OptimizeEngine {
             }),
     ]
 
-    /// Elevation-required. Declared so the UI can show them, but disabled
-    /// until the SMAppService privileged helper exists (F2 follow-up / F7).
+    /// Elevation-required. Routed through the SMAppService privileged helper;
+    /// `run` fails gracefully with a clear message when the helper isn't enabled.
     static let privilegedTasks: [OptimizeTask] = [
         OptimizeTask(
             id: "memory_pressure_relief",
             label: "Free inactive memory",
             detail: "Run `purge` to release inactive/cached memory back to the OS.",
             risk: .careful, needsSudo: true,
-            preview: { "Would run: sudo purge (requires privileged helper)" },
-            run: { OptimizeResult(success: false, summary: "Needs privileged helper") }),
+            preview: { "Would run: sudo purge (via privileged helper)" },
+            run: { await PrivilegedHelperClient.shared.perform(.purgeMemory) }),
 
         OptimizeTask(
             id: "network_stack_optimize",
@@ -161,8 +161,8 @@ public enum OptimizeEngine {
             detail: "Flush the route table and ARP cache. Skipped while a VPN is active.",
             risk: .careful, needsSudo: true,
             skipCheck: { await vpnActive() ? "VPN active — network reset skipped" : nil },
-            preview: { "Would flush routes + arp -a -d (requires privileged helper)" },
-            run: { OptimizeResult(success: false, summary: "Needs privileged helper") }),
+            preview: { "Would flush routes + arp -a -d (via privileged helper)" },
+            run: { await PrivilegedHelperClient.shared.perform(.flushNetworkStack) }),
 
         OptimizeTask(
             id: "spotlight_index_optimize",
@@ -174,8 +174,8 @@ public enum OptimizeEngine {
                 // "Indexing enabled." means healthy → skip.
                 return out.stdout.contains("Indexing enabled") ? "Spotlight already healthy" : nil
             },
-            preview: { "Would run: sudo mdutil -E / (requires privileged helper)" },
-            run: { OptimizeResult(success: false, summary: "Needs privileged helper") }),
+            preview: { "Would run: sudo mdutil -E / (via privileged helper)" },
+            run: { await PrivilegedHelperClient.shared.perform(.rebuildSpotlightIndex) }),
     ]
 
     // MARK: Helpers

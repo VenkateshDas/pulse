@@ -11,6 +11,7 @@ struct OptimizeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 header
+                if model.tasks.contains(where: { $0.needsSudo }) { adminBanner }
                 ForEach(OptimizeTask.Risk.allCases, id: \.self) { risk in
                     let group = model.tasks.filter { $0.risk == risk }
                     if !group.isEmpty { section(risk, group) }
@@ -48,6 +49,41 @@ struct OptimizeView: View {
             .buttonStyle(.borderedProminent)
             .tint(Halo.pulseGreen)
         }
+    }
+
+    /// Status + enable control for the privileged helper that backs ADMIN tasks.
+    private var adminBanner: some View {
+        let (icon, text, tint): (String, String, Color) = {
+            switch model.helperStatus {
+            case .enabled:
+                return ("checkmark.shield.fill", "Admin helper enabled — privileged tasks ready.", Halo.pulseGreen)
+            case .requiresApproval:
+                return ("exclamationmark.shield.fill",
+                        "Approve “Pulse” in System Settings → General → Login Items to finish enabling admin tasks.", Halo.amber)
+            case .notRegistered:
+                return ("shield.lefthalf.filled",
+                        "Admin tasks need a one-time privileged helper. Enable it to unlock them.", Halo.volt)
+            case .unavailable:
+                return ("shield.slash.fill",
+                        "Admin helper unavailable — run the signed app bundle (make bundle) to enable privileged tasks.", Halo.textDim)
+            }
+        }()
+        return HStack(spacing: 10) {
+            Image(systemName: icon).foregroundStyle(tint)
+            Text(text).font(.system(size: 11)).foregroundStyle(Halo.textDim)
+            Spacer()
+            if model.helperStatus == .notRegistered || model.helperStatus == .requiresApproval {
+                Button(model.helperStatus == .requiresApproval ? "Re-check" : "Enable") {
+                    Task { await model.enableHelper() }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(Halo.volt)
+            }
+        }
+        .padding(12)
+        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(tint.opacity(0.3), lineWidth: 1))
     }
 
     private func section(_ risk: OptimizeTask.Risk, _ tasks: [OptimizeTask]) -> some View {
@@ -99,8 +135,8 @@ struct OptimizeView: View {
             Text(skip)
                 .font(.system(size: 11))
                 .foregroundStyle(Halo.amber)
-        } else if task.needsSudo {
-            Text("Requires a privileged helper — coming in a later update.")
+        } else if task.needsSudo && model.helperStatus != .enabled {
+            Text("Requires the admin helper (see banner above).")
                 .font(.system(size: 11))
                 .foregroundStyle(Halo.textDim)
         } else {
@@ -114,11 +150,11 @@ struct OptimizeView: View {
     private func actionControl(_ task: OptimizeTask, _ s: OptimizeModel.TaskState) -> some View {
         if s.isRunning {
             ProgressView().controlSize(.small)
-        } else if task.needsSudo {
+        } else if task.needsSudo && model.helperStatus != .enabled {
             Image(systemName: "lock.fill")
                 .font(.system(size: 12))
                 .foregroundStyle(Halo.textDim)
-                .help("Disabled until the privileged helper ships")
+                .help("Enable the admin helper to run this")
         } else if s.skipReason != nil {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 14))

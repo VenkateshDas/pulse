@@ -478,3 +478,40 @@ struct OptimizeEngineTests {
         #expect(bytes >= 10_000)
     }
 }
+
+// MARK: - Privileged helper contract (F2 helper)
+
+@Suite("PrivilegedHelper")
+struct PrivilegedHelperTests {
+    @Test func everyOperationMapsToAbsolutePathCommands() {
+        for op in PrivilegedOperation.allCases {
+            #expect(!op.commands.isEmpty)
+            for cmd in op.commands {
+                #expect(cmd.path.hasPrefix("/"))   // no PATH lookup, no injection
+                #expect(!op.label.isEmpty)
+            }
+        }
+    }
+
+    @Test func rawValuesRoundTrip() {
+        for op in PrivilegedOperation.allCases {
+            #expect(PrivilegedOperation(rawValue: op.rawValue) == op)
+        }
+        #expect(PrivilegedOperation(rawValue: "rm -rf /") == nil)
+    }
+
+    @Test func codeSignRequirementPinsIdentifier() {
+        #expect(pulseCodeSignRequirement(identifier: "com.pulse.helper")
+            == "identifier \"com.pulse.helper\"")
+    }
+
+    @Test func privilegedTasksCoverThreeOperations() {
+        #expect(OptimizeEngine.privilegedTasks.count == PrivilegedOperation.allCases.count)
+    }
+
+    @Test func unenabledHelperPerformFailsGracefully() async {
+        // No bundle in the test runner → status .unavailable → never crashes.
+        let result = await PrivilegedHelperClient.shared.perform(.purgeMemory)
+        #expect(!result.success)
+    }
+}
