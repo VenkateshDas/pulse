@@ -1,31 +1,35 @@
 import PulseKit
 import SwiftUI
 
-/// Health module (M6): battery state + 60-day capacity trend, startup
-/// items (launch agents) with next-login toggles, and on-demand
-/// micro-benchmarks.
 struct HealthView: View {
     @Environment(HealthModel.self) private var model
+    @Environment(DashboardModel.self) private var dashboardModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
             header
             BatteryCard()
-                .frame(height: 120)
+                .frame(height: 185)
             if !model.batteryUnavailable {
-                CapacityTrendCard()
-                    .frame(height: 130)
+                let readings = dashboardModel.batteryTrend.compactMap { $0.capacityPercent }
+                if readings.count >= 2 {
+                    CapacityTrendCard()
+                        .frame(height: 130)
+                } else {
+                    BatteryStatsCard()
+                        .frame(height: 100)
+                }
             }
             HStack(alignment: .top, spacing: 16) {
                 StartupItemsCard()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if !model.batteryUnavailable {
                     BatteryConsumptionCard()
-                        .frame(maxWidth: 320, maxHeight: .infinity)
+                        .frame(maxWidth: 340, maxHeight: .infinity)
                 }
             }
             BenchmarkCard()
-                .frame(height: 180) // A bit taller to fit baselines
+                .frame(height: 180)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -35,16 +39,15 @@ struct HealthView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Health")
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
-            Text(
-                "Battery condition with a 60-day capacity trend, what launches at login, and repeatable speed benchmarks. Login items beyond launch agents need private Apple APIs to list — Pulse shows only what it can truthfully read."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(Halo.textDim)
+            Text("Battery, startup agents, and repeatable performance benchmarks.")
+                .font(.system(size: 12))
+                .foregroundStyle(Halo.textDim)
         }
+        .padding(.bottom, 4)
     }
 }
 
@@ -96,17 +99,24 @@ private struct BatteryCard: View {
             Spacer()
         }
 
-        LazyVGrid(
-            columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-            alignment: .leading, spacing: 12
-        ) {
-            fact(
-                "CAPACITY", "\(battery.capacityPercent)% of design",
-                battery.capacityPercent >= 80 ? Halo.textPrimary : Halo.amber)
+        // 6-fact grid: row 1 = capacity / cycles / condition; row 2 = power / cycles left / thermal
+        let cols = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+        LazyVGrid(columns: cols, alignment: .leading, spacing: 10) {
+            fact("CAPACITY", "\(battery.capacityPercent)% of design",
+                 battery.capacityPercent >= 80 ? Halo.textPrimary : Halo.amber)
             fact("CYCLES", "\(battery.cycleCount)", Halo.textPrimary)
-            fact(
-                "CONDITION", battery.condition,
-                battery.condition == "Normal" ? Halo.pulseGreen : Halo.amber)
+            fact("CONDITION", battery.condition,
+                 battery.condition == "Normal" ? Halo.pulseGreen : Halo.amber)
+
+            if let watts = battery.powerWatts {
+                fact("POWER DRAW", String(format: "%.1f W", watts), Halo.ion)
+            } else {
+                fact("POWER DRAW", "—", Halo.textDim)
+            }
+            let left = battery.cyclesRemaining
+            fact("CYCLES LEFT", "\(left)",
+                 left > 500 ? Halo.pulseGreen : left > 150 ? Halo.amber : Halo.flare)
+            thermalFact()
         }
     }
 
@@ -154,6 +164,19 @@ private struct BatteryCard: View {
         return battery.isCharging ? "~\(span) to full" : "~\(span) remaining"
     }
 
+    @ViewBuilder
+    private func thermalFact() -> some View {
+        let state = ProcessInfo.processInfo.thermalState
+        let (label, color): (String, Color) = switch state {
+        case .nominal: ("Nominal", Halo.pulseGreen)
+        case .fair: ("Fair", Halo.amber)
+        case .serious: ("Serious", Halo.flare)
+        case .critical: ("Critical!", Halo.flare)
+        @unknown default: ("Unknown", Halo.textDim)
+        }
+        fact("THERMAL", label, color)
+    }
+
     private func fact(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
@@ -167,11 +190,89 @@ private struct BatteryCard: View {
     }
 }
 
+// MARK: - Battery Stats Card (shown while the 60-day trend is still collecting)
+
+private struct BatteryStatsCard: View {
+    @Environment(HealthModel.self) private var model
+    @Environment(DashboardModel.self) private var dashboardModel
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 0) {
+            statBlock(
+                icon: "bolt.heart.fill",
+                title: "CAPACITY HEALTH",
+                value: model.battery.map { "\($0.capacityPercent)%" } ?? "—",
+                subtitle: model.battery.map {
+                    $0.capacityPercent >= 80 ? "Within normal range" : "Below Apple threshold"
+                } ?? "",
+                color: capacityColor
+            )
+            divider
+            statBlock(
+                icon: "arrow.clockwise.circle.fill",
+                title: "CYCLE HEALTH",
+                value: model.battery.map { "\($0.cyclesRemaining)" } ?? "—",
+                subtitle: model.battery.map {
+                    "cycles remaining · \($0.cycleCount) of 1000 used"
+                } ?? "",
+                color: cyclesColor
+            )
+            divider
+            statBlock(
+                icon: "chart.line.uptrend.xyaxis",
+                title: "CAPACITY TREND",
+                value: "Collecting",
+                subtitle: "1 reading/day · builds over 60 days",
+                color: Halo.textDim
+            )
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Halo.surface2)
+            .frame(width: 1)
+            .padding(.vertical, 4)
+    }
+
+    private var capacityColor: Color {
+        guard let b = model.battery else { return Halo.textDim }
+        return b.capacityPercent >= 80 ? Halo.pulseGreen : Halo.amber
+    }
+
+    private var cyclesColor: Color {
+        guard let b = model.battery else { return Halo.textDim }
+        return b.cyclesRemaining > 500 ? Halo.pulseGreen : b.cyclesRemaining > 150 ? Halo.amber : Halo.flare
+    }
+
+    private func statBlock(icon: String, title: String, value: String, subtitle: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundStyle(color)
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(Halo.textDim)
+            }
+            Text(value)
+                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .foregroundStyle(color)
+            Text(subtitle)
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // MARK: - Capacity Trend Card
 
-/// 60-day battery capacity (% of design) degradation trend — one reading per
-/// day from BatteryHistoryStore. The y-axis is a tight band around the data so
-/// a few points of drift are visible; gaps render honestly (no interpolation).
 private struct CapacityTrendCard: View {
     @Environment(DashboardModel.self) private var dashboardModel
 
@@ -191,31 +292,22 @@ private struct CapacityTrendCard: View {
                 }
             }
 
-            if readings.count < 2 {
-                Text("Collecting — one reading per day builds the trend over time.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                // Tight band: floor a few points below the minimum so small
-                // degradation is legible without distorting the zero baseline.
-                let minReading = readings.min() ?? 0
-                let floorValue = Double(max(0, minReading - 3))
-                let scale = 100.0 - floorValue
-                let series: [Double?] = dashboardModel.batteryTrend.map { entry in
-                    entry.capacityPercent.map { Double($0) - floorValue }
+            let minReading = readings.min() ?? 0
+            let floorValue = Double(max(0, minReading - 3))
+            let scale = 100.0 - floorValue
+            let series: [Double?] = dashboardModel.batteryTrend.map { entry in
+                entry.capacityPercent.map { Double($0) - floorValue }
+            }
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .trailing) {
+                    Text("100%")
+                    Spacer()
+                    Text("\(Int(floorValue))%")
                 }
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .trailing) {
-                        Text("100%")
-                        Spacer()
-                        Text("\(Int(floorValue))%")
-                    }
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
-                    .frame(width: 44, alignment: .trailing)
-                    HistoryChart(values: series, color: Halo.volt, maxValue: scale)
-                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 44, alignment: .trailing)
+                HistoryChart(values: series, color: Halo.volt, maxValue: scale)
             }
         }
         .padding(16)
@@ -231,7 +323,7 @@ private struct BatteryConsumptionCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("BATTERY CONSUMPTION (DAILY)")
+            Text("BATTERY USE · DAILY")
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(2)
                 .foregroundStyle(Halo.textDim)
@@ -244,7 +336,6 @@ private struct BatteryConsumptionCard: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 2) {
-                        // Show most recent days first
                         ForEach(dashboardModel.batteryTrend.reversed()) { entry in
                             row(for: entry)
                         }
@@ -259,19 +350,49 @@ private struct BatteryConsumptionCard: View {
     }
 
     private func row(for entry: BatteryHistoryStore.Entry) -> some View {
-        HStack {
-            Text(formatDate(entry.date))
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textPrimary)
-            Spacer()
-            let hours = entry.timeOnBattery / 3600.0
-            Text(String(format: "%.1f hrs", hours))
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(Halo.ion)
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 8) {
+                Text(formatDate(entry.date))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Halo.textPrimary)
+                    .frame(width: 70, alignment: .leading)
+
+                Spacer()
+
+                // Time-of-day window (e.g. "9:00 AM – 11:30 PM")
+                if let first = entry.firstActiveAt, let last = entry.lastActiveAt {
+                    Text("\(formatTime(first)) – \(formatTime(last))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(Halo.textDim)
+                }
+
+                let hours = entry.timeOnBattery / 3600.0
+                Text(String(format: "%.1f h", hours))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(hoursColor(hours))
+                    .frame(width: 40, alignment: .trailing)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+
+            // Thin usage bar proportional to 12h max
+            GeometryReader { geo in
+                let fraction = min(entry.timeOnBattery / (12 * 3600), 1.0)
+                HStack(spacing: 0) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Halo.ion.opacity(0.4))
+                        .frame(width: geo.size.width * fraction, height: 2)
+                    Spacer(minLength: 0)
+                }
+            }
+            .frame(height: 2)
+            .padding(.horizontal, 10)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 6))
+        .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func hoursColor(_ hours: Double) -> Color {
+        hours >= 8 ? Halo.pulseGreen : hours >= 4 ? Halo.ion : Halo.textDim
     }
 
     private func formatDate(_ date: Date) -> String {
@@ -280,6 +401,14 @@ private struct BatteryConsumptionCard: View {
         if cal.isDateInYesterday(date) { return "Yesterday" }
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        formatter.amSymbol = "am"
+        formatter.pmSymbol = "pm"
         return formatter.string(from: date)
     }
 }
@@ -443,10 +572,9 @@ private struct BenchmarkCard: View {
                         .font(.system(size: 11))
                         .foregroundStyle(Halo.textDim)
                 }
-                
+
                 Spacer()
-                
-                // Baselines context
+
                 VStack(alignment: .leading, spacing: 4) {
                     baselineFact("GOOD", "> 1000", "M1+ Class", color: Halo.pulseGreen)
                     baselineFact("BAD", "500-1000", "Older Intel", color: Halo.amber)
@@ -515,7 +643,6 @@ private struct BenchmarkCard: View {
         .help("1000 ≈ base M1 — average of the three phases against fixed reference speeds")
     }
 
-    /// Benchmarks jitter a few percent run to run; color only real moves.
     private func deltaColor(_ delta: Int, baseline: Int) -> Color {
         let fraction = Double(delta) / Double(baseline)
         if fraction <= -0.10 { return Halo.amber }

@@ -16,10 +16,16 @@ public struct BatteryHealth: Sendable, Equatable {
     /// "Normal" or "Service Recommended" — derived from permanent-failure
     /// status and the <80% capacity threshold Apple uses in System Settings.
     public let condition: String
+    /// Instantaneous battery power draw in watts (|amps| × volts / 1e6).
+    /// nil when idle on AC or when IOKit doesn't report the keys.
+    public let powerWatts: Double?
+    /// Cycles left before the Apple 1000-cycle service threshold.
+    public let cyclesRemaining: Int
 
     public init(
         capacityPercent: Int, cycleCount: Int, isCharging: Bool, isOnAC: Bool,
-        currentChargePercent: Int, timeToEvent: TimeInterval?, condition: String
+        currentChargePercent: Int, timeToEvent: TimeInterval?, condition: String,
+        powerWatts: Double? = nil, cyclesRemaining: Int = 0
     ) {
         self.capacityPercent = capacityPercent
         self.cycleCount = cycleCount
@@ -28,6 +34,8 @@ public struct BatteryHealth: Sendable, Equatable {
         self.currentChargePercent = currentChargePercent
         self.timeToEvent = timeToEvent
         self.condition = condition
+        self.powerWatts = powerWatts
+        self.cyclesRemaining = cyclesRemaining
     }
 }
 
@@ -66,14 +74,25 @@ public enum BatteryDecode {
             failed || capacityPercent < serviceCapacityThreshold
             ? "Service Recommended" : "Normal"
 
+        let cycleCount = props["CycleCount"] as? Int ?? 0
+        let cyclesRemaining = Swift.max(0, 1000 - cycleCount)
+
+        // Instantaneous power draw: |InstantAmperage mA| × Voltage mV → watts.
+        let amps = props["InstantAmperage"] as? Int ?? 0
+        let volts = props["Voltage"] as? Int ?? 0
+        let rawWatts = volts > 0 ? Double(abs(amps)) * Double(volts) / 1_000_000.0 : 0
+        let powerWatts: Double? = rawWatts > 0.5 ? rawWatts : nil
+
         return BatteryHealth(
             capacityPercent: capacityPercent,
-            cycleCount: props["CycleCount"] as? Int ?? 0,
+            cycleCount: cycleCount,
             isCharging: isCharging,
             isOnAC: isOnAC,
             currentChargePercent: chargePercent,
             timeToEvent: minutes.map { TimeInterval($0 * 60) },
-            condition: condition
+            condition: condition,
+            powerWatts: powerWatts,
+            cyclesRemaining: cyclesRemaining
         )
     }
 }

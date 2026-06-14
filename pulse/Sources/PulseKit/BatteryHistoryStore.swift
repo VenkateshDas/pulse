@@ -10,12 +10,21 @@ public final class BatteryHistoryStore {
         /// Maximum-capacity ratio (% of design) on this day. nil until a
         /// reading is recorded — older entries decode to nil.
         public var capacityPercent: Int?
+        /// Earliest and latest timestamps of battery-on activity this day.
+        /// Used to show "9:00 AM – 11:30 PM" in the consumption card.
+        public var firstActiveAt: Date?
+        public var lastActiveAt: Date?
         public var id: Date { date }
 
-        public init(date: Date, timeOnBattery: TimeInterval, capacityPercent: Int? = nil) {
+        public init(
+            date: Date, timeOnBattery: TimeInterval, capacityPercent: Int? = nil,
+            firstActiveAt: Date? = nil, lastActiveAt: Date? = nil
+        ) {
             self.date = Calendar.current.startOfDay(for: date)
             self.timeOnBattery = timeOnBattery
             self.capacityPercent = capacityPercent
+            self.firstActiveAt = firstActiveAt
+            self.lastActiveAt = lastActiveAt
         }
     }
 
@@ -37,11 +46,28 @@ public final class BatteryHistoryStore {
     }
 
     /// Adds time spent on battery to the current calendar day's entry.
+    /// Also tracks the earliest and latest active timestamps for the day so
+    /// the UI can display a "9:00 AM – 11:30 PM" usage window.
     public func addTimeOnBattery(_ duration: TimeInterval, at date: Date = .now) {
         guard duration > 0 else { return }
-        updateEntry(for: date, duration: duration, maxAgeDate: date) { current, new in
-            current += new
+        guard date.timeIntervalSince(Calendar.current.startOfDay(for: date)) >= 0 else { return }
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        let sessionStart = date.addingTimeInterval(-duration)
+
+        if let index = entries.firstIndex(where: { $0.date == startOfDay }) {
+            entries[index].timeOnBattery += duration
+            entries[index].firstActiveAt = entries[index].firstActiveAt.map {
+                min($0, sessionStart)
+            } ?? sessionStart
+            entries[index].lastActiveAt = max(entries[index].lastActiveAt ?? date, date)
+        } else {
+            entries.append(
+                Entry(
+                    date: startOfDay, timeOnBattery: duration,
+                    firstActiveAt: sessionStart, lastActiveAt: date))
+            entries.sort { $0.date < $1.date }
         }
+        entries.removeAll { date.timeIntervalSince($0.date) > Self.maxAge }
         persist()
     }
 
