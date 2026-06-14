@@ -56,6 +56,7 @@ PLIST
 # Signing. Set SIGN_IDENTITY to a Developer ID Application identity for a
 # distributable, notarizable build (hardened runtime); otherwise ad-hoc sign
 # for local launches only (Gatekeeper blocks ad-hoc apps on other machines).
+DEV_IDENTITY="Pulse Local Signing"
 if [ -n "${SIGN_IDENTITY:-}" ]; then
     codesign --force --options runtime --timestamp \
         --sign "$SIGN_IDENTITY" "$APP"
@@ -64,9 +65,17 @@ if [ -n "${SIGN_IDENTITY:-}" ]; then
     echo "  ditto -c -k --keepParent \"$APP\" Pulse.zip"
     echo "  xcrun notarytool submit Pulse.zip --keychain-profile <profile> --wait"
     echo "  xcrun stapler staple \"$APP\""
+elif security find-identity -v -p codesigning 2>/dev/null | grep -q "$DEV_IDENTITY"; then
+    # Stable local identity: TCC grants (Full Disk Access / App Management)
+    # persist across rebuilds, so permission-gated features stay testable.
+    codesign --force --sign "$DEV_IDENTITY" "$APP"
+    echo "Signed with local dev identity \"$DEV_IDENTITY\" — TCC grants persist across rebuilds."
 else
     codesign --force --sign - "$APP"
     echo "Ad-hoc signed (local launches only — set SIGN_IDENTITY for distribution)."
+    echo "NOTE: ad-hoc builds get a new code hash each rebuild, which RESETS any"
+    echo "      Full Disk Access / App Management grant. Run 'make dev-cert' once"
+    echo "      for a stable identity so Uninstall (and other gated features) work."
 fi
 
 echo "Built: $APP"
