@@ -6,11 +6,15 @@ import SwiftUI
 struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
 
+    /// Posted when the user taps the diagnosis culprit chip; RootView
+    /// switches the sidebar to the Monitor tab.
+    static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
+
     var body: some View {
         // No ScrollView: the layout is designed to fit the window's minimum
         // size, and the bottom row stretches to absorb extra height.
         VStack(alignment: .leading, spacing: 16) {
-            greeting
+            hero
             vitals
             AlertsSection()
             HStack(alignment: .top, spacing: 16) {
@@ -31,17 +35,38 @@ struct DashboardView: View {
         .background(Halo.void)
     }
 
-    // MARK: Greeting
+    // MARK: Hero (greeting + diagnosis verdict + health score)
+
+    private var hero: some View {
+        HStack(alignment: .center, spacing: 20) {
+            greeting
+            Spacer()
+            HealthScoreRing(score: model.healthScore)
+        }
+    }
 
     private var greeting: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("\(timeGreeting), \(firstName)")
                 .font(.system(size: 24, weight: .bold, design: .default))
                 .foregroundStyle(Halo.textPrimary)
+            DiagnosisBadge(
+                diagnosis: model.diagnosis,
+                culpritName: culpritName,
+                onCulpritTap: {
+                    NotificationCenter.default.post(
+                        name: Self.navigateToMonitor, object: nil)
+                })
             Text(statusLine)
                 .font(.system(size: 13, weight: .medium, design: .default))
                 .foregroundStyle(Halo.textDim)
         }
+    }
+
+    /// Name of the diagnosis culprit process, looked up by PID in the snapshot.
+    private var culpritName: String? {
+        guard let pid = model.diagnosis.culpritPID else { return nil }
+        return model.snapshot?.topProcesses.first { $0.pid == pid }?.name
     }
 
     private var timeGreeting: String {

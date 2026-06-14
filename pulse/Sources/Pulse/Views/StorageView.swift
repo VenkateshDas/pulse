@@ -200,7 +200,7 @@ struct StorageView: View {
     private var legendItems: [(String, Color)] {
         switch lens {
         case .safety:
-            return [("Safe", Halo.pulseGreen), ("Careful", Halo.amber), ("Review", Halo.flare)]
+            return [("Safe", Halo.pulseGreen), ("Careful", Halo.amber), ("Review", Halo.flare), ("Protected", Halo.textDim)]
         case .age:
             return [("<30d", Halo.pulseGreen), ("30–180d", Halo.amber), (">180d", Halo.flare), ("unknown", Halo.textDim)]
         case .owner:

@@ -16,6 +16,7 @@ struct MenuBarContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            hud
             if let snapshot = model.snapshot {
                 metricRow(
                     "CPU", String(format: "%.0f%%", snapshot.cpuTotalPercent),
@@ -45,6 +46,25 @@ struct MenuBarContent: View {
         .padding(14)
         .frame(width: 280)
         .background(Halo.void)
+    }
+
+    // MARK: HUD (live verdict + score)
+
+    private var hud: some View {
+        HStack(spacing: 10) {
+            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(model.diagnosis.line)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Halo.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text("Health \(model.healthScore.value) · \(model.healthScore.band.rawValue)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+            }
+            Spacer()
+        }
     }
 
     // MARK: Metric rows

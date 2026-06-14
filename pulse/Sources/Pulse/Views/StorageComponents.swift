@@ -52,7 +52,7 @@ struct CleanFooter: View {
                     if storage.isCleaning {
                         ProgressView().controlSize(.small)
                     }
-                    Text("⚡ Clean \(ByteFormat.string(storage.selectedBytes))")
+                    Text("Move \(ByteFormat.string(storage.selectedBytes)) to Trash")
                         .font(.system(size: 13, weight: .bold))
                 }
                 .foregroundStyle(Halo.void)
@@ -72,6 +72,6 @@ struct CleanFooter: View {
 
     private var footerNote: String {
         storage.cleanReport
-            ?? "→ staged in Vault for 7 days · restore anytime · space frees when the Vault purges, never silently"
+            ?? "→ moved to macOS Trash · frees space when emptied"
     }
 }

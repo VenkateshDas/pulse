@@ -33,14 +33,14 @@ struct CommandPaletteView: View {
         }
         list.append(
             Command(
-                title: "Run Quick Clean", subtitle: "Stage the safe tier into the Vault",
+                title: "Run Quick Clean", subtitle: "Move the safe tier to Trash",
                 symbol: "sparkles"
-            ) { selection = .clean; clean.runNow() })
+            ) { selection = .storage; clean.runNow() })
         list.append(
             Command(
-                title: "Empty Trash", subtitle: "Move Trash into the Vault",
+                title: "Empty Trash", subtitle: "Empty the macOS Trash",
                 symbol: "trash"
-            ) { selection = .vault; storage.emptyTrash() })
+            ) { selection = .storage; storage.emptyTrash() })
         list.append(
             Command(
                 title: "Scan Orphaned Files",
@@ -61,11 +61,6 @@ struct CommandPaletteView: View {
                 title: "Rescan Storage", subtitle: "Re-walk the disk for large + cleanable files",
                 symbol: "arrow.clockwise"
             ) { selection = .storage; storage.runScan() })
-        list.append(
-            Command(
-                title: "Weekly Pulse Report", subtitle: "Space reclaimed and vitals for the last 7 days",
-                symbol: "calendar"
-            ) { NotificationCenter.default.post(name: WeeklyReportView.showNotification, object: nil) })
         list.append(
             Command(
                 title: "Storage Timeline", subtitle: "What ate my disk this week — daily usage trend",

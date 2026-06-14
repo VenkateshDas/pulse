@@ -25,7 +25,18 @@ struct StorageDetailPanel: View {
                         .foregroundStyle(Halo.textDim)
                 }
                 Spacer()
-                GradePill(grade: cell.grade)
+                if cell.isProtected {
+                    Text("PROTECTED")
+                        .font(.system(size: 8.5, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Halo.textDim)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2.5)
+                        .background(Halo.surface2, in: Capsule())
+                        .fixedSize()
+                } else {
+                    GradePill(grade: cell.grade)
+                }
             }
 
             Divider().overlay(Halo.surface2)
@@ -54,10 +65,11 @@ struct StorageDetailPanel: View {
     }
 
     private var consequence: String {
+        if cell.isProtected { return "System or restricted file. Cannot be modified." }
         switch cell.grade {
-        case .safe: "Regenerates automatically — safe to clean."
-        case .careful: "Review before cleaning — may need a rebuild/redownload."
-        case .review: "Real data — open in Finder and decide yourself. Never bulk-cleaned."
+        case .safe: return "Regenerates automatically — safe to clean."
+        case .careful: return "Review before cleaning — may need a rebuild/redownload."
+        case .review: return "Real data — open in Finder and decide yourself. Never bulk-cleaned."
         }
     }
 
@@ -83,11 +95,19 @@ struct StorageDetailPanel: View {
             }
             .buttonStyle(.bordered)
             .tint(Halo.textDim)
-            if cell.grade != .review {
+            if cell.isProtected {
+                Button {} label: {
+                    Label("Protected", systemImage: "lock.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Halo.surface2)
+                .disabled(true)
+            } else if cell.grade != .review {
                 Button {
                     storage.cleanNode(cell.node)
                 } label: {
-                    Label("Clean (stage in Vault)", systemImage: "sparkles")
+                    Label("Move to Trash", systemImage: "trash")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)

@@ -447,7 +447,7 @@ struct UninstallResultCard: View {
                 successHeader(result)
                 Divider().overlay(Halo.surface2)
                 appRow(result)
-                if !result.stagedItems.isEmpty {
+                if !result.trashedLeftovers.isEmpty {
                     stagedSection(result)
                 }
                 failedSection(result)
@@ -480,8 +480,8 @@ struct UninstallResultCard: View {
     }
 
     private func headline(_ result: UninstallModel.UninstallResult) -> String {
-        let count = result.stagedCount + (result.appTrashed ? 1 : 0)
-        return "\(count) item\(count == 1 ? "" : "s") removed · \(ByteFormat.string(result.stagedBytes)) staged in Vault"
+        let count = result.trashedCount + (result.appTrashed ? 1 : 0)
+        return "\(count) item\(count == 1 ? "" : "s") removed · \(ByteFormat.string(result.trashedBytes)) moved to Trash"
     }
 
     private func appRow(_ result: UninstallModel.UninstallResult) -> some View {
@@ -515,21 +515,21 @@ struct UninstallResultCard: View {
     private func stagedSection(_ result: UninstallModel.UninstallResult) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                Text("STAGED IN VAULT")
+                Text("MOVED TO TRASH")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(1.5)
                     .foregroundStyle(Halo.pulseGreen)
-                Text("exactly what was removed — restorable for 7 days")
+                Text("moved to Trash — empty Trash to free space")
                     .font(.system(size: 9))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
-                Text(ByteFormat.string(result.stagedBytes))
+                Text(ByteFormat.string(result.trashedBytes))
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
             }
             .padding(.top, 2)
-            ForEach(result.stagedItems, id: \.originalPath) { item in
-                stagedRow(item)
+            ForEach(result.trashedLeftovers, id: \.path) { item in
+                trashedRow(item)
             }
         }
     }
@@ -578,9 +578,9 @@ struct UninstallResultCard: View {
     }
 
 
-    private func stagedRow(_ item: VaultItem) -> some View {
+    private func trashedRow(_ item: UninstallModel.PendingItem) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "arrow.down.to.line.compact")
+            Image(systemName: "trash")
                 .font(.system(size: 10))
                 .foregroundStyle(Halo.pulseGreen)
                 .frame(width: 16)
@@ -589,7 +589,7 @@ struct UninstallResultCard: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                     .lineLimit(1)
-                Text(item.originalPath)
+                Text(item.path)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
@@ -649,8 +649,8 @@ struct UninstallResultCard: View {
             .font(.system(size: 11))
             .foregroundStyle(Halo.textDim)
         }
-        if result.stagedItems.isEmpty && result.failedCount == 0 {
-            Text("No leftovers were staged — removing the app fully uninstalled it.")
+        if result.trashedLeftovers.isEmpty && result.failedCount == 0 {
+            Text("No leftovers were removed — removing the app fully uninstalled it.")
                 .font(.system(size: 11))
                 .foregroundStyle(Halo.textDim)
         }
@@ -691,23 +691,6 @@ struct UninstallResultCard: View {
                 .buttonStyle(.plain)
                 .disabled(model.isUninstalling)
                 .help("Re-attempt the parts that failed")
-            } else if !result.sessionIDs.isEmpty, !result.stagedItems.isEmpty {
-                Button {
-                    model.restoreLastUninstall()
-                } label: {
-                    HStack(spacing: 6) {
-                        if model.isRestoringResult { ProgressView().controlSize(.small) }
-                        Text(model.isRestoringResult ? "Restoring…" : "↺ Restore everything")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(Halo.pulseGreen)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Halo.pulseGreen.opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isRestoringResult)
-                .help("Pull every staged leftover back to its original location")
             }
             Spacer()
             Button {

@@ -28,6 +28,7 @@ struct TreemapCell: Identifiable, Equatable {
     let grade: SafetyGrade
     let idleDays: Int?
     let category: String
+    var isProtected: Bool { StorageScanner.isProtected(node.path) }
     var id: String { node.id }
 }
 
@@ -82,6 +83,13 @@ struct TreemapView: View {
                     }
                     .padding(5)
                 }
+                if cell.isProtected && rect.width > 24 && rect.height > 24 {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(Halo.void.opacity(0.8))
+                        .padding(4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
             }
             .frame(width: max(rect.width - 2, 0), height: max(rect.height - 2, 0))
             .contentShape(Rectangle())
@@ -97,6 +105,7 @@ struct TreemapView: View {
     private func lensColor(_ cell: TreemapCell) -> Color {
         switch lens {
         case .safety:
+            if cell.isProtected { return Halo.textDim }
             return gradeColor(cell.grade)
         case .age:
             guard let idle = cell.idleDays else { return Halo.textDim }
