@@ -11,10 +11,12 @@ struct DiskView: View {
                 if selectedTab == 0 {
                     StorageView()
                 } else if selectedTab == 1 {
-                    CleanView()
+                    InsightsView()
                 } else if selectedTab == 2 {
-                    TrashView()
+                    CleanView()
                 } else if selectedTab == 3 {
+                    TrashView()
+                } else if selectedTab == 4 {
                     OptimizeView()
                 }
             }
@@ -25,9 +27,10 @@ struct DiskView: View {
     private var tabBar: some View {
         HStack(spacing: 24) {
             tabBtn("Map", index: 0)
-            tabBtn("Reclaim", index: 1)
-            tabBtn("Trash", index: 2)
-            tabBtn("Optimize", index: 3)
+            tabBtn("Insights", index: 1)
+            tabBtn("Reclaim", index: 2)
+            tabBtn("Trash", index: 3)
+            tabBtn("Optimize", index: 4)
             Spacer()
         }
         .padding(.horizontal, 32)
