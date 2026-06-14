@@ -39,8 +39,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSSupportsAutomaticTermination</key><false/>
-    <!-- Menu-bar-primary app: no dock icon (mirrors .accessory policy). -->
-    <key>LSUIElement</key><true/>
+    <!-- Regular app: shows in dock and responds to Cmd+Tab. -->
+    <key>LSUIElement</key><false/>
     <!-- TCC pre-flight: shown when Pulse first reads these locations. -->
     <key>NSDesktopFolderUsageDescription</key><string>Pulse scans your Desktop to map large files and find safe-to-clean space.</string>
     <key>NSDocumentsFolderUsageDescription</key><string>Pulse scans Documents to map large files and find safe-to-clean space.</string>

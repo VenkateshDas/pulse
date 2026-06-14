@@ -12,16 +12,10 @@ struct PulseApp: App {
     @State private var timelineModel = TimelineModel()
 
     init() {
-        #if DEBUG
-        // Dev (`make run`, bare SwiftPM exe): give the process a real app
-        // presence — dock icon and key windows — so the window can be focused.
+        // Regular policy: dock icon + Cmd+Tab switcher presence.
+        // The app still lives primarily in the menu bar — the main window
+        // is the command centre and can be hidden/shown from there.
         NSApplication.shared.setActivationPolicy(.regular)
-        #else
-        // Production: menu-bar-primary app, no dock icon (LSUIElement in the
-        // bundle Info.plist mirrors this). The Command Center opens from the
-        // menu bar popover.
-        NSApplication.shared.setActivationPolicy(.accessory)
-        #endif
     }
 
     var body: some Scene {
