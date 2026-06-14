@@ -1,0 +1,54 @@
+name: CI
+
+# Build + test gate for every change. Required status check on protected
+# branches (see CONTRIBUTING.md), so this must stay green to merge.
+on:
+  pull_request:
+    branches: [main, "release/**"]
+  push:
+    branches: [main, "release/**"]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build & Test (macOS)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: pulse
+    steps:
+      - uses: actions/checkout@v4
+
+      # swift-tools-version 6.2 — pick the newest stable Xcode the runner ships.
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Toolchain versions
+        run: |
+          swift --version
+          xcodebuild -version
+
+      # CI runners have a healthy toolchain, so the local CLT 26.5 workaround
+      # (Makefile fix-toolchain / SWIFTPM_CUSTOM_LIBS_DIR) is neither needed nor
+      # wanted here — invoke SwiftPM directly.
+      - name: Build (debug)
+        run: swift build -v
+
+      - name: Test
+        run: swift test -v
+
+      # Smoke-test the release path that CD depends on: a release build must
+      # compile and bundle.sh must produce a launchable .app.
+      - name: Release build + bundle smoke test
+        run: |
+          swift build -c release
+          scripts/bundle.sh dist-ci
+          test -x dist-ci/Pulse.app/Contents/MacOS/Pulse

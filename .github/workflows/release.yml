@@ -1,0 +1,63 @@
+name: Release
+
+# Tag-driven CD. Push a tag like v0.1.0 or v0.1.0-beta.1 to cut a release:
+#   git tag v0.1.0 && git push origin v0.1.0
+# Builds the ad-hoc-signed DMG and publishes a GitHub Release with it attached.
+# Pre-release tags (containing '-') are marked as pre-releases.
+#
+# SIGNING: currently ad-hoc (Gatekeeper warns on other Macs). To ship a fully
+# signed + notarized DMG later, add these repo secrets and the build step picks
+# them up via scripts/bundle.sh + `make notarize`:
+#   APPLE_DEV_ID_CERT_P12_BASE64, APPLE_DEV_ID_CERT_PASSWORD,
+#   APPLE_DEV_ID_IDENTITY, APPLE_NOTARY_PROFILE (or notarytool API key trio).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # create releases + upload assets
+
+jobs:
+  release:
+    name: Build DMG & Publish Release
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: pulse
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Derive version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build + bundle + DMG (ad-hoc signed)
+        run: |
+          swift build -c release
+          scripts/bundle.sh
+          scripts/dmg.sh "${{ steps.ver.outputs.version }}"
+          ls -la dist/*.dmg
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            --title "Pulse ${{ steps.ver.outputs.tag }}" \
+            --notes-file scripts/beta-release-notes.md \
+            ${{ steps.ver.outputs.prerelease == 'true' && '--prerelease' || '' }} \
+            "dist/Pulse-${{ steps.ver.outputs.version }}.dmg"
