@@ -46,6 +46,9 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
             selection = .storage
         }
+        .onReceive(NotificationCenter.default.publisher(for: DashboardView.navigateToMonitor)) { _ in
+            selection = .monitor
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)

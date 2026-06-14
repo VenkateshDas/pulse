@@ -340,3 +340,101 @@ struct EngineTests {
         #expect(top.allSatisfy { !$0.name.isEmpty })
     }
 }
+
+// MARK: - DiagnosisEngine (F1)
+
+@Suite("DiagnosisEngine")
+struct DiagnosisEngineTests {
+    @Test func quietSystemIsAllClear() {
+        let d = DiagnosisEngine.evaluate(makeSnapshot())
+        #expect(d.line == "All clear")
+        #expect(d.severity == .clear)
+        #expect(d.culpritPID == nil)
+    }
+
+    @Test func highCPUNamesLeadingProcess() {
+        let snap = makeSnapshot(
+            cpuTotalPercent: 92,
+            topProcesses: [ProcessSample(pid: 501, name: "Chrome", cpuPercent: 88, residentBytes: 0)])
+        let d = DiagnosisEngine.evaluate(snap)
+        #expect(d.line == "Chrome high CPU")
+        #expect(d.severity == .critical)
+        #expect(d.culpritPID == 501)
+        #expect(d.factor == .cpu)
+    }
+
+    @Test func highCPUWithoutLeaderIsGeneric() {
+        // Total high but spread across processes (none above 50% alone).
+        let snap = makeSnapshot(
+            cpuTotalPercent: 90,
+            topProcesses: [ProcessSample(pid: 1, name: "a", cpuPercent: 30, residentBytes: 0)])
+        #expect(DiagnosisEngine.evaluate(snap).line == "CPU load high")
+    }
+
+    @Test func memoryPressureBeatsDisk() {
+        let snap = makeSnapshot(
+            memoryPressure: .critical,
+            diskFreeBytes: 1_000_000_000, diskTotalBytes: 100_000_000_000,
+            topProcesses: [ProcessSample(pid: 7, name: "Xcode", cpuPercent: 5, residentBytes: 9_000_000_000)])
+        let d = DiagnosisEngine.evaluate(snap)
+        #expect(d.line == "Xcode memory pressure")
+        #expect(d.culpritPID == 7)
+    }
+
+    @Test func lowDiskReportsFreeSpace() {
+        let snap = makeSnapshot(diskFreeBytes: 5_000_000_000, diskTotalBytes: 100_000_000_000)
+        let d = DiagnosisEngine.evaluate(snap)
+        #expect(d.line.hasPrefix("Disk low"))
+        #expect(d.factor == .disk)
+    }
+
+    @Test func longNamesAreShortened() {
+        let snap = makeSnapshot(
+            cpuTotalPercent: 92,
+            topProcesses: [ProcessSample(pid: 1, name: "ReallyLongProcessNameHere", cpuPercent: 99, residentBytes: 0)])
+        #expect(DiagnosisEngine.evaluate(snap).line.count <= "ReallyLongProcessNa high CPU".count)
+    }
+}
+
+// MARK: - HealthScore (F1)
+
+@Suite("HealthScore")
+struct HealthScoreTests {
+    @Test func idleSystemScoresHigh() {
+        let s = HealthScore.evaluate(makeSnapshot(sensors: SensorReadings(cpuTempC: 45)))
+        #expect(s.value >= 95)
+        #expect(s.band == .excellent)
+    }
+
+    @Test func pinnedSystemScoresLow() {
+        let s = HealthScore.evaluate(makeSnapshot(
+            cpuTotalPercent: 100,
+            memoryUsedBytes: 7_900_000_000, memoryTotalBytes: 8_000_000_000,
+            memoryPressure: .critical,
+            diskFreeBytes: 1_000_000_000, diskTotalBytes: 100_000_000_000,
+            sensors: SensorReadings(cpuTempC: 100)))
+        #expect(s.value < 30)
+        #expect(s.band == .poor)
+    }
+
+    @Test func belowNormalLosesNoPoints() {
+        #expect(HealthScore.pointsLost(.cpu, value: 40) == 0)
+        #expect(HealthScore.pointsLost(.cpu, value: 50) == 0)
+    }
+
+    @Test func atHighLosesHalfWeight() {
+        // CPU normal 50, high 85, weight 30 → at high, half weight (15) lost.
+        #expect(abs(HealthScore.pointsLost(.cpu, value: 85) - 15) < 0.01)
+    }
+
+    @Test func wellAboveHighLosesFullWeight() {
+        #expect(abs(HealthScore.pointsLost(.cpu, value: 120) - 30) < 0.01)
+    }
+
+    @Test func bandThresholds() {
+        #expect(HealthScore.Band(value: 90) == .excellent)
+        #expect(HealthScore.Band(value: 70) == .good)
+        #expect(HealthScore.Band(value: 50) == .fair)
+        #expect(HealthScore.Band(value: 20) == .poor)
+    }
+}

@@ -8,6 +8,8 @@ struct HealthView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
+            HealthScoreCard()
+                .frame(height: 150)
             BatteryCard()
                 .frame(height: 185)
             if !model.batteryUnavailable {
@@ -48,6 +50,78 @@ struct HealthView: View {
                 .foregroundStyle(Halo.textDim)
         }
         .padding(.bottom, 4)
+    }
+}
+
+// MARK: - Health score card (F1 breakdown)
+
+/// Unified weighted score with per-factor "points lost" bars. Reads the live
+/// HealthScore the DashboardModel computes each sample.
+private struct HealthScoreCard: View {
+    @Environment(DashboardModel.self) private var model
+
+    var body: some View {
+        let score = model.healthScore
+        // Largest contributor first; only factors that actually cost points.
+        let factors = score.breakdown
+            .filter { $0.value > 0.05 }
+            .sorted { $0.value > $1.value }
+
+        return HStack(alignment: .center, spacing: 24) {
+            VStack(spacing: 6) {
+                HealthScoreRing(score: score, diameter: 96)
+                Text(model.diagnosis.line)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Halo.textDim)
+                    .lineLimit(1)
+            }
+            .frame(width: 150)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("WHAT'S COSTING YOU")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(Halo.textDim)
+                if factors.isEmpty {
+                    Text("Nothing — every metric is in the green.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textDim)
+                } else {
+                    ForEach(factors, id: \.key) { factor, lost in
+                        factorRow(factor, lost: lost)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+    }
+
+    private func factorRow(_ factor: HealthFactor, lost: Double) -> some View {
+        // Bar fills relative to the worst-case the factor can cost (its weight).
+        let fraction = min(1, lost / factor.weight)
+        return HStack(spacing: 10) {
+            Text(factor.label)
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textPrimary)
+                .frame(width: 60, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Halo.surface2)
+                    Capsule()
+                        .fill(fraction > 0.66 ? Halo.flare : (fraction > 0.33 ? Halo.amber : Halo.ion))
+                        .frame(width: geo.size.width * fraction)
+                }
+            }
+            .frame(height: 6)
+            Text(String(format: "−%.0f pts", lost))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 52, alignment: .trailing)
+        }
     }
 }
 

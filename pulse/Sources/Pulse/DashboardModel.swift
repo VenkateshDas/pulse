@@ -52,6 +52,11 @@ enum MenuBarMetric: String, CaseIterable, Identifiable {
 final class DashboardModel {
     private(set) var snapshot: SystemSnapshot?
     private(set) var alerts: [PulseAlert] = []
+    /// One-line verdict + culprit, recomputed every sample (F1).
+    private(set) var diagnosis = Diagnosis(line: "Sampling…", severity: .clear,
+                                           culpritPID: nil, factor: nil)
+    /// Weighted 0–100 health score with per-factor breakdown (F1).
+    private(set) var healthScore = HealthScore(value: 100, band: .excellent, breakdown: [:])
     private(set) var cpuHistory: [Double] = []
     /// Minute-averaged CPU over the trailing 24h (nil = no data for that
     /// minute); persisted across launches by MinuteHistoryStore.
@@ -107,6 +112,10 @@ final class DashboardModel {
     @ObservationIgnored private var powerBuffer: [Double] = []
     @ObservationIgnored private var latest: SystemSnapshot?
     @ObservationIgnored private var latestAlerts: [PulseAlert] = []
+    @ObservationIgnored private var latestDiagnosis = Diagnosis(
+        line: "Sampling…", severity: .clear, culpritPID: nil, factor: nil)
+    @ObservationIgnored private var latestHealth = HealthScore(
+        value: 100, band: .excellent, breakdown: [:])
     @ObservationIgnored private let batteryHistory = BatteryHistoryStore()
     @ObservationIgnored private var lastIngestUptime: TimeInterval?
     /// Per-alert-id last fire time — enforces the 30-min notification cooldown
@@ -172,6 +181,8 @@ final class DashboardModel {
     private func ingest(_ snapshot: SystemSnapshot) {
         latest = snapshot
         latestAlerts = AlertsEngine.evaluate(snapshot, ownPID: getpid())
+        latestDiagnosis = DiagnosisEngine.evaluate(snapshot)
+        latestHealth = HealthScore.evaluate(snapshot)
         // A dismissed alert resets once its condition clears, so a fresh
         // occurrence shows (and notifies) again.
         let activeIDs = Set(latestAlerts.map(\.id))
@@ -282,6 +293,8 @@ final class DashboardModel {
     private func publishLatest() {
         snapshot = latest
         alerts = latestAlerts.filter { !dismissedAlerts.contains($0.id) }
+        diagnosis = latestDiagnosis
+        healthScore = latestHealth
         cpuHistory = cpuBuffer
         cpuDayHistory = cpuDayStore.series()
         memoryHistory = memoryBuffer
