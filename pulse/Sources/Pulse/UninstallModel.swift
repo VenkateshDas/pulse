@@ -200,11 +200,7 @@ final class UninstallModel {
 
         Task.detached(priority: .userInitiated) { [vault] in
             // 1. App bundle → system Trash (Finder "Put Back" restores it).
-            let trashed: Bool = await withCheckedContinuation { continuation in
-                NSWorkspace.shared.recycle([appURL]) { _, error in
-                    continuation.resume(returning: error == nil)
-                }
-            }
+            let trashed = Self.moveAppToTrash(appURL)
 
             // 2. Ticked leftovers → one Vault session (instant APFS rename).
             //    The session's items are the *real* staged contents — a row only
@@ -259,11 +255,7 @@ final class UninstallModel {
         Task.detached(priority: .userInitiated) { [vault] in
             var trashed = previous.appTrashed
             if needsTrash {
-                trashed = await withCheckedContinuation { continuation in
-                    NSWorkspace.shared.recycle([appURL]) { _, error in
-                        continuation.resume(returning: error == nil)
-                    }
-                }
+                trashed = Self.moveAppToTrash(appURL)
             }
 
             var session: VaultSession?
@@ -294,6 +286,36 @@ final class UninstallModel {
                     self.report = "All set — \(appName) and its leftovers are fully removed."
                 }
             }
+        }
+    }
+
+    /// Moves an app bundle to the system Trash. Uses `FileManager.trashItem`
+    /// (not `NSWorkspace.recycle`): recycle silently fails on Mac App Store
+    /// bundles carrying a `com.apple.macl` sandbox xattr, while `trashItem`
+    /// performs the same rename into `~/.Trash` and still records Finder
+    /// "Put Back" metadata. Succeeds whenever the parent dir is writable
+    /// (`/Applications` is writable by admin users), regardless of the
+    /// bundle's own root ownership.
+    nonisolated static func moveAppToTrash(_ url: URL) -> Bool {
+        do {
+            try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            return true
+        } catch {
+            // Fallback: if even trashItem refuses, a direct rename into
+            // ~/.Trash works whenever the parent dir is writable (it loses
+            // the Finder "Put Back" anchor, but the app is still recoverable).
+            let trash = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".Trash")
+            var dest = trash.appendingPathComponent(url.lastPathComponent)
+            var counter = 2
+            while FileManager.default.fileExists(atPath: dest.path) {
+                let base = url.deletingPathExtension().lastPathComponent
+                let ext = url.pathExtension
+                dest = trash.appendingPathComponent(
+                    ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)")
+                counter += 1
+            }
+            return (try? FileManager.default.moveItem(at: url, to: dest)) != nil
         }
     }
 
