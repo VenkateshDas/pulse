@@ -61,6 +61,10 @@ open dist/Pulse.app
 
 ## Architecture
 
+<div align="center">
+  <img src="assets/pulse_architecture.png" width="700" alt="Pulse Architecture Infographic" />
+</div>
+
 | Module | Role |
 |--------|------|
 | `Sources/PulseKit` | UI-free data collection core. CPU, memory, disk, network, battery, processes. Reads kernel APIs directly — zero subprocess calls. |
