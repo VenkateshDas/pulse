@@ -14,6 +14,8 @@ struct DiskView: View {
                     CleanView()
                 } else if selectedTab == 2 {
                     TrashView()
+                } else if selectedTab == 3 {
+                    OptimizeView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -25,6 +27,7 @@ struct DiskView: View {
             tabBtn("Map", index: 0)
             tabBtn("Reclaim", index: 1)
             tabBtn("Trash", index: 2)
+            tabBtn("Optimize", index: 3)
             Spacer()
         }
         .padding(.horizontal, 32)
