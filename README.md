@@ -2,8 +2,6 @@
 
 <img src="pulse/Sources/Pulse/Resources/Logo.png" width="120" alt="Pulse logo" />
 
-# Pulse
-
 **Native macOS system monitor — CPU, memory, disk, network & battery in one menu bar app.**
 
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue?logo=apple&logoColor=white)](https://github.com/VenkateshDas/pulse/releases)
