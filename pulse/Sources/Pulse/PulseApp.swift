@@ -12,6 +12,7 @@ struct PulseApp: App {
     @State private var healthModel = HealthModel()
     @State private var timelineModel = TimelineModel()
     @State private var optimizeModel = OptimizeModel()
+    @State private var insightsModel = InsightsModel()
 
     init() {
         // Regular policy: dock icon + Cmd+Tab switcher presence.
@@ -31,6 +32,7 @@ struct PulseApp: App {
                 .environment(healthModel)
                 .environment(timelineModel)
                 .environment(optimizeModel)
+                .environment(insightsModel)
                 .onAppear {
                     model.start()
                     cleanModel.start()

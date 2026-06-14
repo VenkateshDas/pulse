@@ -509,3 +509,54 @@ struct PrivilegedOperationTests {
         #expect(OptimizeEngine.privilegedTasks.count == PrivilegedOperation.allCases.count)
     }
 }
+
+// MARK: - InsightScanner (F4)
+
+@Suite("InsightScanner")
+struct InsightScannerTests {
+    private func tempDir() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @Test func oldDownloadsCountsOnlyStaleFiles() throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let now = Date()
+
+        let old = dir.appendingPathComponent("old.zip")
+        try Data(repeating: 1, count: 20_000).write(to: old)
+        try FileManager.default.setAttributes(
+            [.modificationDate: now.addingTimeInterval(-100 * 86400)], ofItemAtPath: old.path)
+
+        let fresh = dir.appendingPathComponent("fresh.zip")
+        try Data(repeating: 1, count: 50_000).write(to: fresh)
+        try FileManager.default.setAttributes(
+            [.modificationDate: now], ofItemAtPath: fresh.path)
+
+        let bytes = InsightScanner.oldDownloadsBytes(in: dir, days: 90, now: now)
+        #expect(bytes >= 20_000)
+        #expect(bytes < 50_000)   // the fresh file is excluded
+    }
+
+    @Test func resolveMatchesWildcardSegment() throws {
+        let home = try tempDir()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let container = home.appendingPathComponent("Library/Group Containers/HUAQ.dev.orbstack")
+        try FileManager.default.createDirectory(at: container, withIntermediateDirectories: true)
+
+        let scanner = InsightScanner(home: home)
+        let url = scanner.resolve("Library/Group Containers/*dev.orbstack/data")
+        #expect(url?.path.contains("HUAQ.dev.orbstack/data") == true)
+        // No match → nil.
+        #expect(scanner.resolve("Library/Group Containers/*nonesuch/data") == nil)
+    }
+
+    @Test func scanReturnsNothingForEmptyHome() async throws {
+        let home = try tempDir()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let found = await InsightScanner(home: home).scan()
+        #expect(found.isEmpty)
+    }
+}
