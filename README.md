@@ -28,6 +28,7 @@
 - **Dashboard** — real-time charts, per-core CPU heatmap, top processes by CPU/memory
 - **Storage vault** — treemap of disk usage, smart-scan for reclaimable space (caches, venvs, node_modules)
 - **Smart Clean** — safety-checked bulk delete with a preview vault before anything is removed
+- **App Uninstaller** — drag an app (or pick from the installed list); Pulse finds its leftover files, grades every match by confidence (exact bundle-ID = safe, vendor/name = careful, weak name = review-only), trashes the app, stages leftovers in the Vault, and shows a receipt of exactly what was removed. Orphan scan finds debris from apps already deleted.
 - **Health score** — single composite score from thermals, memory pressure, disk health, and battery wear
 - **Timeline** — per-minute history charts for CPU, memory, disk I/O, and network
 - **Dev Mode** — process-level sampler with µs-resolution CPU accounting
@@ -88,8 +89,18 @@ make build      # debug build
 make test       # run test suite
 make run        # run from terminal
 make bundle     # → dist/Pulse.app (ad-hoc signed)
+make dev-cert   # one-time: stable local signing so TCC grants survive rebuilds
 make dmg        # → dist/Pulse-x.y.z.dmg
 ```
+
+> **Testing permission-gated features locally (App Uninstaller).** `make bundle`
+> ad-hoc signs, which gives the app a new code hash every rebuild — macOS then
+> drops any Full Disk Access / App Management grant you made. Run `make dev-cert`
+> **once** to create a stable self-signed identity so a granted permission
+> persists across rebuilds. To trash an App-Store / root-owned bundle, Pulse
+> asks Finder via Apple Events (in-process, no shell), so the first uninstall
+> prompts for "control Finder" and, for root-owned apps, an admin password —
+> exactly like a manual drag-to-Trash.
 
 ## Contributing
 
