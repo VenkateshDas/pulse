@@ -246,4 +246,50 @@ struct UninstallOrphanScanTests {
         // Numeric cache dirs are not bundle IDs — first component must be a TLD.
         #expect(UninstallScanner.bundleID(fromResidueName: "12.34.567") == nil)
     }
+
+    @Test func flagsLaunchAgentWithMissingBinary() throws {
+        let root = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let userLib = root.appendingPathComponent("Library")
+        let agents = userLib.appendingPathComponent("LaunchAgents")
+        try makeDir(agents)
+
+        // Job whose binary is gone → orphan.
+        try writeAgent(agents.appendingPathComponent("com.dead.updater.plist"),
+                       label: "com.dead.updater",
+                       program: "/Applications/Gone.app/Contents/MacOS/updater")
+        // Job whose binary exists (point at /bin/sh) → not flagged.
+        try writeAgent(agents.appendingPathComponent("com.live.tool.plist"),
+                       label: "com.live.tool", program: "/bin/sh")
+        // Apple job → never flagged even if binary missing.
+        try writeAgent(agents.appendingPathComponent("com.apple.something.plist"),
+                       label: "com.apple.something", program: "/nope/missing")
+
+        let scanner = UninstallScanner(userLibrary: userLib, systemLibrary: nil, appDirectories: [])
+        let orphans = scanner.scanOrphans { _ in true }   // every bundle "installed"
+
+        #expect(orphans.contains { $0.path.hasSuffix("com.dead.updater.plist") })
+        #expect(!orphans.contains { $0.path.hasSuffix("com.live.tool.plist") })
+        #expect(!orphans.contains { $0.path.contains("com.apple.") })
+        #expect(orphans.first { $0.path.contains("com.dead") }?.grade == .careful)
+    }
+
+    @Test func programPathPrefersProgramThenArguments() {
+        #expect(UninstallScanner.programPath(["Program": "/usr/local/bin/x"]) == "/usr/local/bin/x")
+        #expect(UninstallScanner.programPath(["ProgramArguments": ["/opt/y", "-v"]]) == "/opt/y")
+        #expect(UninstallScanner.programPath([:]) == nil)
+    }
+
+    @Test func systemProgramsAreRecognized() {
+        #expect(UninstallScanner.isSystemProgram("/usr/libexec/foo"))
+        #expect(UninstallScanner.isSystemProgram("/System/Library/x"))
+        #expect(!UninstallScanner.isSystemProgram("/Applications/Foo.app/bin"))
+    }
+}
+
+private func writeAgent(_ url: URL, label: String, program: String) throws {
+    let plist: [String: Any] = ["Label": label, "Program": program]
+    let data = try PropertyListSerialization.data(
+        fromPropertyList: plist, format: .xml, options: 0)
+    try data.write(to: url)
 }

@@ -308,8 +308,82 @@ public struct UninstallScanner: Sendable {
                 }
             }
         }
+        // Second pass: launchd jobs whose program binary is gone. The name
+        // scan above can't catch these — the plist filename may look fine (or
+        // not be a bundle ID at all) while the executable it loads is deleted.
+        out += orphanLaunchJobs(seen: &seenPaths)
         out.sort { $0.sizeBytes > $1.sizeBytes }
         return out
+    }
+
+    /// LaunchAgents/Daemons/PrivilegedHelperTools jobs referencing a binary
+    /// that no longer exists — a high-signal leftover the name scan misses.
+    /// Graded CAREFUL (user agents) / REVIEW (root-owned `/Library`).
+    func orphanLaunchJobs(seen: inout Set<String>) -> [CleanItem] {
+        var roots: [(dir: URL, category: String, isSystem: Bool)] = [
+            (userLibrary.appendingPathComponent("LaunchAgents"), "Launch agent", false)
+        ]
+        if let systemLibrary {
+            roots += [
+                (systemLibrary.appendingPathComponent("LaunchAgents"), "Launch agent", true),
+                (systemLibrary.appendingPathComponent("LaunchDaemons"), "Launch daemon", true),
+                (systemLibrary.appendingPathComponent("PrivilegedHelperTools"),
+                 "Privileged helper", true),
+            ]
+        }
+        var out: [CleanItem] = []
+        for (dir, category, isSystem) in roots {
+            guard let children = Self.shallowChildren(of: dir) else { continue }
+            for child in children where child.pathExtension == "plist" {
+                guard !seen.contains(child.path),
+                    let plist = Self.readLaunchPlist(child),
+                    let program = Self.programPath(plist),
+                    !Self.isSystemProgram(program),
+                    !(plist["Label"] as? String ?? "").hasPrefix("com.apple."),
+                    !FileManager.default.fileExists(atPath: program)
+                else { continue }
+                seen.insert(child.path)
+                let detail = "loads a missing binary (\(program)) — leftover from a removed app"
+                out.append(
+                    CleanItem(
+                        category: category,
+                        label: child.lastPathComponent,
+                        detail: isSystem ? detail + "; in /Library, needs admin to remove" : detail,
+                        path: child.path,
+                        sizeBytes: Self.itemSize(child),
+                        idleDays: idleDays(of: child),
+                        grade: isSystem ? .review : .careful))
+            }
+        }
+        return out
+    }
+
+    /// Reads a launchd plist; nil if unreadable/malformed.
+    public static func readLaunchPlist(_ url: URL) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: url),
+            let plist = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil) as? [String: Any]
+        else { return nil }
+        return plist
+    }
+
+    /// Program (string) or first element of ProgramArguments.
+    public static func programPath(_ plist: [String: Any]) -> String? {
+        if let program = plist["Program"] as? String, !program.isEmpty { return program }
+        if let args = plist["ProgramArguments"] as? [String], let first = args.first,
+            !first.isEmpty {
+            return first
+        }
+        return nil
+    }
+
+    /// Binaries that belong to macOS itself — never flag these.
+    public static func isSystemProgram(_ path: String) -> Bool {
+        for prefix in ["/System/", "/usr/libexec/", "/usr/sbin/", "/usr/bin/",
+                       "/bin/", "/sbin/", "/Library/Apple/"] where path.hasPrefix(prefix) {
+            return true
+        }
+        return false
     }
 
     // MARK: - Classification
