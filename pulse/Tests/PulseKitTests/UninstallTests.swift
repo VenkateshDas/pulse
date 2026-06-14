@@ -73,6 +73,19 @@ struct UninstallClassificationTests {
                 == .safe)
     }
 
+    @Test func bundleIDMustBeAnchoredNotInfixOrSuffix() {
+        // An unrelated longer reverse-DNS name that merely CONTAINS the id as a
+        // sub-namespace must not be graded SAFE (the residual infix/suffix hole).
+        let app = AppIdentity.make(
+            bundleID: "foo.bar.baz", bundleName: "Baz", displayName: "Baz", bundleStem: "Baz")
+        #expect(UninstallScanner.classify(name: "com.foo.bar.baz", identity: app)?.grade != .safe)
+        // Anchored matches still resolve: exact, file, and group container.
+        #expect(UninstallScanner.classify(name: "foo.bar.baz", identity: app)?.grade == .safe)
+        #expect(UninstallScanner.classify(name: "foo.bar.baz.plist", identity: app)?.grade == .safe)
+        #expect(
+            UninstallScanner.classify(name: "group.foo.bar.baz", identity: app)?.grade == .safe)
+    }
+
     @Test func vendorMatchIsBoundaryAware() {
         // `com.spotifyx.*` shares no real vendor with `com.spotify.*`.
         let match = UninstallScanner.classify(name: "com.spotifyx.app", identity: spotify)
@@ -171,6 +184,26 @@ struct UninstallLeftoverScanTests {
         // not be pre-selected since it can't be staged without admin.
         try touch(sysLib.appendingPathComponent("PrivilegedHelperTools/com.spotify.client"))
         try touch(sysLib.appendingPathComponent("LaunchDaemons/com.spotify.client.plist"))
+
+        let scanner = UninstallScanner(
+            userLibrary: userLib, systemLibrary: sysLib, appDirectories: [])
+        let items = scanner.scanLeftovers(for: spotify)
+
+        #expect(items.count == 2)
+        #expect(items.allSatisfy { $0.grade == .review })
+    }
+
+    @Test func anySystemLibraryLeftoverIsReviewNotStageable() throws {
+        // Generalized beyond helpers/daemons: a bundle-ID-named dir under any
+        // root-owned /Library location must be REVIEW (can't be Vault-staged),
+        // not SAFE — otherwise it becomes a perpetually-failed staging target.
+        let root = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let userLib = root.appendingPathComponent("Library")
+        let sysLib = root.appendingPathComponent("SystemLibrary")
+
+        try makeDir(sysLib.appendingPathComponent("Application Support/com.spotify.client"))
+        try touch(sysLib.appendingPathComponent("Preferences/com.spotify.client.plist"))
 
         let scanner = UninstallScanner(
             userLibrary: userLib, systemLibrary: sysLib, appDirectories: [])

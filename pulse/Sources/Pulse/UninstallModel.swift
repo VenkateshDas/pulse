@@ -6,8 +6,8 @@ import PulseKit
 /// Owns the App Uninstaller flow (§3.14): installed-app discovery, the
 /// confidence-graded leftover scan for a chosen app, and the orphan scan.
 /// Removal is split across two reversible stores — the `.app` goes to the
-/// system Trash (`NSWorkspace.recycle`, Finder "Put Back"); every ticked
-/// leftover stages into the Vault. All blocking work runs detached.
+/// system Trash (Finder "Put Back"); every ticked leftover stages into the
+/// Vault. All blocking work (scan, trash, stage) runs on detached tasks.
 @MainActor
 @Observable
 final class UninstallModel {
@@ -37,6 +37,8 @@ final class UninstallModel {
     struct UninstallResult: Equatable {
         let appName: String
         let appBundlePath: String
+        /// Carried so a retry can re-check the running-app guard.
+        let appBundleID: String
         let appTrashed: Bool
         /// The leftovers that genuinely made it into the Vault.
         let stagedItems: [VaultItem]
@@ -53,6 +55,11 @@ final class UninstallModel {
         var failedCount: Int { failedItems.count }
         /// Something didn't complete — the app stayed put or a leftover failed.
         var needsAttention: Bool { !appTrashed || !failedItems.isEmpty }
+        /// The app bundle move failed — an App Management / Finder-consent issue,
+        /// distinct from leftover (Full Disk Access) failures.
+        var appNeedsAttention: Bool { !appTrashed }
+        /// Leftovers couldn't be staged — the genuine Full Disk Access case.
+        var leftoversNeedAttention: Bool { !failedItems.isEmpty }
     }
 
     var tab: Tab = .uninstall
@@ -81,6 +88,18 @@ final class UninstallModel {
     private let scanner = UninstallScanner()
     private let vault = SafetyVault(rootURL: SafetyVault.defaultRootURL())
 
+    /// Memoized file icons so SwiftUI row builders don't re-hit LaunchServices
+    /// on every render (e.g. each keystroke in the installed-app filter).
+    @ObservationIgnored private var iconCache: [String: NSImage] = [:]
+
+    /// Cached icon for a path — fetched once per path, not once per render.
+    func icon(for path: String) -> NSImage {
+        if let cached = iconCache[path] { return cached }
+        let image = NSWorkspace.shared.icon(forFile: path)
+        iconCache[path] = image
+        return image
+    }
+
     // MARK: - Lifecycle
 
     func appeared() {
@@ -103,7 +122,7 @@ final class UninstallModel {
 
     /// Scans leftovers for an app picked from the installed list.
     func selectApp(_ app: InstalledApp) {
-        scan(appPath: app.path, prebuilt: app)
+        scan(appPath: app.path)
     }
 
     /// Handles an `.app` dropped onto the drop zone.
@@ -112,10 +131,10 @@ final class UninstallModel {
             report = "That isn't an application — drop a .app bundle."
             return
         }
-        scan(appPath: url.path, prebuilt: nil)
+        scan(appPath: url.path)
     }
 
-    private func scan(appPath: String, prebuilt: InstalledApp?) {
+    private func scan(appPath: String) {
         guard !isScanning else { return }
         isScanning = true
         report = nil
@@ -124,8 +143,11 @@ final class UninstallModel {
         selection = []
         let appURL = URL(fileURLWithPath: appPath)
         Task.detached(priority: .userInitiated) { [scanner] in
+            // describeApp computes the real bundle size here (the installed-app
+            // list defers it to keep its load cheap), so the plan/receipt show
+            // an accurate size for just the one chosen app.
             guard let identity = scanner.identity(forApp: appURL),
-                let app = prebuilt ?? scanner.describeApp(at: appURL)
+                let app = scanner.describeApp(at: appURL)
             else {
                 await MainActor.run { [weak self] in
                     self?.isScanning = false
@@ -172,12 +194,16 @@ final class UninstallModel {
         (plan?.app.sizeBytes ?? 0) + selectedLeftoverBytes
     }
 
-    /// True when the target app is currently running — the hard guard.
+    /// True when the bundle ID has a running instance — the hard guard against
+    /// trashing a live app.
+    nonisolated static func isRunning(_ bundleID: String) -> Bool {
+        !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
+    }
+
+    /// True when the currently-planned app is running.
     var isPlanAppRunning: Bool {
         guard let plan else { return false }
-        return !NSRunningApplication.runningApplications(
-            withBundleIdentifier: plan.app.bundleID
-        ).isEmpty
+        return Self.isRunning(plan.app.bundleID)
     }
 
     // MARK: - Uninstall
@@ -188,104 +214,92 @@ final class UninstallModel {
             report = "Quit \(plan.app.name) first — it's currently running."
             return
         }
-        isUninstalling = true
-        report = nil
         result = nil
-        let appURL = URL(fileURLWithPath: plan.app.path)
-        let appName = plan.app.name
-        let leftovers = selectedLeftovers.map {
-            (path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
-        }
         let reviewLeft = plan.leftovers.filter { $0.grade == .review }.count
-
-        Task { [vault] in
-            // 1. App bundle → system Trash. Runs on the main actor: the Finder
-            //    fallback uses Apple Events, which must be sent from the main
-            //    thread to present its consent/auth prompts.
-            let trashed = Self.moveAppToTrash(appURL)
-
-            // 2. Ticked leftovers → one Vault session (instant APFS rename) on a
-            //    background task. The session's items are the *real* staged
-            //    contents — a row only exists if its move truly succeeded.
-            let session: VaultSession? =
-                leftovers.isEmpty
-                ? nil
-                : await Task.detached(priority: .userInitiated) {
-                    try? vault.stage(
-                        items: leftovers,
-                        title: "Uninstall \(appName) — \(leftovers.count) leftovers")
-                }.value
-
-            let stagedItems = session?.items ?? []
-            let stagedPaths = Set(stagedItems.map(\.originalPath))
-            let failed = leftovers
-                .filter { !stagedPaths.contains($0.path) }
-                .map { PendingItem(path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes) }
-
-            self.isUninstalling = false
-            self.result = UninstallResult(
-                appName: appName,
-                appBundlePath: appURL.path,
-                appTrashed: trashed,
-                stagedItems: stagedItems,
-                stagedBytes: session?.totalBytes ?? 0,
-                failedItems: failed,
-                reviewLeftCount: reviewLeft,
-                sessionIDs: session.map { [$0.id] } ?? [])
-            self.plan = nil
-            self.selection = []
-            // The trashed app is gone — drop it from the installed list.
-            if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
-        }
+        perform(
+            appURL: URL(fileURLWithPath: plan.app.path),
+            appName: plan.app.name,
+            bundleID: plan.app.bundleID,
+            needsTrash: true,
+            leftovers: selectedLeftovers.map {
+                PendingItem(path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
+            },
+            reviewLeft: reviewLeft,
+            titleSuffix: "",
+            base: nil)
+        self.plan = nil
+        self.selection = []
     }
 
     /// Re-attempts only the parts that failed (the app move and/or unstaged
-    /// leftovers) — used after the user grants Full Disk Access. Merges the new
-    /// outcome into the existing receipt so the list stays cumulative.
+    /// leftovers) — used after the user grants the missing permission. Merges
+    /// the new outcome into the existing receipt so the list stays cumulative.
     func retryUninstall() {
         guard let previous = result, previous.needsAttention, !isUninstalling else { return }
+        let needsTrash = !previous.appTrashed
+        // Same running-app guard as the first pass: never trash a live app.
+        if needsTrash, Self.isRunning(previous.appBundleID) {
+            report = "Quit \(previous.appName) first — it's currently running."
+            return
+        }
+        perform(
+            appURL: URL(fileURLWithPath: previous.appBundlePath),
+            appName: previous.appName,
+            bundleID: previous.appBundleID,
+            needsTrash: needsTrash,
+            leftovers: previous.failedItems,
+            reviewLeft: previous.reviewLeftCount,
+            titleSuffix: " (retry)",
+            base: previous)
+    }
+
+    /// Shared engine for both the first uninstall and a retry. Trashes the app
+    /// (if needed) and stages the leftovers on a background task, then builds a
+    /// receipt — accumulating onto `base` when this is a retry. Runs entirely
+    /// off the main actor so the Finder consent / admin prompt never freezes
+    /// the UI; only the final state write hops back to the main actor.
+    private func perform(
+        appURL: URL, appName: String, bundleID: String, needsTrash: Bool,
+        leftovers: [PendingItem], reviewLeft: Int, titleSuffix: String, base: UninstallResult?
+    ) {
         isUninstalling = true
         report = nil
-        let appURL = URL(fileURLWithPath: previous.appBundlePath)
-        let appName = previous.appName
-        let needsTrash = !previous.appTrashed
-        let failed = previous.failedItems.map {
-            (path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
-        }
-
-        Task { [vault] in
-            var trashed = previous.appTrashed
-            if needsTrash {
-                trashed = Self.moveAppToTrash(appURL)
-            }
+        Task.detached(priority: .userInitiated) { [vault] in
+            let trashed = needsTrash ? Self.moveAppToTrash(appURL) : (base?.appTrashed ?? true)
 
             let session: VaultSession? =
-                failed.isEmpty
+                leftovers.isEmpty
                 ? nil
-                : await Task.detached(priority: .userInitiated) {
-                    try? vault.stage(
-                        items: failed,
-                        title: "Uninstall \(appName) (retry) — \(failed.count) leftovers")
-                }.value
+                : try? vault.stage(
+                    items: leftovers.map {
+                        (path: $0.path, label: $0.label, sizeBytes: $0.sizeBytes)
+                    },
+                    title: "Uninstall \(appName)\(titleSuffix) — \(leftovers.count) leftovers")
+
+            // Real staged contents only — a row exists iff its move succeeded.
             let newlyStaged = session?.items ?? []
-            let newlyStagedPaths = Set(newlyStaged.map(\.originalPath))
-            let stillFailed = previous.failedItems.filter { !newlyStagedPaths.contains($0.path) }
+            let stagedPaths = Set(newlyStaged.map(\.originalPath))
+            let stillFailed = leftovers.filter { !stagedPaths.contains($0.path) }
 
-            let merged = UninstallResult(
+            let receipt = UninstallResult(
                 appName: appName,
-                appBundlePath: previous.appBundlePath,
+                appBundlePath: appURL.path,
+                appBundleID: bundleID,
                 appTrashed: trashed,
-                stagedItems: previous.stagedItems + newlyStaged,
-                stagedBytes: previous.stagedBytes + (session?.totalBytes ?? 0),
+                stagedItems: (base?.stagedItems ?? []) + newlyStaged,
+                stagedBytes: (base?.stagedBytes ?? 0) + (session?.totalBytes ?? 0),
                 failedItems: stillFailed,
-                reviewLeftCount: previous.reviewLeftCount,
-                sessionIDs: previous.sessionIDs + (session.map { [$0.id] } ?? []))
+                reviewLeftCount: reviewLeft,
+                sessionIDs: (base?.sessionIDs ?? []) + (session.map { [$0.id] } ?? []))
 
-            self.isUninstalling = false
-            self.result = merged
-            if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
-            if !merged.needsAttention {
-                self.report = "All set — \(appName) and its leftovers are fully removed."
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isUninstalling = false
+                self.result = receipt
+                if trashed { self.installedApps.removeAll { $0.path == appURL.path } }
+                if base != nil, !receipt.needsAttention {
+                    self.report = "All set — \(appName) and its leftovers are fully removed."
+                }
             }
         }
     }
@@ -300,11 +314,13 @@ final class UninstallModel {
     ///    ask **Finder** to trash it via Apple Events. Finder is exempt from
     ///    App Management and prompts for admin auth exactly like a manual
     ///    drag-to-Trash. `NSAppleScript` sends Apple Events in-process — no
-    ///    subprocess — but must run on the main thread to present its prompts.
+    ///    subprocess. Called off the main actor so its modal prompt never
+    ///    freezes the UI.
     ///
-    /// Returns true only if the bundle actually left its original location.
-    @MainActor
-    static func moveAppToTrash(_ url: URL) -> Bool {
+    /// Returns true only if the Apple Event reported no error AND the bundle
+    /// actually left its original location (so a denied consent prompt or a
+    /// coincidentally-missing path is never mistaken for success).
+    nonisolated static func moveAppToTrash(_ url: URL) -> Bool {
         if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil {
             return true
         }
@@ -313,8 +329,10 @@ final class UninstallModel {
             .replacingOccurrences(of: "\"", with: "\\\"")
         let source = "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"
         var scriptError: NSDictionary?
-        NSAppleScript(source: source)?.executeAndReturnError(&scriptError)
-        // Trust the filesystem, not the event result — confirm it's really gone.
+        let script = NSAppleScript(source: source)
+        script?.executeAndReturnError(&scriptError)
+        guard script != nil, scriptError == nil else { return false }
+        // Confirm against the filesystem, not just the event result.
         return !FileManager.default.fileExists(atPath: url.path)
     }
 

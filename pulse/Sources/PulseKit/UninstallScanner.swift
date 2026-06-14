@@ -140,10 +140,6 @@ public struct UninstallScanner: Sendable {
         ("PrivilegedHelperTools", "Privileged helper"),
     ]
 
-    /// Categories that live in root-owned `/Library` — removable only with
-    /// admin rights, so they're always surfaced REVIEW (never pre-selected).
-    static let systemOnlyCategories: Set<String> = ["Launch daemon", "Privileged helper"]
-
     // MARK: - Installed apps
 
     /// Every app under the scanned application directories, newest-used first.
@@ -173,7 +169,10 @@ public struct UninstallScanner: Sendable {
                     InstalledApp(
                         name: name, bundleID: bundleID, version: version,
                         path: entry.path,
-                        sizeBytes: SmartScanner.directorySize(entry),
+                        // Size is deferred to selection (`describeApp`): walking
+                        // every bundle's tree here would stall the list load on
+                        // large apps (Xcode, games). 0 = "not computed yet".
+                        sizeBytes: 0,
                         lastUsedDays: lastUsedDays(of: entry)))
             }
         }
@@ -221,7 +220,7 @@ public struct UninstallScanner: Sendable {
         var out: [CleanItem] = []
         var seenPaths: Set<String> = []
 
-        for (root, dirs) in residueRoots() {
+        for (root, isSystem, dirs) in residueRoots() {
             for spec in dirs {
                 let dir = root.appendingPathComponent(spec.rel)
                 guard let children = Self.shallowChildren(of: dir) else { continue }
@@ -230,14 +229,14 @@ public struct UninstallScanner: Sendable {
                     guard let match = Self.classify(name: name, identity: identity) else { continue }
                     guard !seenPaths.contains(child.path) else { continue }
                     seenPaths.insert(child.path)
-                    // Root-owned system helpers/daemons can't be staged without
-                    // admin, so never pre-select them — surface as REVIEW
-                    // (awareness) instead of dishonestly claiming SAFE.
-                    let systemOwned = Self.systemOnlyCategories.contains(spec.category)
-                    let grade = systemOwned ? .review : match.grade
+                    // Everything under root-owned /Library needs admin to remove
+                    // and can never be staged into the Vault by Pulse, so surface
+                    // it REVIEW (awareness only) — never pre-selected, so it never
+                    // becomes a perpetually-"failed" staging target.
+                    let grade: SafetyGrade = isSystem ? .review : match.grade
                     let detail =
-                        systemOwned
-                        ? match.reason + " — needs admin to remove, review manually"
+                        isSystem
+                        ? match.reason + " — in /Library, needs admin to remove manually"
                         : match.reason
                     out.append(
                         CleanItem(
@@ -276,7 +275,7 @@ public struct UninstallScanner: Sendable {
         var seenPaths: Set<String> = []
         var verdictCache: [String: Bool] = [:]
 
-        for (root, dirs) in residueRoots() {
+        for (root, isSystem, dirs) in residueRoots() {
             for spec in dirs {
                 let dir = root.appendingPathComponent(spec.rel)
                 guard let children = Self.shallowChildren(of: dir) else { continue }
@@ -293,15 +292,19 @@ public struct UninstallScanner: Sendable {
                     }
                     guard !installed else { continue }
                     seenPaths.insert(child.path)
+                    // Root-owned /Library orphans need admin → REVIEW, never
+                    // pre-staged; user-space orphans are CAREFUL (Vault-stageable).
                     out.append(
                         CleanItem(
                             category: spec.category,
                             label: name,
-                            detail: "owning app \(bundleID) is not installed",
+                            detail: isSystem
+                                ? "owning app \(bundleID) is not installed — in /Library, needs admin to remove"
+                                : "owning app \(bundleID) is not installed",
                             path: child.path,
                             sizeBytes: Self.itemSize(child),
                             idleDays: idleDays(of: child),
-                            grade: .careful))
+                            grade: isSystem ? .review : .careful))
                 }
             }
         }
@@ -319,18 +322,20 @@ public struct UninstallScanner: Sendable {
         let lower = name.lowercased()
         let bid = identity.bundleID
 
-        // SAFE — the bundle ID appears as a contiguous run of dot components.
-        // Boundary-aware so uninstalling `com.google.Chrome` never matches a
-        // *different* app's `com.google.ChromeCanary` data (covers exact files,
-        // `<id>.plist`, `<id>.savedState`, and `group.<id>` containers).
-        if Self.componentRun(name, contains: bid) {
+        // SAFE — the bundle ID appears anchored at the start of the name's dot
+        // components (or right after a `group.` container prefix). Anchoring
+        // (not "contiguous run anywhere") is what makes this boundary-safe:
+        // it rejects both `com.google.ChromeCanary` (sibling app, prefix) and
+        // `com.foo.bar.baz` matching an unrelated app whose id is `foo.bar.baz`
+        // (infix/suffix). Covers exact files, `<id>.plist`, `<id>.savedState`.
+        if Self.bundleIDAnchored(name, bid) {
             return (.safe, "matches bundle ID \(bid)")
         }
 
-        // CAREFUL — vendor reverse-DNS prefix (`com.spotify.*`), same
-        // component-boundary rule so `com.spotifyx.*` is not swept in.
+        // CAREFUL — vendor reverse-DNS prefix (`com.spotify.*`), same anchored
+        // rule so `com.spotifyx.*` and unrelated infix matches aren't swept in.
         if let vendor = identity.vendorPrefix, !vendorDenylist.contains(vendor),
-            Self.componentRun(name, contains: vendor)
+            Self.bundleIDAnchored(name, vendor)
         {
             return (.careful, "matches vendor prefix \(vendor)")
         }
@@ -376,10 +381,16 @@ public struct UninstallScanner: Sendable {
 
     // MARK: - Helpers
 
-    private func residueRoots() -> [(root: URL, dirs: [(rel: String, category: String)])] {
-        var roots: [(URL, [(rel: String, category: String)])] = [(userLibrary, Self.residueDirs)]
+    /// `isSystem` marks the root-owned `/Library` root, whose contents Pulse
+    /// can only surface (REVIEW), never stage.
+    private func residueRoots()
+        -> [(root: URL, isSystem: Bool, dirs: [(rel: String, category: String)])]
+    {
+        var roots: [(URL, Bool, [(rel: String, category: String)])] = [
+            (userLibrary, false, Self.residueDirs)
+        ]
         if let systemLibrary {
-            roots.append((systemLibrary, Self.residueDirs + Self.systemOnlyResidueDirs))
+            roots.append((systemLibrary, true, Self.residueDirs + Self.systemOnlyResidueDirs))
         }
         return roots
     }
@@ -391,18 +402,19 @@ public struct UninstallScanner: Sendable {
             at: dir, includingPropertiesForKeys: nil, options: [])
     }
 
-    /// True when `query`'s dot-delimited components appear as a contiguous
-    /// run inside `name`'s components — the boundary-aware test that stops
-    /// `com.google.chrome` from matching `com.google.chromecanary`.
-    static func componentRun(_ name: String, contains query: String) -> Bool {
-        let comps = name.lowercased().split(separator: ".").map(String.init)
+    /// True when `query`'s dot components match the START of `name`'s
+    /// components (optionally after a leading `group.` container prefix) — the
+    /// only legitimate way a bundle ID / vendor prefix embeds in a residue
+    /// name. Anchoring at the start rejects sibling-app prefixes
+    /// (`com.google.ChromeCanary` vs `com.google.Chrome`) AND unrelated
+    /// infix/suffix matches (`com.foo.bar.baz` vs an app whose id is
+    /// `foo.bar.baz`).
+    static func bundleIDAnchored(_ name: String, _ query: String) -> Bool {
+        var comps = name.lowercased().split(separator: ".").map(String.init)
+        if comps.first == "group" { comps.removeFirst() }
         let q = query.lowercased().split(separator: ".").map(String.init)
         guard !q.isEmpty, comps.count >= q.count else { return false }
-        for start in 0...(comps.count - q.count)
-        where Array(comps[start..<start + q.count]) == q {
-            return true
-        }
-        return false
+        return Array(comps.prefix(q.count)) == q
     }
 
     /// Extracts a reverse-DNS bundle ID from a residue name, or nil when the

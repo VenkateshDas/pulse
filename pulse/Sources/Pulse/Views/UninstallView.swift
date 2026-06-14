@@ -189,7 +189,7 @@ struct InstalledAppsCard: View {
             model.selectApp(app)
         } label: {
             HStack(spacing: 12) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+                Image(nsImage: model.icon(for: app.path))
                     .resizable()
                     .frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 1) {
@@ -203,10 +203,14 @@ struct InstalledAppsCard: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                Text(ByteFormat.string(app.sizeBytes))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.textPrimary)
-                    .frame(width: 76, alignment: .trailing)
+                // Size is computed lazily on selection, so the list omits it
+                // (0 = not yet computed) to keep the list load fast.
+                if app.sizeBytes > 0 {
+                    Text(ByteFormat.string(app.sizeBytes))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Halo.textPrimary)
+                        .frame(width: 76, alignment: .trailing)
+                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10))
                     .foregroundStyle(Halo.textDim)
@@ -288,7 +292,7 @@ struct UninstallPlanCard: View {
             Image(systemName: "checkmark.square.fill")
                 .font(.system(size: 13))
                 .foregroundStyle(Halo.pulseGreen)
-            Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+            Image(nsImage: model.icon(for: app.path))
                 .resizable()
                 .frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 1) {
@@ -356,7 +360,7 @@ struct UninstallPlanCard: View {
                 selectable
                     ? "" : "REVIEW matches are never bulk-selected — open in Finder and decide yourself")
 
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+            Image(nsImage: model.icon(for: item.path))
                 .resizable()
                 .frame(width: 16, height: 16)
 
@@ -485,7 +489,7 @@ struct UninstallResultCard: View {
             Image(systemName: result.appTrashed ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.system(size: 13))
                 .foregroundStyle(result.appTrashed ? Halo.pulseGreen : Halo.flare)
-            Image(nsImage: NSWorkspace.shared.icon(forFile: result.appBundlePath))
+            Image(nsImage: model.icon(for: result.appBundlePath))
                 .resizable()
                 .frame(width: 18, height: 18)
             VStack(alignment: .leading, spacing: 1) {
@@ -495,7 +499,7 @@ struct UninstallResultCard: View {
                 Text(
                     result.appTrashed
                         ? "moved to Trash · Finder “Put Back” restores it"
-                        : "couldn't be moved to Trash — it may need Full Disk Access"
+                        : "couldn't be moved to Trash — Retry and approve the Finder prompt"
                 )
                 .font(.system(size: 10))
                 .foregroundStyle(Halo.textDim)
@@ -573,16 +577,6 @@ struct UninstallResultCard: View {
         }
     }
 
-    private func fdaMessage(_ result: UninstallModel.UninstallResult) -> String {
-        switch (result.appTrashed, result.failedItems.isEmpty) {
-        case (false, false):
-            return "\(result.appName) and \(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access."
-        case (false, true):
-            return "\(result.appName) couldn't be moved to Trash — Pulse needs Full Disk Access."
-        default:
-            return "\(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access."
-        }
-    }
 
     private func stagedRow(_ item: VaultItem) -> some View {
         HStack(spacing: 10) {
@@ -614,11 +608,32 @@ struct UninstallResultCard: View {
 
     @ViewBuilder
     private func notes(_ result: UninstallModel.UninstallResult) -> some View {
-        if result.needsAttention {
+        // App-bundle failure is an App Management / Finder-consent issue —
+        // NOT Full Disk Access. Route it to its real remedy.
+        if result.appNeedsAttention {
             VStack(alignment: .leading, spacing: 4) {
-                Label(fdaMessage(result), systemImage: "lock.shield")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Halo.amber)
+                Label(
+                    "\(result.appName) couldn't be moved to the Trash.",
+                    systemImage: "lock.shield"
+                )
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Halo.amber)
+                Text(
+                    "Removing another app needs permission. Click Retry and approve the “control Finder” prompt (and the admin password, if asked) — same as dragging the app to the Trash by hand."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+            }
+        }
+        // Leftover-staging failure is the genuine Full Disk Access case.
+        if result.leftoversNeedAttention {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(
+                    "\(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access.",
+                    systemImage: "externaldrive.badge.xmark"
+                )
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Halo.amber)
                 Text(
                     "Grant Pulse Full Disk Access, then Retry. In Settings, toggle Pulse on under Full Disk Access (add it with “+” if it isn’t listed)."
                 )
@@ -644,18 +659,22 @@ struct UninstallResultCard: View {
     private func actions(_ result: UninstallModel.UninstallResult) -> some View {
         HStack(spacing: 10) {
             if result.needsAttention {
-                Button {
-                    model.openFullDiskAccessSettings()
-                } label: {
-                    Text("Grant Full Disk Access")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Halo.void)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Halo.amber, in: Capsule())
+                // FDA only helps the leftover (container) failures, so only
+                // surface that button when leftovers actually failed.
+                if result.leftoversNeedAttention {
+                    Button {
+                        model.openFullDiskAccessSettings()
+                    } label: {
+                        Text("Grant Full Disk Access")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Halo.void)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Halo.amber, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open System Settings → Privacy & Security → Full Disk Access")
                 }
-                .buttonStyle(.plain)
-                .help("Open System Settings → Privacy & Security → Full Disk Access")
                 Button {
                     model.retryUninstall()
                 } label: {
@@ -774,7 +793,7 @@ struct OrphanScanCard: View {
             }
             .buttonStyle(.plain)
 
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+            Image(nsImage: model.icon(for: item.path))
                 .resizable()
                 .frame(width: 16, height: 16)
 
