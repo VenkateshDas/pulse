@@ -560,3 +560,76 @@ struct InsightScannerTests {
         #expect(found.isEmpty)
     }
 }
+
+// MARK: - ProcessWatcher (F5)
+
+@Suite("ProcessWatcher")
+struct ProcessWatcherTests {
+    private func proc(_ pid: Int32, _ name: String, _ cpu: Double) -> ProcessSample {
+        ProcessSample(pid: pid, name: name, cpuPercent: cpu, residentBytes: 0)
+    }
+
+    @Test func spikeBelowWindowDoesNotAlert() {
+        var w = ProcessWatcher(cpuThreshold: 50, window: 60)
+        let t0 = Date()
+        #expect(w.ingest([proc(1, "A", 90)], now: t0).isEmpty)
+        // 30s later — still under the 60s window.
+        #expect(w.ingest([proc(1, "A", 90)], now: t0.addingTimeInterval(30)).isEmpty)
+    }
+
+    @Test func sustainedAboveWindowAlertsOnce() {
+        var w = ProcessWatcher(cpuThreshold: 50, window: 60)
+        let t0 = Date()
+        _ = w.ingest([proc(1, "A", 90)], now: t0)
+        let fired = w.ingest([proc(1, "A", 95)], now: t0.addingTimeInterval(61))
+        #expect(fired.count == 1)
+        #expect(fired.first?.isNewlySustained == true)
+        // Next tick still sustained, but no longer "newly".
+        let again = w.ingest([proc(1, "A", 95)], now: t0.addingTimeInterval(63))
+        #expect(again.first?.isNewlySustained == false)
+    }
+
+    @Test func droppingBelowThresholdResetsClock() {
+        var w = ProcessWatcher(cpuThreshold: 50, window: 60)
+        let t0 = Date()
+        _ = w.ingest([proc(1, "A", 90)], now: t0)
+        // Cools off → track cleared.
+        _ = w.ingest([proc(1, "A", 10)], now: t0.addingTimeInterval(30))
+        // Hot again, but clock restarts: 40s later is not yet sustained.
+        let fired = w.ingest([proc(1, "A", 90)], now: t0.addingTimeInterval(70))
+        #expect(fired.isEmpty)
+    }
+
+    @Test func belowThresholdNeverTracked() {
+        var w = ProcessWatcher(cpuThreshold: 50, window: 60)
+        let t0 = Date()
+        #expect(w.ingest([proc(1, "A", 40)], now: t0).isEmpty)
+        #expect(w.ingest([proc(1, "A", 49)], now: t0.addingTimeInterval(120)).isEmpty)
+    }
+}
+
+@Suite("AnomalyStore")
+struct AnomalyStoreTests {
+    @Test func recordsNewestFirstAndCapsCount() {
+        let store = AnomalyStore(fileURL: nil)
+        let base = Date()
+        for i in 0..<5 {
+            store.record(AnomalyRecord(
+                processName: "P\(i)", pid: Int32(i), cpuPercent: 90,
+                date: base.addingTimeInterval(Double(i)), sustainedSeconds: 60))
+        }
+        #expect(store.records.first?.processName == "P4")   // newest first
+        #expect(store.records.count == 5)
+    }
+
+    @Test func dropsEntriesOlderThanMaxAge() {
+        let store = AnomalyStore(fileURL: nil)
+        let now = Date()
+        store.record(AnomalyRecord(processName: "old", pid: 1, cpuPercent: 90,
+            date: now.addingTimeInterval(-Double(40 * 24 * 3600)), sustainedSeconds: 60))
+        store.record(AnomalyRecord(processName: "new", pid: 2, cpuPercent: 90,
+            date: now, sustainedSeconds: 60))
+        #expect(store.records.contains { $0.processName == "new" })
+        #expect(!store.records.contains { $0.processName == "old" })
+    }
+}

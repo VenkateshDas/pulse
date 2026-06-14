@@ -6,22 +6,17 @@ import Foundation
 /// CPU% is computed from the delta of per-process task time between
 /// consecutive samples, so the first call returns 0% for every process.
 final class ProcessSampler {
-    // pti_total_* are in nanoseconds; mach_absolute_time() is in mach ticks
-    // (≈24MHz on Apple Silicon), so the wall delta must be converted to ns
-    // before forming the busy/wall ratio — they do NOT share units on M-series.
-    private static let timebase: mach_timebase_info_data_t = {
-        var info = mach_timebase_info_data_t()
-        mach_timebase_info(&info)
-        return info
-    }()
+    // proc_taskinfo's pti_total_user/system and mach_absolute_time() are BOTH
+    // in mach-absolute time units, so the busy/wall ratio is unit-free — no
+    // timebase conversion is needed (and applying one to only the wall delta
+    // inflated it ~42× on Apple Silicon, crushing every process's CPU% by that
+    // same factor). Compare the raw deltas directly.
     private var previousTaskTime: [pid_t: UInt64] = [:]
     private var previousSampleAt: UInt64 = 0
 
     func sample(limit: Int) -> [ProcessSample] {
         let now = mach_absolute_time()
-        let wallDelta =
-            (now &- previousSampleAt) &* UInt64(Self.timebase.numer)
-            / UInt64(Self.timebase.denom)
+        let wallDelta = now &- previousSampleAt
         let firstSample = previousSampleAt == 0
         defer { previousSampleAt = now }
 

@@ -41,6 +41,10 @@ struct TimelineView: View {
                     if let latest = model.snapshots.last, !latest.categories.isEmpty {
                         categoryCard(latest)
                     }
+                    if !dashboard.recentAnomalies.isEmpty {
+                        sectionLabel("PROCESS ANOMALIES · SUSTAINED CPU")
+                        anomalyCard
+                    }
                 }
                 .padding(.bottom, 16)
             }
@@ -64,6 +68,40 @@ struct TimelineView: View {
                 .foregroundStyle(Halo.textDim)
         }
         .padding(.bottom, 4)
+    }
+
+    // MARK: - Process anomalies (F5)
+
+    private var anomalyCard: some View {
+        let items = Array(dashboard.recentAnomalies.prefix(20))
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(items) { anomaly in
+                HStack(spacing: 10) {
+                    Image(systemName: "bolt.horizontal.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Halo.amber)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(anomaly.processName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Halo.textPrimary)
+                        Text("\(Int(anomaly.cpuPercent))% CPU for \(Int(anomaly.sustainedSeconds / 60)) min · pid \(anomaly.pid)")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                    }
+                    Spacer()
+                    Text(anomaly.date.formatted(date: .abbreviated, time: .shortened))
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.textDim)
+                }
+                .padding(.vertical, 8)
+                if anomaly.id != items.last?.id {
+                    Rectangle().fill(Halo.border).frame(height: 1)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
     }
 
     // MARK: - Data join
