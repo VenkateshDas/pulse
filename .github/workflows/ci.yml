@@ -23,7 +23,7 @@ jobs:
       run:
         working-directory: pulse
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # swift-tools-version 6.2 — pick the newest stable Xcode the runner ships.
       - name: Select Xcode
