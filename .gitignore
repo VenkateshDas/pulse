@@ -27,6 +27,7 @@ docs/
 index.md
 log.md
 AGENTS.md
+CLAUDE.md
 
 # Python legacy
 legacy_tui/__pycache__/
