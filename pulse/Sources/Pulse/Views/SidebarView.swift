@@ -8,6 +8,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case storage = "Storage"
     case timeline = "Timeline"
     case clean = "Clean"
+    case uninstall = "Uninstall"
     case monitor = "Monitor"
     case health = "Health"
     case vault = "Vault"
@@ -21,6 +22,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .storage: "internaldrive"
         case .timeline: "chart.xyaxis.line"
         case .clean: "sparkles"
+        case .uninstall: "trash.slash"
         case .monitor: "waveform.path.ecg"
         case .health: "heart"
         case .vault: "shield"
@@ -30,7 +32,9 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var isAvailable: Bool {
         switch self {
-        case .dashboard, .storage, .timeline, .clean, .monitor, .health, .vault, .diagnostics: true
+        case .dashboard, .storage, .timeline, .clean, .uninstall, .monitor, .health, .vault,
+            .diagnostics:
+            true
         }
     }
 }
