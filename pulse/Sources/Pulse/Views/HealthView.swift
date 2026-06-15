@@ -12,6 +12,10 @@ struct HealthView: View {
                 .frame(height: 150)
             BatteryCard()
                 .frame(height: 185)
+            if !model.bluetoothDevices.isEmpty {
+                BluetoothCard()
+                    .frame(height: 90)
+            }
             if !model.batteryUnavailable {
                 let readings = dashboardModel.batteryTrend.compactMap { $0.capacityPercent }
                 if readings.count >= 2 {
@@ -261,6 +265,55 @@ private struct BatteryCard: View {
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
         }
+    }
+}
+
+// MARK: - Bluetooth Card
+
+private struct BluetoothCard: View {
+    @Environment(HealthModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("BLUETOOTH PERIPHERALS")
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(2)
+                .foregroundStyle(Halo.textDim)
+
+            HStack(spacing: 20) {
+                ForEach(model.bluetoothDevices) { device in
+                    HStack(spacing: 8) {
+                        Image(systemName: "b.square.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Halo.ion)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(device.name)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Halo.textPrimary)
+                                .lineLimit(1)
+                            
+                            if let battery = device.batteryPercent {
+                                Text("\(battery)%")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(battery > 20 ? Halo.pulseGreen : Halo.flare)
+                            } else {
+                                Text("Unknown")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Halo.textDim)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 

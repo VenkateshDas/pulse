@@ -42,7 +42,6 @@ public actor BluetoothSampler {
         
         var currentDevice: String?
         var isConnectedSection = false
-        var deviceHasBattery = false
         var currentBattery: Int?
 
         for rawLine in lines {
@@ -61,16 +60,14 @@ public actor BluetoothSampler {
             let indentCount = line.prefix(while: { $0 == " " }).count
             if indentCount == 10 {
                 // New device block
-                if let name = currentDevice, deviceHasBattery {
+                if let name = currentDevice {
                     devices.append(BluetoothDevice(name: name, batteryPercent: currentBattery))
                 }
                 currentDevice = String(trimmed.dropLast(1)) // Remove trailing colon
-                deviceHasBattery = false
                 currentBattery = nil
             } else if indentCount > 10 {
                 // Device property
                 if trimmed.contains("Battery Level:") {
-                    deviceHasBattery = true
                     if let percentStr = trimmed.split(separator: ":").last?.trimmingCharacters(in: .whitespaces),
                        let percent = Int(percentStr.dropLast().trimmingCharacters(in: .whitespaces)) {
                         currentBattery = percent
@@ -78,7 +75,7 @@ public actor BluetoothSampler {
                 }
             }
         }
-        if let name = currentDevice, deviceHasBattery {
+        if let name = currentDevice {
             devices.append(BluetoothDevice(name: name, batteryPercent: currentBattery))
         }
         return devices
