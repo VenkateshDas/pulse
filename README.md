@@ -83,9 +83,9 @@ open dist/Pulse.app
 
 ## Architecture
 
-<div align="center">
+<!-- <div align="center">
   <img src="assets/pulse_architecture.png" width="700" alt="Pulse Architecture Infographic" />
-</div>
+</div> -->
 
 | Module | Role |
 |--------|------|
