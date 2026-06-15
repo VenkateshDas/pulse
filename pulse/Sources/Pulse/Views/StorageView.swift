@@ -262,10 +262,12 @@ struct StorageView: View {
                 
                 Spacer()
                 
+                // "Free" matches Finder and the dashboard/popover: it counts
+                // purgeable space as available (volumeAvailableCapacityForImportantUsage).
+                // Purgeable is still surfaced separately as a breakdown, not subtracted.
                 let finderFree = model.snapshot?.diskFreeBytes ?? 0
                 let total = model.snapshot?.diskTotalBytes ?? 0
                 let purgeable = storage.purgeableBytes
-                let rawFree = finderFree > purgeable ? finderFree - purgeable : 0
                 let used = total > finderFree ? total - finderFree : 0
                 
                 HStack(spacing: 12) {
@@ -281,7 +283,7 @@ struct StorageView: View {
                     }
                     Group {
                         Text("Free: ").foregroundStyle(Halo.textDim) +
-                        Text(ByteFormat.string(rawFree)).foregroundStyle(Halo.pulseGreen)
+                        Text(ByteFormat.string(finderFree)).foregroundStyle(Halo.pulseGreen)
                     }
                     Text("•").foregroundStyle(Halo.surface2)
                     Group {
