@@ -29,6 +29,17 @@ final class AppActivation {
     /// counted so a re-opened or second window can't strand us in `.accessory`.
     private var openWindowCount = 0
 
+    /// Set by the popover's "Quit Pulse" so `applicationShouldTerminate` knows
+    /// the user really means to exit. Cmd-Q / the app menu's Quit are otherwise
+    /// reinterpreted as "close the Command Center, stay in the menu bar".
+    private(set) var userRequestedQuit = false
+
+    /// The one true exit: actually terminate Pulse (popover "Quit Pulse").
+    func quit() {
+        userRequestedQuit = true
+        NSApp.terminate(nil)
+    }
+
     private init() {
         showDockIcon = UserDefaults.standard.bool(forKey: Self.dockKey)
     }
@@ -72,5 +83,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// bar. Only the popover's "Quit Pulse" terminates.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    /// Cmd-Q / the app menu's Quit reach here too, but for Pulse they should
+    /// mean "close the Command Center and stay in the menu bar" — not exit.
+    /// Only the popover's "Quit Pulse" (which sets `userRequestedQuit`) really
+    /// terminates. If no Command Center window is open there's nothing to close
+    /// to, so we allow termination (covers logout/shutdown while backgrounded).
+    func applicationShouldTerminate(
+        _ sender: NSApplication
+    ) -> NSApplication.TerminateReply {
+        if AppActivation.shared.userRequestedQuit { return .terminateNow }
+        let commandCenter = sender.windows.filter {
+            $0.isVisible && $0.title.hasPrefix("Pulse")
+        }
+        guard !commandCenter.isEmpty else { return .terminateNow }
+        commandCenter.forEach { $0.close() }
+        return .terminateCancel
     }
 }

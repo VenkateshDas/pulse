@@ -218,7 +218,9 @@ struct MenuBarContent: View {
             }
 
             Button("Quit Pulse") {
-                NSApp.terminate(nil)
+                // The one true exit. Cmd-Q only closes the window (stays in the
+                // menu bar); this actually terminates Pulse.
+                AppActivation.shared.quit()
             }
             .buttonStyle(.plain)
             .font(.system(size: 11))
