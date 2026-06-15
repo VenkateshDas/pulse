@@ -298,9 +298,9 @@ private struct BluetoothCard: View {
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(battery > 20 ? Halo.pulseGreen : Halo.flare)
                             } else {
-                                Text("Unknown")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(Halo.textDim)
+                                Text("3rd party · connection only")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Halo.textDim.opacity(0.8))
                             }
                         }
                     }
