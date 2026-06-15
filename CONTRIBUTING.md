@@ -71,6 +71,39 @@ git push origin v0.1.0
 CD builds the DMG and publishes a GitHub Release with it attached. Tags ending
 in a `-suffix` (e.g. `-beta.1`) are marked as pre-releases.
 
-**Signing:** builds are currently **ad-hoc signed** — Gatekeeper warns on first
-launch on other Macs (right-click → Open). To ship a signed + notarized DMG,
-add the Apple Developer secrets noted at the top of `release.yml`.
+**Signing:** with no secrets configured, builds are **ad-hoc signed** —
+Gatekeeper warns on first launch on other Macs (right-click → Open, or
+`xattr -dr com.apple.quarantine /Applications/Pulse.app`). Ad-hoc apps may be
+**blocked outright** on MDM-managed machines (e.g. work laptops) whose
+Gatekeeper policy only allows identified developers — there is no user-side
+bypass for that; the DMG must be notarized.
+
+### Shipping a signed + notarized DMG (required for work/MDM laptops)
+
+The pipeline signs + notarizes automatically once these repo secrets exist
+(Settings → Secrets and variables → Actions). No workflow edit needed.
+
+1. **Apple Developer account** ($99/yr) → in *Certificates, IDs & Profiles*
+   create a **Developer ID Application** certificate, then export it from
+   Keychain Access as a `.p12` (set an export password).
+2. Add the **signing** secrets:
+   - `APPLE_DEV_ID_CERT_P12_BASE64` — `base64 -i cert.p12 | pbcopy`
+   - `APPLE_DEV_ID_CERT_PASSWORD` — the `.p12` export password
+   - `APPLE_DEV_ID_IDENTITY` — `Developer ID Application: Your Name (TEAMID)`
+3. Add the **notarization** secrets (App Store Connect):
+   - `APPLE_ID` — your Apple ID email
+   - `APPLE_APP_PASSWORD` — an app-specific password from appleid.apple.com
+   - `APPLE_TEAM_ID` — your 10-character Team ID
+4. Re-tag (`git tag v0.1.0-beta.5 && git push origin v0.1.0-beta.5`). The
+   release job imports the cert into a temporary keychain, signs with the
+   hardened runtime, notarizes, and staples — the resulting DMG opens with no
+   Gatekeeper warning.
+
+With **only** the signing secrets (step 2) the DMG is signed but not
+notarized, so Gatekeeper still warns. Both sets are needed for a clean launch.
+Even notarized, a strict MDM allowlist may still require IT to approve the
+bundle ID `com.pulse.app` — that's an org policy step, not a build step.
+
+To sign/notarize **locally** instead of via CD:
+`make sign SIGN_IDENTITY="Developer ID Application: …"` then
+`make notarize NOTARY_PROFILE=<stored notarytool profile>`.
