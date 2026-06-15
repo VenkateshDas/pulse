@@ -5,11 +5,20 @@ name: Release
 # Builds the ad-hoc-signed DMG and publishes a GitHub Release with it attached.
 # Pre-release tags (containing '-') are marked as pre-releases.
 #
-# SIGNING: currently ad-hoc (Gatekeeper warns on other Macs). To ship a fully
-# signed + notarized DMG later, add these repo secrets and the build step picks
-# them up via scripts/bundle.sh + `make notarize`:
-#   APPLE_DEV_ID_CERT_P12_BASE64, APPLE_DEV_ID_CERT_PASSWORD,
-#   APPLE_DEV_ID_IDENTITY, APPLE_NOTARY_PROFILE (or notarytool API key trio).
+# SIGNING: ad-hoc by default (Gatekeeper warns on other Macs). To ship a fully
+# signed + NOTARIZED DMG that opens cleanly anywhere — including MDM-managed
+# work laptops — add these repo secrets; the build step below picks them up
+# automatically (no workflow edit needed):
+#   Signing (Developer ID Application cert exported as .p12):
+#     APPLE_DEV_ID_CERT_P12_BASE64  — base64 of the .p12 file
+#     APPLE_DEV_ID_CERT_PASSWORD    — the .p12 export password
+#     APPLE_DEV_ID_IDENTITY         — "Developer ID Application: Name (TEAMID)"
+#   Notarization (App Store Connect credentials):
+#     APPLE_ID                      — Apple ID email
+#     APPLE_APP_PASSWORD            — app-specific password (appleid.apple.com)
+#     APPLE_TEAM_ID                 — 10-char Team ID
+# With only the signing secrets: signed but not notarized (still warns).
+# With both sets: signed + notarized + stapled = no Gatekeeper warning.
 on:
   push:
     tags: ["v*"]
@@ -45,11 +54,52 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build + bundle + DMG (ad-hoc signed)
+      - name: Build + bundle + DMG (signed + notarized when secrets present)
+        env:
+          PULSE_VERSION: ${{ steps.ver.outputs.version }}
+          SIGN_CERT_B64: ${{ secrets.APPLE_DEV_ID_CERT_P12_BASE64 }}
+          SIGN_CERT_PW: ${{ secrets.APPLE_DEV_ID_CERT_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.APPLE_DEV_ID_IDENTITY }}
+          AC_APPLE_ID: ${{ secrets.APPLE_ID }}
+          AC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          AC_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          set -euo pipefail
           swift build -c release
-          scripts/bundle.sh
-          scripts/dmg.sh "${{ steps.ver.outputs.version }}"
+
+          if [ -n "${SIGN_CERT_B64:-}" ] && [ -n "${SIGN_IDENTITY:-}" ]; then
+            echo "Importing Developer ID certificate into a temporary keychain"
+            KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+            KEYCHAIN_PW="$(openssl rand -base64 24)"
+            security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN"
+            security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+            echo "$SIGN_CERT_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+            security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+              -P "${SIGN_CERT_PW:-}" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: \
+              -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+            security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+
+            SIGN_IDENTITY="$SIGN_IDENTITY" scripts/bundle.sh
+
+            if [ -n "${AC_APPLE_ID:-}" ] && [ -n "${AC_PASSWORD:-}" ] && [ -n "${AC_TEAM_ID:-}" ]; then
+              echo "Notarizing with App Store Connect credentials"
+              ditto -c -k --keepParent dist/Pulse.app "$RUNNER_TEMP/notarize.zip"
+              xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+                --apple-id "$AC_APPLE_ID" --password "$AC_PASSWORD" \
+                --team-id "$AC_TEAM_ID" --wait
+              xcrun stapler staple dist/Pulse.app
+              echo "Signed + notarized + stapled."
+            else
+              echo "::warning::Signed but NOT notarized (no App Store Connect creds) — Gatekeeper will still warn."
+            fi
+          else
+            echo "::warning::No signing secrets — building ad-hoc DMG (Gatekeeper blocks on other Macs)."
+            scripts/bundle.sh
+          fi
+
+          scripts/dmg.sh "$PULSE_VERSION"
           ls -la dist/*.dmg
 
       - name: Publish GitHub Release
