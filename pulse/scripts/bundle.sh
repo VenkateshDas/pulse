@@ -18,11 +18,28 @@ FIX_DIR="$HOME/.local/swiftpm-fix"
 if [ -d "$FIX_DIR/ManifestAPI" ]; then
     export SWIFTPM_CUSTOM_LIBS_DIR="$FIX_DIR"
 fi
-swift build -c release
+# Architecture selection. Default is a native single-arch build, which works
+# with a Command Line Tools-only toolchain (local dev). Multi-arch (universal)
+# builds go through SwiftPM's Xcode build system and need full Xcode + xcbuild,
+# so CD opts in by exporting PULSE_ARCHS="arm64 x86_64" to ship a DMG that runs
+# on both Apple Silicon and Intel Macs.
+ARCH_FLAGS=""
+for a in ${PULSE_ARCHS:-}; do ARCH_FLAGS="$ARCH_FLAGS --arch $a"; done
+# shellcheck disable=SC2086
+swift build -c release $ARCH_FLAGS
+
+# Multi-arch SwiftPM emits to .build/apple/Products/Release; a plain native
+# build lands in .build/release. Pick whichever exists.
+BIN=""
+for candidate in ".build/apple/Products/Release/Pulse" ".build/release/Pulse"; do
+    if [ -f "$candidate" ]; then BIN="$candidate"; break; fi
+done
+[ -n "$BIN" ] || { echo "error: built Pulse binary not found"; exit 1; }
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp ".build/release/Pulse" "$APP/Contents/MacOS/Pulse"
+cp "$BIN" "$APP/Contents/MacOS/Pulse"
+echo "Bundled binary architectures: $(lipo -archs "$APP/Contents/MacOS/Pulse" 2>/dev/null || echo unknown)"
 if [ -f "Sources/Pulse/Resources/AppIcon.icns" ]; then
     cp "Sources/Pulse/Resources/AppIcon.icns" "$APP/Contents/Resources/"
 fi
