@@ -31,6 +31,7 @@ final class StorageModel {
     private(set) var trashBytes: UInt64 = 0
     private(set) var trashItems: [TrashItem] = []
     private(set) var trashAccessError: Bool = false
+    private(set) var undoEntries: [UndoEntry] = []
     
     @ObservationIgnored private var trashObserver: DispatchSourceFileSystemObject?
     @ObservationIgnored private var refreshTrashTask: Task<Void, Never>?
@@ -59,12 +60,14 @@ final class StorageModel {
     func appeared() {
         refreshPurgeable()
         refreshTrashInfo()
+        refreshUndoHistory()
         if scanState == .idle { runScan() }
     }
 
     func refreshAll() {
         refreshPurgeable()
         refreshTrashInfo()
+        refreshUndoHistory()
         runScan()
     }
 
@@ -295,6 +298,30 @@ final class StorageModel {
         }
     }
 
+    func refreshUndoHistory() {
+        Task {
+            self.undoEntries = await UndoJournal.shared.entries
+        }
+    }
+
+    func restore(entry: UndoEntry) {
+        guard !isCleaning else { return }
+        isCleaning = true
+        Task {
+            do {
+                try await UndoJournal.shared.restore(entry.id)
+                self.cleanReport = "Restored \(entry.items.count) items"
+            } catch {
+                self.cleanReport = "Failed to restore items"
+            }
+            self.isCleaning = false
+            self.refreshTrashInfo()
+            self.refreshUndoHistory()
+            self.refreshPurgeable()
+            self.runScan()
+        }
+    }
+
     func refreshTrashInfo() {
         startTrashObserver()
         refreshTrashTask?.cancel()
@@ -333,6 +360,7 @@ final class StorageModel {
                 self.trashAccessError = accessError
             }
         }
+        refreshUndoHistory()
     }
 
     private nonisolated static func itemSize(_ url: URL) -> UInt64 {

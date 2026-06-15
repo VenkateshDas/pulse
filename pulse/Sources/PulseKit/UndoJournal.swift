@@ -30,7 +30,7 @@ public actor UndoJournal {
     public static let shared = UndoJournal()
     
     private let storeURL: URL
-    private(set) var entries: [UndoEntry] = []
+    public private(set) var entries: [UndoEntry] = []
 
     public init(storeURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/antigravity/undo_journal.json")) {
         self.storeURL = storeURL
