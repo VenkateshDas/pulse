@@ -29,12 +29,14 @@ extension Diagnosis.Severity {
 
 /// Circular 0–100 health gauge with the number centered. Band drives color.
 struct HealthScoreRing: View {
+    /// What to draw inside the ring. The compact menu-bar popover uses
+    /// `.scoreOnly` (number, no band word).
+    enum LabelMode { case full, scoreOnly, none }
+
     let score: HealthScore
     var diameter: CGFloat = 96
     var lineWidth: CGFloat = 9
-    /// When false, the ring is drawn empty (no score/band text inside) — used
-    /// by the compact menu-bar popover.
-    var showsLabel: Bool = true
+    var labelMode: LabelMode = .full
 
     var body: some View {
         ZStack {
@@ -46,20 +48,33 @@ struct HealthScoreRing: View {
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.easeOut(duration: 0.4), value: score.value)
-            if showsLabel {
-                VStack(spacing: 0) {
-                    Text("\(score.value)")
-                        .font(.system(size: diameter * 0.32, weight: .bold, design: .rounded))
-                        .foregroundStyle(Halo.textPrimary)
-                        .contentTransition(.numericText())
-                    Text(score.band.rawValue.uppercased())
-                        .font(.system(size: diameter * 0.1, weight: .semibold))
-                        .tracking(1.5)
-                        .foregroundStyle(score.band.color)
-                }
-            }
+            label
         }
         .frame(width: diameter, height: diameter)
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        switch labelMode {
+        case .none:
+            EmptyView()
+        case .scoreOnly:
+            Text("\(score.value)")
+                .font(.system(size: diameter * 0.36, weight: .bold, design: .rounded))
+                .foregroundStyle(Halo.textPrimary)
+                .contentTransition(.numericText())
+        case .full:
+            VStack(spacing: 0) {
+                Text("\(score.value)")
+                    .font(.system(size: diameter * 0.32, weight: .bold, design: .rounded))
+                    .foregroundStyle(Halo.textPrimary)
+                    .contentTransition(.numericText())
+                Text(score.band.rawValue.uppercased())
+                    .font(.system(size: diameter * 0.1, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(score.band.color)
+            }
+        }
     }
 }
 

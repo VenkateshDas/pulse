@@ -56,7 +56,7 @@ struct MenuBarContent: View {
 
     private var hud: some View {
         HStack(spacing: 10) {
-            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, showsLabel: false)
+            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, labelMode: .scoreOnly)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.diagnosis.line)
                     .font(.system(size: 12, weight: .semibold))
