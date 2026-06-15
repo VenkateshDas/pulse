@@ -157,6 +157,7 @@ public struct UninstallScanner: Sendable {
                 guard let info = Self.infoPlist(forApp: entry) else { continue }
                 let bundleID = info["CFBundleIdentifier"] as? String ?? ""
                 guard !bundleID.isEmpty else { continue }
+                guard !BundleGuard.isProtected(bundleID: bundleID) else { continue }
                 seen.insert(entry.path)
                 let name =
                     (info["CFBundleDisplayName"] as? String)
@@ -199,6 +200,7 @@ public struct UninstallScanner: Sendable {
         guard let info = Self.infoPlist(forApp: appURL),
             let bundleID = info["CFBundleIdentifier"] as? String, !bundleID.isEmpty
         else { return nil }
+        guard !BundleGuard.isProtected(bundleID: bundleID) else { return nil }
         let name =
             (info["CFBundleDisplayName"] as? String)
             ?? (info["CFBundleName"] as? String)

@@ -24,16 +24,22 @@
 
 ## Features
 
-- **Menu bar vitals** — CPU %, memory pressure, network throughput, battery state at a glance
-- **Dashboard** — real-time charts, per-core CPU heatmap, top processes by CPU/memory
-- **Storage vault** — treemap of disk usage, smart-scan for reclaimable space (caches, venvs, node_modules)
-- **Smart Clean** — safety-checked bulk delete with a preview vault before anything is removed
-- **App Uninstaller** — drag an app (or pick from the installed list); Pulse finds its leftover files, grades every match by confidence (exact bundle-ID = safe, vendor/name = careful, weak name = review-only), trashes the app, stages leftovers in the Vault, and shows a receipt of exactly what was removed. Orphan scan finds debris from apps already deleted.
-- **Health score** — single composite score from thermals, memory pressure, disk health, and battery wear
-- **Timeline** — per-minute history charts for CPU, memory, disk I/O, and network
-- **Dev Mode** — process-level sampler with µs-resolution CPU accounting
-- **Weekly report** — summarized resource usage across the past 7 days
-- **Zero overhead** — <1% CPU, <50 MB RSS while sampling every 2 s
+- **Diagnosis verdict** — one line telling you what's wrong and who's to blame ("Chrome high CPU"), with a tap-through to the culprit process. Shown on the Dashboard, in the menu-bar HUD, and logged to history.
+- **Health score** — a single 0–100 score (CPU, memory, disk, thermal) with a per-factor "what's costing you" breakdown.
+- **Menu bar HUD** — live score + verdict, plus CPU/memory/disk/battery vitals at a glance.
+- **Dashboard** — real-time charts, per-core CPU heatmap, top processes by CPU/memory.
+- **Disk** — one unified view with sub-tabs:
+  - **Map** — treemap of disk usage.
+  - **Hidden Space** — surfaces big, easy-to-forget locations (iOS backups, Xcode DerivedData/simulators, Docker/OrbStack, dev caches, Downloads >90 days), flagged 👀 real-data vs cleanable.
+  - **Reclaim** — safety-graded scan for reclaimable space (caches, venvs, `node_modules`).
+  - **Trash** — review and empty.
+  - **Optimize** — safe maintenance tasks (QuickLook/DNS/Launch Services), admin tasks via a macOS password prompt (`purge`, network flush, Spotlight reindex), and a "we refuse these 5 risky ops" trust panel.
+- **App Uninstaller** — drag an app (or pick from the list); Pulse finds leftover files, grades every match by confidence (exact bundle-ID = safe, vendor/name = careful, weak name = review-only), trashes the app, and shows a receipt. **Orphan scan** finds debris from apps already deleted — including launch agents/daemons that load a now-missing binary.
+- **Process watch** — alerts only when a process stays hot for a sustained window (no momentary-spike false alarms), with a searchable anomaly history.
+- **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies.
+- **Dev Mode** — process-level sampler with µs-resolution CPU accounting.
+- **Reversible by default** — removals go to the Trash, not `rm`.
+- **Zero overhead** — <1% CPU, <50 MB RSS while sampling every 2 s.
 
 ## Install
 
