@@ -38,7 +38,7 @@
 - **Process watch** — alerts only when a process stays hot for a sustained window (no momentary-spike false alarms), with a searchable anomaly history.
 - **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies.
 - **Dev Mode** — process-level sampler with µs-resolution CPU accounting.
-- **Reversible by default** — removals go to the Trash, not `rm`.
+- **Reversible by default** — every removal (Smart Clean, Reclaim, Optimize, Uninstall, orphans) goes to the Trash, not `rm`, and is logged to a 30-day **Undo history** you can restore from one tap. The journal lives in `~/Library/Application Support/Pulse/`.
 - **Zero overhead** — <1% CPU, <50 MB RSS while sampling every 2 s.
 
 ## Install

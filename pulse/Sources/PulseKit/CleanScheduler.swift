@@ -85,6 +85,7 @@ public actor CleanScheduler {
 
     private let directory: URL
     private let home: URL
+    private let journal: UndoJournal
     private var schedule: CleanSchedule
 
     public static func defaultDirectory() -> URL {
@@ -98,10 +99,12 @@ public actor CleanScheduler {
     public init(
         directory: URL = CleanScheduler.defaultDirectory(),
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
+        journal: UndoJournal = .shared,
         now: Date = .now
     ) {
         self.directory = directory
         self.home = home
+        self.journal = journal
         self.schedule = Self.loadSchedule(from: directory) ?? .default(now: now)
     }
 
@@ -128,30 +131,44 @@ public actor CleanScheduler {
 
     public func scheduleIfNeeded(now: Date = .now) async -> (itemsCleaned: Int, bytesFreed: UInt64)? {
         guard isDue(now: now), schedule.autoCleanSafeTier else { return nil }
-        return runNow(autoMode: true, now: now)
+        return await runNow(autoMode: true, now: now)
     }
 
     // MARK: - Running
 
     @discardableResult
-    public func runNow(autoMode: Bool, now: Date = .now) -> (itemsCleaned: Int, bytesFreed: UInt64) {
+    public func runNow(autoMode: Bool, now: Date = .now) async -> (itemsCleaned: Int, bytesFreed: UInt64) {
         let items = SmartScanner(home: home, now: now).scan()
             .items.filter { $0.grade == .safe }
 
         var itemsCleaned = 0
         var bytesFreed: UInt64 = 0
+        var trashedItems: [TrashedItem] = []
         if !items.isEmpty {
             for item in items {
                 do {
-                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(
+                        at: URL(fileURLWithPath: item.path), resultingItemURL: &trashedURL)
                     itemsCleaned += 1
                     bytesFreed += item.sizeBytes
+                    if let trashPath = trashedURL?.path {
+                        trashedItems.append(
+                            TrashedItem(originalPath: item.path, trashPath: trashPath))
+                    }
                 } catch {
                     // ignore
                 }
             }
         }
-        
+        // Record undo so Smart Clean is reversible like every other clean path.
+        if !trashedItems.isEmpty {
+            await journal.record(
+                UndoEntry(
+                    op: autoMode ? "Scheduled Clean" : "Smart Clean",
+                    items: trashedItems, bytesFreed: Int64(bytesFreed)))
+        }
+
         schedule.lastRun = now
         schedule.nextRun = schedule.frequency.nextRun(
             after: now, hour: schedule.timePreference.runHour)

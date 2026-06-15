@@ -309,8 +309,15 @@ final class StorageModel {
         isCleaning = true
         Task {
             do {
-                try await UndoJournal.shared.restore(entry.id)
-                self.cleanReport = "Restored \(entry.items.count) items"
+                let restored = try await UndoJournal.shared.restore(entry.id)
+                switch restored {
+                case 0:
+                    self.cleanReport = "Nothing restored — items no longer in Trash"
+                case entry.items.count:
+                    self.cleanReport = "Restored \(restored) items"
+                default:
+                    self.cleanReport = "Restored \(restored) of \(entry.items.count) items"
+                }
             } catch {
                 self.cleanReport = "Failed to restore items"
             }

@@ -28,11 +28,23 @@ public struct UndoEntry: Codable, Sendable, Equatable, Identifiable {
 
 public actor UndoJournal {
     public static let shared = UndoJournal()
-    
+
     private let storeURL: URL
     public private(set) var entries: [UndoEntry] = []
 
-    public init(storeURL: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/antigravity/undo_journal.json")) {
+    /// Default journal location: Pulse's own Application Support directory.
+    /// Must NOT live under any path the cleaners can delete (e.g. `~/.gemini`,
+    /// which CleanCatalog stages as developer junk) — that would let Smart Clean
+    /// wipe its own undo history.
+    public static func defaultStoreURL() -> URL {
+        let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        ).first ?? FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support")
+        return appSupport.appendingPathComponent("Pulse/undo_journal.json")
+    }
+
+    public init(storeURL: URL = UndoJournal.defaultStoreURL()) {
         self.storeURL = storeURL
         if let data = try? Data(contentsOf: storeURL),
            let loaded = try? JSONDecoder().decode([UndoEntry].self, from: data) {
@@ -54,27 +66,52 @@ public actor UndoJournal {
         save()
     }
 
-    public func restore(_ id: UUID) async throws {
-        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+    /// Attempts to restore every item in the entry. Returns the count actually
+    /// moved back. Items whose trashed copy is gone (Trash emptied) or whose
+    /// original path is already occupied are skipped, not fatal — one bad item
+    /// must not abort the rest. Successfully restored items are dropped from the
+    /// entry; the entry is removed only once it's fully restored.
+    @discardableResult
+    public func restore(_ id: UUID) async throws -> Int {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return 0 }
         let entry = entries[index]
         let fm = FileManager.default
 
+        var restored = 0
+        var remaining: [TrashedItem] = []
         for item in entry.items {
             let trashURL = URL(fileURLWithPath: item.trashPath)
             let originalURL = URL(fileURLWithPath: item.originalPath)
 
+            // Trashed copy gone (e.g. Trash emptied) — nothing to restore.
             guard fm.fileExists(atPath: trashURL.path) else { continue }
-            
-            // Re-create parent directories if needed
+            // Original path reoccupied (e.g. cache regenerated) — leave the
+            // trashed copy in place rather than clobbering live data.
+            guard !fm.fileExists(atPath: originalURL.path) else {
+                remaining.append(item)
+                continue
+            }
+
             let parent = originalURL.deletingLastPathComponent()
             try? fm.createDirectory(at: parent, withIntermediateDirectories: true)
 
-            // Move it back
-            try fm.moveItem(at: trashURL, to: originalURL)
+            do {
+                try fm.moveItem(at: trashURL, to: originalURL)
+                restored += 1
+            } catch {
+                remaining.append(item)
+            }
         }
 
-        entries.remove(at: index)
+        if remaining.isEmpty {
+            entries.remove(at: index)
+        } else {
+            entries[index] = UndoEntry(
+                id: entry.id, op: entry.op, date: entry.date,
+                items: remaining, bytesFreed: entry.bytesFreed)
+        }
         save()
+        return restored
     }
 
     public func prune(olderThan days: Int = 30) {
