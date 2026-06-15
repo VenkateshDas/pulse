@@ -7,6 +7,10 @@ cd "$(dirname "$0")/.."
 OUT="${1:-dist}"
 APP="$OUT/Pulse.app"
 
+# Version stamped into the bundle. CD passes PULSE_VERSION (derived from the
+# git tag) so the app's About box matches the release; local builds default.
+VERSION="${PULSE_VERSION:-0.1.0}"
+
 # See Makefile: patched ManifestAPI works around a broken CLT 26.5 install.
 # Only applied when the patched dir exists (local dev) — CI runners have a
 # healthy toolchain and must not point SwiftPM at a missing libs dir.
@@ -23,7 +27,7 @@ if [ -f "Sources/Pulse/Resources/AppIcon.icns" ]; then
     cp "Sources/Pulse/Resources/AppIcon.icns" "$APP/Contents/Resources/"
 fi
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -34,8 +38,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleDisplayName</key><string>Pulse</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSSupportsAutomaticTermination</key><false/>
@@ -48,10 +52,12 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <!-- Uninstaller: ask Finder to move protected (App Store / App-Management)
          bundles to the Trash via Apple Events. -->
     <key>NSAppleEventsUsageDescription</key><string>Pulse asks Finder to move an app you’re uninstalling to the Trash.</string>
-    <!-- Sparkle auto-update (P0-8): set the appcast URL + public EdDSA key when
-         the Sparkle dependency is enabled in Package.swift. -->
-    <key>SUFeedURL</key><string>https://pulse.app/appcast.xml</string>
-    <key>SUEnableAutomaticChecks</key><true/>
+    <!-- Sparkle auto-update (P0-8): disabled until a real appcast is hosted.
+         Before enabling, host appcast.xml (e.g. via GitHub Releases/Pages),
+         set SUFeedURL + SUPublicEDKey, flip SUEnableAutomaticChecks to true,
+         and add the Sparkle dependency in Package.swift. The previous default
+         pointed at an unowned domain — left off so no build phones it home. -->
+    <key>SUEnableAutomaticChecks</key><false/>
 </dict>
 </plist>
 PLIST
