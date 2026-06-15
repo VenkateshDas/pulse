@@ -1,0 +1,76 @@
+import AppKit
+import SwiftUI
+
+/// Governs Pulse's Dock presence. Pulse is fundamentally a menu-bar app: it
+/// samples and serves its popover from the background with no Dock tile. The
+/// Command Center window temporarily promotes the app to `.regular` (Dock icon
+/// + Cmd-Tab + focusable window) while it is open; closing it drops Pulse back
+/// to the menu bar (`.accessory`). The user may pin a permanent Dock icon.
+///
+/// Policy is always *computed* from current state, never toggled blindly, so the
+/// window-open signal and the preference compose without drift.
+@MainActor
+final class AppActivation {
+    static let shared = AppActivation()
+
+    private static let dockKey = "PulseShowDockIcon"
+
+    /// User preference: keep a permanent Dock icon. Default `false` — Pulse
+    /// lives in the menu bar and only shows a Dock icon while a window is open.
+    var showDockIcon: Bool {
+        didSet {
+            guard showDockIcon != oldValue else { return }
+            UserDefaults.standard.set(showDockIcon, forKey: Self.dockKey)
+            apply()
+        }
+    }
+
+    /// Open Command Center windows. Policy is `.regular` while > 0. Reference
+    /// counted so a re-opened or second window can't strand us in `.accessory`.
+    private var openWindowCount = 0
+
+    private init() {
+        showDockIcon = UserDefaults.standard.bool(forKey: Self.dockKey)
+    }
+
+    /// Applies the launch-time policy. Call once after the app finishes
+    /// launching so background mode is correct even before any window appears.
+    func applyInitialPolicy() { apply() }
+
+    func windowDidAppear() {
+        openWindowCount += 1
+        apply()
+        // Accessory apps don't auto-activate; bring the freshly promoted window
+        // to the front so it doesn't open behind other apps.
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowDidDisappear() {
+        openWindowCount = max(0, openWindowCount - 1)
+        apply()
+    }
+
+    /// `.regular` while a window is open or the user pinned a Dock icon;
+    /// otherwise `.accessory` (menu-bar only, no Dock).
+    private func apply() {
+        let policy: NSApplication.ActivationPolicy =
+            (showDockIcon || openWindowCount > 0) ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+    }
+}
+
+/// Keeps Pulse resident in the menu bar after the last window closes, and sets
+/// the initial activation policy once AppKit is ready.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        AppActivation.shared.applyInitialPolicy()
+    }
+
+    /// Closing the Command Center must not quit Pulse — it returns to the menu
+    /// bar. Only the popover's "Quit Pulse" terminates.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+}

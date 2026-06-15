@@ -11,6 +11,9 @@ struct MenuBarContent: View {
     @Environment(StorageModel.self) private var storage
     @Environment(\.openWindow) private var openWindow
 
+    /// Mirrors the persisted Dock-icon preference so the toggle reflects state.
+    @State private var showDockIcon = AppActivation.shared.showDockIcon
+
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
     private static let sparkSamples = 15
 
@@ -204,6 +207,8 @@ struct MenuBarContent: View {
 
             menuBarMetricChooser
 
+            dockToggle
+
             if Updater.shared.isAvailable {
                 Button("Check for Updates…") { Updater.shared.checkForUpdates() }
                     .buttonStyle(.plain)
@@ -248,6 +253,22 @@ struct MenuBarContent: View {
                     .help(metric.label)
                 }
             }
+        }
+    }
+
+    /// Pins a permanent Dock icon. Off (default) = pure menu-bar app: Pulse
+    /// shows a Dock icon only while the Command Center window is open.
+    private var dockToggle: some View {
+        Toggle(isOn: $showDockIcon) {
+            Text("Show Dock Icon")
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+        }
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .tint(Halo.ion)
+        .onChange(of: showDockIcon) { _, newValue in
+            AppActivation.shared.showDockIcon = newValue
         }
     }
 

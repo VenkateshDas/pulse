@@ -72,7 +72,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSSupportsAutomaticTermination</key><false/>
-    <!-- Regular app: shows in dock and responds to Cmd+Tab. -->
+    <!-- Dock presence is controlled at runtime by AppActivation, not here:
+         Pulse is a menu-bar app and shows a Dock icon only while the Command
+         Center window is open (or if the user pins one). LSUIElement stays
+         false so the launch state is a normal app; the window opens at launch
+         (regular) then demotes to .accessory (menu-bar only) when closed. -->
     <key>LSUIElement</key><false/>
     <!-- TCC pre-flight: shown when Pulse first reads these locations. -->
     <key>NSDesktopFolderUsageDescription</key><string>Pulse scans your Desktop to map large files and find safe-to-clean space.</string>
