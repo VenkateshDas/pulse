@@ -39,7 +39,7 @@
 - **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies.
 - **Dev Mode** — process-level sampler with µs-resolution CPU accounting.
 - **Reversible by default** — every removal (Smart Clean, Reclaim, Optimize, Uninstall, orphans) goes to the Trash, not `rm`, and is logged to a 30-day **Undo history** you can restore from one tap. The journal lives in `~/Library/Application Support/Pulse/`.
-- **Zero overhead** — <1% CPU, <50 MB RSS while sampling every 2 s.
+- **Low overhead** — ~0.1% CPU while sampling every 2 s; one shared loop feeds every view, so opening more panes adds no samplers. RSS sits around ~110–120 MB — the SwiftUI/AppKit/Charts framework baseline, not Pulse's own data (a few hundred KB of capped ring buffers).
 
 ## Install
 
@@ -100,10 +100,17 @@ One shared sampling loop feeds all views. Opening more panes never adds samplers
 
 | Scenario | CPU | RSS |
 |----------|-----|-----|
-| Menu bar only | ~0.5% | ~30 MB |
-| Dashboard open | ~1.3% | ~30 MB |
+| Menu bar only | ~0.1% | ~110 MB |
+| Dashboard open | ~0.1–0.5% | ~120 MB |
 
-Measured on Apple M2, 60 s `cputime` deltas.
+Measured on Apple M2. CPU is the headline number — Pulse holds ~0.1%, so it
+ranks at the *top* of a CPU-sorted process list only because everything else on
+an idle machine is also near zero; it is not consuming meaningful CPU.
+
+RSS is dominated by the SwiftUI/AppKit/Charts/Metal frameworks, which every
+SwiftUI app links — Pulse's own retained data is a few hundred KB (all history
+buffers are bounded ring buffers). A lower number isn't reachable without
+dropping SwiftUI Charts.
 
 ## Build commands
 
