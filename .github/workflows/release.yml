@@ -57,6 +57,8 @@ jobs:
       - name: Build + bundle + DMG (signed + notarized when secrets present)
         env:
           PULSE_VERSION: ${{ steps.ver.outputs.version }}
+          # Universal binary so the DMG runs on Apple Silicon AND Intel Macs.
+          PULSE_ARCHS: "arm64 x86_64"
           SIGN_CERT_B64: ${{ secrets.APPLE_DEV_ID_CERT_P12_BASE64 }}
           SIGN_CERT_PW: ${{ secrets.APPLE_DEV_ID_CERT_PASSWORD }}
           SIGN_IDENTITY: ${{ secrets.APPLE_DEV_ID_IDENTITY }}
