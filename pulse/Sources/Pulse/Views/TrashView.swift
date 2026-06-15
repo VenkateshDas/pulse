@@ -4,23 +4,49 @@ import SwiftUI
 
 struct TrashView: View {
     @Environment(StorageModel.self) private var storage
+    @State private var selectedTab: Tab = .raw
+    
+    enum Tab {
+        case raw
+        case history
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             
-            if storage.trashAccessError {
-                fdaWarningState
-            } else if storage.trashItemCount == 0 {
-                emptyState
+            Picker("", selection: $selectedTab) {
+                Text("Raw Trash").tag(Tab.raw)
+                Text("Pulse History").tag(Tab.history)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Halo.surface2)
+            
+            Divider().background(Halo.border)
+            
+            if selectedTab == .raw {
+                if storage.trashAccessError {
+                    fdaWarningState
+                } else if storage.trashItemCount == 0 {
+                    emptyState(text: "Trash is Empty", icon: "trash")
+                } else {
+                    contentList
+                }
             } else {
-                contentList
+                if storage.undoEntries.isEmpty {
+                    emptyState(text: "No Recent Operations", icon: "clock.arrow.circlepath")
+                } else {
+                    historyList
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Halo.void)
         .onAppear {
             storage.refreshTrashInfo()
+            storage.refreshUndoHistory()
         }
     }
 
@@ -36,23 +62,22 @@ struct TrashView: View {
                     .foregroundStyle(Halo.textDim)
             }
             Spacer()
-            Button(role: .destructive) {
-                storage.emptyTrash()
-            } label: {
-                Text("Empty Trash")
-                    .font(.system(size: 11, weight: .semibold))
+            if selectedTab == .raw {
+                Button(role: .destructive) {
+                    storage.emptyTrash()
+                } label: {
+                    Text("Empty Trash")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.red)
+                .controlSize(.small)
+                .disabled(storage.trashItemCount == 0 || storage.isCleaning)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.red)
-            .controlSize(.small)
-            .disabled(storage.trashItemCount == 0 || storage.isCleaning)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Halo.surface2)
-        .overlay(alignment: .bottom) {
-            Divider().background(Halo.border)
-        }
     }
 
     private var contentList: some View {
@@ -65,13 +90,24 @@ struct TrashView: View {
             .padding(.vertical, 8)
         }
     }
+    
+    private var historyList: some View {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(storage.undoEntries) { entry in
+                    UndoEntryRow(entry: entry)
+                }
+            }
+            .padding(16)
+        }
+    }
 
-    private var emptyState: some View {
+    private func emptyState(text: String, icon: String) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "trash")
+            Image(systemName: icon)
                 .font(.system(size: 32))
                 .foregroundStyle(Halo.surface2)
-            Text("Trash is Empty")
+            Text(text)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(Halo.textDim)
         }
@@ -119,5 +155,77 @@ private struct TrashItemRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+}
+
+private struct UndoEntryRow: View {
+    @Environment(StorageModel.self) private var storage
+    let entry: UndoEntry
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.op)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Halo.textPrimary)
+                    
+                    Text("\(entry.date.formatted(date: .abbreviated, time: .shortened)) · \(entry.items.count) items · \(ByteFormat.string(UInt64(entry.bytesFreed)))")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Halo.textDim)
+                }
+                
+                Spacer()
+                
+                Button("Restore") {
+                    storage.restore(entry: entry)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Halo.interactive)
+                .controlSize(.small)
+                .disabled(storage.isCleaning)
+                
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Halo.textDim)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 16, height: 16)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(16)
+            .background(Halo.surface1)
+            
+            if isExpanded {
+                Divider().background(Halo.border)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(entry.items.prefix(10), id: \.originalPath) { item in
+                        Text(URL(fileURLWithPath: item.originalPath).lastPathComponent)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    if entry.items.count > 10 {
+                        Text("... and \(entry.items.count - 10) more")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Halo.textDim.opacity(0.6))
+                    }
+                }
+                .padding(16)
+                .background(Halo.surface2)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Halo.border, lineWidth: 1)
+        )
     }
 }
