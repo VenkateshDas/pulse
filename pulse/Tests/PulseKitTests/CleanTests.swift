@@ -93,7 +93,8 @@ struct CleanSchedulerTests {
         let dir = root.appendingPathComponent("appsupport")
         let home = try makeFakeHome(in: root)
 
-        let scheduler = CleanScheduler(directory: dir, home: home)
+        let journal = UndoJournal(storeURL: root.appendingPathComponent("undo.json"))
+        let scheduler = CleanScheduler(directory: dir, home: home, journal: journal)
         let record = await scheduler.runNow(autoMode: false)
 
         #expect(record.itemsCleaned == 1)
@@ -109,13 +110,32 @@ struct CleanSchedulerTests {
         #expect(schedule.nextRun > .now)
     }
 
+    @Test func runNowRecordsUndoEntry() async throws {
+        let root = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dir = root.appendingPathComponent("appsupport")
+        let home = try makeFakeHome(in: root)
+
+        let journal = UndoJournal(storeURL: root.appendingPathComponent("undo.json"))
+        let scheduler = CleanScheduler(directory: dir, home: home, journal: journal)
+        let record = await scheduler.runNow(autoMode: false)
+        #expect(record.itemsCleaned == 1)
+
+        // Smart Clean must be reversible: the trashed item is journaled.
+        let entries = await journal.entries
+        #expect(entries.count == 1)
+        #expect(entries.first?.items.count == 1)
+        #expect(entries.first?.op == "Smart Clean")
+    }
+
     @Test func scheduleIfNeededRespectsAutoCleanFlag() async throws {
         let root = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: root) }
         let dir = root.appendingPathComponent("appsupport")
         let home = try makeFakeHome(in: root)
 
-        let scheduler = CleanScheduler(directory: dir, home: home)
+        let journal = UndoJournal(storeURL: root.appendingPathComponent("undo.json"))
+        let scheduler = CleanScheduler(directory: dir, home: home, journal: journal)
         var schedule = await scheduler.currentSchedule()
 
         // Due but auto-clean off → no run.
