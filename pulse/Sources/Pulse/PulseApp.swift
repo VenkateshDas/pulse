@@ -4,6 +4,7 @@ import UserNotifications
 
 @main
 struct PulseApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = DashboardModel()
     @State private var storageModel = StorageModel()
     @State private var cleanModel = CleanModel()
@@ -14,12 +15,10 @@ struct PulseApp: App {
     @State private var optimizeModel = OptimizeModel()
     @State private var insightsModel = InsightsModel()
 
-    init() {
-        // Regular policy: dock icon + Cmd+Tab switcher presence.
-        // The app still lives primarily in the menu bar — the main window
-        // is the command centre and can be hidden/shown from there.
-        NSApplication.shared.setActivationPolicy(.regular)
-    }
+    // Activation policy is no longer pinned to `.regular` here. Pulse is a
+    // menu-bar app: `AppActivation` promotes it to `.regular` (Dock + Cmd-Tab)
+    // only while the Command Center window is open, and demotes it back to
+    // `.accessory` (menu-bar only) when closed. See AppActivation.swift.
 
     var body: some Scene {
         Window("Pulse — Command Center", id: "dashboard") {
@@ -38,9 +37,15 @@ struct PulseApp: App {
                     cleanModel.start()
                     model.viewAppeared()
                     Self.scheduleWeeklyReport()
-                    NSApp.activate(ignoringOtherApps: true)
+                    // Promote to a Dock-visible, focusable app while open and
+                    // bring the window forward (also activates from .accessory).
+                    AppActivation.shared.windowDidAppear()
                 }
-                .onDisappear { model.viewDisappeared() }
+                .onDisappear {
+                    model.viewDisappeared()
+                    // Window closed — return Pulse to the menu bar (no Dock).
+                    AppActivation.shared.windowDidDisappear()
+                }
         }
         .defaultSize(width: 1220, height: 840)
         .windowResizability(.contentMinSize)
