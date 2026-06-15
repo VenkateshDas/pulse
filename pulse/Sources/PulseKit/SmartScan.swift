@@ -132,71 +132,8 @@ public struct SmartScanner: Sendable {
         )
     }
 
-    // MARK: - Known Library locations
-
-    /// (relative path, category, grade, consequence). Expanded entries get
-    /// per-app subfolder rows instead of one opaque blob.
-    private static let knownTargets:
-        [(rel: String, category: String, grade: SafetyGrade, detail: String, expand: Bool)] = [
-            (
-                "Library/Caches", "App caches", .safe,
-                "regenerated automatically on next launch", true
-            ),
-            (
-                "Library/Logs", "App logs", .safe,
-                "only useful for active debugging", true
-            ),
-            (
-                "Library/Developer/Xcode/DerivedData", "Developer junk", .safe,
-                "next build is a clean build — no source touched", false
-            ),
-            (
-                "Library/Developer/Xcode/Archives", "Developer junk", .careful,
-                "needed only to re-symbolicate or re-submit past builds", false
-            ),
-            (
-                ".npm", "Developer junk", .safe,
-                "package download cache — refilled on next npm install", false
-            ),
-            (
-                ".cache", "Developer junk", .safe,
-                "pip wheels and CLI tool caches — regenerated on next install", false
-            ),
-            (
-                "Library/Application Support/MobileSync/Backup", "iOS backups", .review,
-                "full device backups — delete only with a current backup elsewhere", false
-            ),
-            (
-                ".Trash", "Trash", .safe,
-                "already deleted — cleaning via Pulse keeps 7-day restore", false
-            ),
-        ]
-
-    /// Heavier developer locations, included only in Developer Junk Mode.
-    private static let developerTargets:
-        [(rel: String, category: String, grade: SafetyGrade, detail: String, expand: Bool)] = [
-            (
-                "Library/Caches/Homebrew", "Developer junk", .safe,
-                "Homebrew download cache — refilled on next brew install", false
-            ),
-            (
-                "Library/Developer/CoreSimulator/Caches", "Developer junk", .safe,
-                "Xcode simulator caches — rebuilt by Xcode automatically", false
-            ),
-            (
-                "Library/Developer/CoreSimulator/Devices", "Developer junk", .careful,
-                "simulator devices and their data — recreate from Xcode if removed", false
-            ),
-            (
-                "Library/Containers/com.docker.docker/Data/vms", "Developer junk", .review,
-                "Docker VM disk — deleting loses all containers, images, and volumes", false
-            ),
-        ]
-
-    private var effectiveTargets:
-        [(rel: String, category: String, grade: SafetyGrade, detail: String, expand: Bool)]
-    {
-        developerMode ? Self.knownTargets + Self.developerTargets : Self.knownTargets
+    private var effectiveTargets: [CleanTarget] {
+        developerMode ? CleanCatalog.knownTargets + CleanCatalog.developerTargets : CleanCatalog.knownTargets
     }
 
     private func scanKnownLocations() -> [CleanItem] {

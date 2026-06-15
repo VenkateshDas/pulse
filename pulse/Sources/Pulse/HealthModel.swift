@@ -11,6 +11,7 @@ final class HealthModel {
     private(set) var battery: BatteryHealth?
     /// True once a sample came back nil — a desktop Mac, not "still loading".
     private(set) var batteryUnavailable = false
+    private(set) var bluetoothDevices: [BluetoothDevice] = []
     private(set) var startupItems: [StartupItem] = []
     private(set) var benchmarkRunning = false
     private(set) var latestBenchmark: BenchmarkResult?
@@ -24,6 +25,7 @@ final class HealthModel {
     static let interval: Duration = .seconds(5)
 
     private let sampler = HealthSampler()
+    private let btSampler = BluetoothSampler()
     private let benchmark = Benchmark()
     @ObservationIgnored private let benchmarkStore = BenchmarkStore()
     private var loop: Task<Void, Never>?
@@ -91,6 +93,8 @@ final class HealthModel {
         let sampled = await sampler.sampleBattery()
         battery = sampled
         batteryUnavailable = sampled == nil
+        
+        bluetoothDevices = await btSampler.sample(now: .now)
     }
 
     // MARK: - Startup items
