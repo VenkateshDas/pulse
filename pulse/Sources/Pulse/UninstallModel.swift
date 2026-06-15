@@ -209,14 +209,24 @@ final class UninstallModel {
             var failedItems: [PendingItem] = []
             var trashedBytes: UInt64 = 0
 
+            var trashedJournalItems: [TrashedItem] = []
+
             for item in leftovers {
                 do {
-                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: &trashedURL)
                     trashedLeftovers.append(PendingItem(path: item.path, label: item.label, sizeBytes: item.sizeBytes))
                     trashedBytes += item.sizeBytes
+                    if let trashPath = trashedURL?.path {
+                        trashedJournalItems.append(TrashedItem(originalPath: item.path, trashPath: trashPath))
+                    }
                 } catch {
                     failedItems.append(PendingItem(path: item.path, label: item.label, sizeBytes: item.sizeBytes))
                 }
+            }
+            
+            if !trashedJournalItems.isEmpty {
+                await UndoJournal.shared.record(UndoEntry(op: "Uninstall Leftovers (\(appName))", items: trashedJournalItems, bytesFreed: Int64(trashedBytes)))
             }
 
             let receipt = UninstallResult(
@@ -248,7 +258,12 @@ final class UninstallModel {
     }
 
     nonisolated static func moveAppToTrash(_ url: URL) -> Bool {
-        if (try? FileManager.default.trashItem(at: url, resultingItemURL: nil)) != nil {
+        var trashedURL: NSURL?
+        if (try? FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)) != nil {
+            if let trashPath = trashedURL?.path {
+                let tItem = TrashedItem(originalPath: url.path, trashPath: trashPath)
+                Task { await UndoJournal.shared.record(UndoEntry(op: "Uninstall App", items: [tItem], bytesFreed: 0)) }
+            }
             return true
         }
         let escaped = url.path
@@ -323,9 +338,14 @@ final class UninstallModel {
                 // need root to bootout and are left to unload on reboot.
                 await Self.bootoutUserAgentIfNeeded(path: item.path)
                 do {
-                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: nil)
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: &trashedURL)
                     trashedPaths.insert(item.id)
                     trashedBytes += item.sizeBytes
+                    if let trashPath = trashedURL?.path {
+                        let tItem = TrashedItem(originalPath: item.path, trashPath: trashPath)
+                        await UndoJournal.shared.record(UndoEntry(op: "Remove Orphan", items: [tItem], bytesFreed: Int64(item.sizeBytes)))
+                    }
                 } catch {
                 }
             }

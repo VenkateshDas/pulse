@@ -199,7 +199,12 @@ final class StorageModel {
             let report = await Task.detached(priority: .userInitiated) {
                 var rep: String
                 do {
-                    try FileManager.default.trashItem(at: URL(fileURLWithPath: nodePath), resultingItemURL: nil)
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: nodePath), resultingItemURL: &trashedURL)
+                    if let trashPath = trashedURL?.path {
+                        let item = TrashedItem(originalPath: nodePath, trashPath: trashPath)
+                        await UndoJournal.shared.record(UndoEntry(op: "Storage Map Clean", items: [item], bytesFreed: Int64(nodeSizeBytes)))
+                    }
                     rep = "\(ByteFormat.string(nodeSizeBytes)) moved to Trash"
                 } catch {
                     rep = "Failed to move \(nodeName) to Trash"
@@ -227,14 +232,22 @@ final class StorageModel {
                 var rep: String
                 var trashedBytes: UInt64 = 0
                 var count = 0
+                var trashedItems: [TrashedItem] = []
                 for (path, size) in zip(itemPaths, itemSizes) {
                     do {
-                        try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+                        var trashedURL: NSURL?
+                        try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: &trashedURL)
+                        if let trashPath = trashedURL?.path {
+                            trashedItems.append(TrashedItem(originalPath: path, trashPath: trashPath))
+                        }
                         trashedBytes += size
                         count += 1
                     } catch {
                         // ignore
                     }
+                }
+                if !trashedItems.isEmpty {
+                    await UndoJournal.shared.record(UndoEntry(op: "Reclaim Clean", items: trashedItems, bytesFreed: Int64(trashedBytes)))
                 }
                 if count > 0 {
                     rep = "Moved \(count) items (\(ByteFormat.string(trashedBytes))) to Trash"

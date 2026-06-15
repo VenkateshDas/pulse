@@ -212,8 +212,18 @@ public enum OptimizeEngine {
             return OptimizeResult(success: false, summary: "Couldn't read \(label)")
         }
         var moved = 0
+        var trashedItems: [TrashedItem] = []
         for entry in entries {
-            if (try? fm.trashItem(at: entry, resultingItemURL: nil)) != nil { moved += 1 }
+            var trashedURL: NSURL?
+            if (try? fm.trashItem(at: entry, resultingItemURL: &trashedURL)) != nil {
+                moved += 1
+                if let trashPath = trashedURL?.path {
+                    trashedItems.append(TrashedItem(originalPath: entry.path, trashPath: trashPath))
+                }
+            }
+        }
+        if !trashedItems.isEmpty {
+            await UndoJournal.shared.record(UndoEntry(op: "Optimize (\(label))", items: trashedItems, bytesFreed: bytes))
         }
         let ok = moved > 0 || entries.isEmpty
         return OptimizeResult(
