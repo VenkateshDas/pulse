@@ -32,6 +32,9 @@ struct HealthScoreRing: View {
     let score: HealthScore
     var diameter: CGFloat = 96
     var lineWidth: CGFloat = 9
+    /// When false, the ring is drawn empty (no score/band text inside) — used
+    /// by the compact menu-bar popover.
+    var showsLabel: Bool = true
 
     var body: some View {
         ZStack {
@@ -43,15 +46,17 @@ struct HealthScoreRing: View {
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.easeOut(duration: 0.4), value: score.value)
-            VStack(spacing: 0) {
-                Text("\(score.value)")
-                    .font(.system(size: diameter * 0.32, weight: .bold, design: .rounded))
-                    .foregroundStyle(Halo.textPrimary)
-                    .contentTransition(.numericText())
-                Text(score.band.rawValue.uppercased())
-                    .font(.system(size: diameter * 0.1, weight: .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(score.band.color)
+            if showsLabel {
+                VStack(spacing: 0) {
+                    Text("\(score.value)")
+                        .font(.system(size: diameter * 0.32, weight: .bold, design: .rounded))
+                        .foregroundStyle(Halo.textPrimary)
+                        .contentTransition(.numericText())
+                    Text(score.band.rawValue.uppercased())
+                        .font(.system(size: diameter * 0.1, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(score.band.color)
+                }
             }
         }
         .frame(width: diameter, height: diameter)

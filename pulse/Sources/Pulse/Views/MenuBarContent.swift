@@ -11,9 +11,6 @@ struct MenuBarContent: View {
     @Environment(StorageModel.self) private var storage
     @Environment(\.openWindow) private var openWindow
 
-    /// Mirrors the persisted Dock-icon preference so the toggle reflects state.
-    @State private var showDockIcon = AppActivation.shared.showDockIcon
-
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
     private static let sparkSamples = 15
 
@@ -30,6 +27,10 @@ struct MenuBarContent: View {
                     fraction: snapshot.memoryUsedFraction,
                     spark: model.memoryHistory)
                 diskRow(snapshot)
+                thermalRow(snapshot)
+                if let battery = snapshot.battery {
+                    batteryRow(battery)
+                }
                 Divider().overlay(Halo.surface2)
                 topProcesses(snapshot)
             } else {
@@ -55,7 +56,7 @@ struct MenuBarContent: View {
 
     private var hud: some View {
         HStack(spacing: 10) {
-            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5)
+            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, showsLabel: false)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.diagnosis.line)
                     .font(.system(size: 12, weight: .semibold))
@@ -100,7 +101,7 @@ struct MenuBarContent: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
-                Text(ByteFormat.string(snapshot.diskFreeBytes))
+                Text("\(ByteFormat.string(snapshot.diskFreeBytes)) / \(ByteFormat.string(snapshot.diskTotalBytes))")
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.textPrimary)
             }
@@ -111,6 +112,58 @@ struct MenuBarContent: View {
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(weekly >= 0 ? Halo.amber : Halo.pulseGreen)
             }
+        }
+    }
+
+    /// Temperature + thermal-pressure state. Shows the SMC reading when this
+    /// Mac exposes one; otherwise falls back to the kernel thermal level word.
+    private func thermalRow(_ snapshot: SystemSnapshot) -> some View {
+        let temp = [snapshot.sensors.cpuTempC, snapshot.sensors.gpuTempC]
+            .compactMap { $0 }.max()
+        let value = temp.map { String(format: "%.0f°C · ", $0) } ?? ""
+        return infoRow(
+            "Thermal",
+            value + thermalText(snapshot.thermal),
+            color: thermalColor(snapshot.thermal))
+    }
+
+    private func batteryRow(_ battery: BatteryHealth) -> some View {
+        let state = battery.isCharging ? "Charging"
+            : (battery.isOnAC ? "On AC" : "On battery")
+        return infoRow(
+            "Battery",
+            "\(battery.currentChargePercent)% · \(state)",
+            color: Halo.textPrimary)
+    }
+
+    /// Compact label/value row (no bar/sparkline) for the secondary metrics.
+    private func infoRow(_ label: String, _ value: String, color: Color) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+            Spacer()
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(color)
+        }
+    }
+
+    private func thermalText(_ level: ThermalLevel) -> String {
+        switch level {
+        case .nominal: "Nominal"
+        case .fair: "Fair"
+        case .serious: "Serious"
+        case .critical: "Critical"
+        }
+    }
+
+    private func thermalColor(_ level: ThermalLevel) -> Color {
+        switch level {
+        case .nominal: Halo.pulseGreen
+        case .fair: Halo.ion
+        case .serious: Halo.amber
+        case .critical: Halo.flare
         }
     }
 
@@ -205,10 +258,6 @@ struct MenuBarContent: View {
                     .lineLimit(2)
             }
 
-            menuBarMetricChooser
-
-            dockToggle
-
             if Updater.shared.isAvailable {
                 Button("Check for Updates…") { Updater.shared.checkForUpdates() }
                     .buttonStyle(.plain)
@@ -226,51 +275,6 @@ struct MenuBarContent: View {
             .font(.system(size: 11))
             .foregroundStyle(Halo.textDim)
             .frame(maxWidth: .infinity)
-        }
-    }
-
-    /// Lets the user pick which metrics the menu-bar label shows.
-    private var menuBarMetricChooser: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("MENU BAR SHOWS")
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
-                .foregroundStyle(Halo.textDim)
-            HStack(spacing: 6) {
-                ForEach(MenuBarMetric.allCases) { metric in
-                    let on = model.menuBarMetrics.contains(metric)
-                    Button {
-                        if on { model.menuBarMetrics.remove(metric) }
-                        else { model.menuBarMetrics.insert(metric) }
-                    } label: {
-                        Image(systemName: metric.symbol)
-                            .font(.system(size: 11))
-                            .foregroundStyle(on ? Halo.void : Halo.textDim)
-                            .frame(width: 26, height: 22)
-                            .background(
-                                on ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2),
-                                in: RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .help(metric.label)
-                }
-            }
-        }
-    }
-
-    /// Pins a permanent Dock icon. Off (default) = pure menu-bar app: Pulse
-    /// shows a Dock icon only while the Command Center window is open.
-    private var dockToggle: some View {
-        Toggle(isOn: $showDockIcon) {
-            Text("Show Dock Icon")
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.textDim)
-        }
-        .toggleStyle(.switch)
-        .controlSize(.mini)
-        .tint(Halo.ion)
-        .onChange(of: showDockIcon) { _, newValue in
-            AppActivation.shared.showDockIcon = newValue
         }
     }
 

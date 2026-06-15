@@ -3,29 +3,24 @@ import SwiftUI
 /// HALO design tokens — Precision Instrument Aesthetic
 /// Dynamic Light/Dark mode support.
 enum Halo {
-    static let void = Color(nsColor: NSColor(name: "Canvas", dynamicProvider: { appearance in
-        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.08, alpha: 1.0) : NSColor(calibratedWhite: 0.96, alpha: 1.0)
-    }))
+    /// A light/dark grayscale token. Matching on `bestMatch` (not
+    /// `name == .darkAqua`) is what makes the menu-bar popover follow the
+    /// system: its window renders with a *vibrant* appearance
+    /// (`.vibrantDark`/`.vibrantLight`), which `== .darkAqua` never matched —
+    /// so every token fell through to its light value.
+    private static func dynamicWhite(light: CGFloat, dark: CGFloat, name: NSColor.Name) -> Color {
+        Color(nsColor: NSColor(name: name, dynamicProvider: { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(calibratedWhite: isDark ? dark : light, alpha: 1.0)
+        }))
+    }
 
-    static let surface1 = Color(nsColor: NSColor(name: "Surface1", dynamicProvider: { appearance in
-        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.12, alpha: 1.0) : NSColor(calibratedWhite: 1.0, alpha: 1.0)
-    }))
-
-    static let surface2 = Color(nsColor: NSColor(name: "Surface2", dynamicProvider: { appearance in
-        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.18, alpha: 1.0) : NSColor(calibratedWhite: 0.92, alpha: 1.0)
-    }))
-
-    static let border = Color(nsColor: NSColor(name: "Border", dynamicProvider: { appearance in
-        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.25, alpha: 1.0) : NSColor(calibratedWhite: 0.85, alpha: 1.0)
-    }))
-
-    static let textPrimary = Color(nsColor: NSColor(name: "TextPrimary", dynamicProvider: { appearance in
-        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.95, alpha: 1.0) : NSColor(calibratedWhite: 0.10, alpha: 1.0)
-    }))
-
-    static let textDim = Color(nsColor: NSColor(name: "TextDim", dynamicProvider: { appearance in
-        appearance.name == .darkAqua ? NSColor(calibratedWhite: 0.60, alpha: 1.0) : NSColor(calibratedWhite: 0.50, alpha: 1.0)
-    }))
+    static let void = dynamicWhite(light: 0.96, dark: 0.08, name: "Canvas")
+    static let surface1 = dynamicWhite(light: 1.0, dark: 0.12, name: "Surface1")
+    static let surface2 = dynamicWhite(light: 0.92, dark: 0.18, name: "Surface2")
+    static let border = dynamicWhite(light: 0.85, dark: 0.25, name: "Border")
+    static let textPrimary = dynamicWhite(light: 0.10, dark: 0.95, name: "TextPrimary")
+    static let textDim = dynamicWhite(light: 0.50, dark: 0.60, name: "TextDim")
 
     // Semantic Data Colors (Precision Instrument)
     static let nominal = Color(hex: 0x34C759)   // Apple Green
