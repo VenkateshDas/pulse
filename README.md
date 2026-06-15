@@ -46,10 +46,27 @@
 ### Download (recommended)
 
 1. [Download the latest `.dmg`](https://github.com/VenkateshDas/pulse/releases/latest)
-2. Open DMG → drag **Pulse** to Applications
-3. First launch: **right-click Pulse.app → Open**
+2. Open DMG → drag **Pulse** to Applications → **eject the DMG**
+3. First launch — the build is not notarized, so macOS blocks it. Two ways through:
 
-> If macOS still blocks it: `xattr -dr com.apple.quarantine /Applications/Pulse.app`
+   **Terminal (reliable on all versions, incl. macOS Sequoia 15):**
+   ```sh
+   xattr -cr /Applications/Pulse.app
+   open /Applications/Pulse.app
+   ```
+
+   **Or via System Settings:** double-click Pulse → click **Done** on the
+   "not opened" dialog → **System Settings → Privacy & Security** → scroll to
+   **Security** → **Open Anyway** → authenticate.
+
+> On **macOS Sequoia (15)** the old "right-click → Open" bypass was removed —
+> use one of the two methods above. Run `xattr` on the copy in `/Applications`
+> (not the one inside the mounted DMG), or it won't take.
+>
+> A **notarized** build (no warning at all) is published once Apple Developer
+> signing secrets are configured — see [CONTRIBUTING.md](CONTRIBUTING.md#releases-cd).
+> MDM-managed work laptops may require notarization and/or IT to allowlist
+> `com.pulse.app`.
 
 ### Build from source
 
