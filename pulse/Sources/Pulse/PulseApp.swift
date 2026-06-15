@@ -32,6 +32,7 @@ struct PulseApp: App {
                 .environment(timelineModel)
                 .environment(optimizeModel)
                 .environment(insightsModel)
+                .environment(Updater.shared)
                 .onAppear {
                     model.start()
                     cleanModel.start()
@@ -55,6 +56,7 @@ struct PulseApp: App {
                 .environment(model)
                 .environment(cleanModel)
                 .environment(storageModel)
+                .environment(Updater.shared)
         } label: {
             menuBarLabel
         }

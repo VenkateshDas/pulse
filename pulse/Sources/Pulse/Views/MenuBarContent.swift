@@ -9,6 +9,7 @@ struct MenuBarContent: View {
     @Environment(DashboardModel.self) private var model
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
+    @Environment(Updater.self) private var updater
     @Environment(\.openWindow) private var openWindow
 
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
@@ -45,6 +46,7 @@ struct MenuBarContent: View {
         .onAppear {
             model.viewAppeared()
             storage.refreshTrashInfo()
+            updater.checkForUpdates()  // throttled background check
         }
         .onDisappear { model.viewDisappeared() }
         .padding(14)
@@ -258,13 +260,7 @@ struct MenuBarContent: View {
                     .lineLimit(2)
             }
 
-            if Updater.shared.isAvailable {
-                Button("Check for Updates…") { Updater.shared.checkForUpdates() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.ion)
-                    .frame(maxWidth: .infinity)
-            }
+            updateRow
 
             Button("Quit Pulse") {
                 // The one true exit. Cmd-Q only closes the window (stays in the
@@ -275,6 +271,42 @@ struct MenuBarContent: View {
             .font(.system(size: 11))
             .foregroundStyle(Halo.textDim)
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// Update nudge / "Check for Updates…" control. Shows a prominent download
+    /// button when a newer GitHub release exists, otherwise a quiet check link.
+    @ViewBuilder private var updateRow: some View {
+        switch updater.status {
+        case .available(let release):
+            Button {
+                updater.openLatestDownload()
+            } label: {
+                Label("Update available · v\(release.version)", systemImage: "arrow.down.circle.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .controlSize(.small)
+            .buttonStyle(.borderedProminent)
+            .tint(Halo.ion)
+        case .checking:
+            Text("Checking for updates…")
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+                .frame(maxWidth: .infinity)
+        default:
+            Button(updateLinkLabel) { updater.checkForUpdates(userInitiated: true) }
+                .buttonStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(updater.status == .failed ? Halo.amber : Halo.ion)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var updateLinkLabel: String {
+        switch updater.status {
+        case .upToDate: return "You're up to date · v\(updater.currentVersion)"
+        case .failed:   return "Update check failed — retry"
+        default:        return "Check for Updates…"
         }
     }
 
