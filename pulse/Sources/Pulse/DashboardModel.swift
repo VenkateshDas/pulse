@@ -67,6 +67,7 @@ final class DashboardModel {
     private(set) var loadHistory: [Double] = []
     private(set) var tempHistory: [Double] = []
     private(set) var gpuTempHistory: [Double] = []
+    private(set) var gpuUtilHistory: [Double] = []
     private(set) var networkInHistory: [Double] = []
     private(set) var networkOutHistory: [Double] = []
     private(set) var powerHistory: [Double] = []
@@ -109,6 +110,7 @@ final class DashboardModel {
     @ObservationIgnored private var loadBuffer: [Double] = []
     @ObservationIgnored private var tempBuffer: [Double] = []
     @ObservationIgnored private var gpuTempBuffer: [Double] = []
+    @ObservationIgnored private var gpuUtilBuffer: [Double] = []
     @ObservationIgnored private var networkInBuffer: [Double] = []
     @ObservationIgnored private var networkOutBuffer: [Double] = []
     @ObservationIgnored private var powerBuffer: [Double] = []
@@ -224,6 +226,9 @@ final class DashboardModel {
         if let gpuTemp = snapshot.sensors.gpuTempC {
             append(gpuTemp, to: &gpuTempBuffer)
         }
+        if let gpu = snapshot.gpuUsage {
+            append(gpu.deviceUtilization, to: &gpuUtilBuffer)
+        }
         append(Double(snapshot.networkBytesInPerSecond), to: &networkInBuffer)
         append(Double(snapshot.networkBytesOutPerSecond), to: &networkOutBuffer)
         if let watts = snapshot.sensors.systemWatts {
@@ -321,6 +326,7 @@ final class DashboardModel {
         loadHistory = loadBuffer
         tempHistory = tempBuffer
         gpuTempHistory = gpuTempBuffer
+        gpuUtilHistory = gpuUtilBuffer
         networkInHistory = networkInBuffer
         networkOutHistory = networkOutBuffer
         powerHistory = powerBuffer

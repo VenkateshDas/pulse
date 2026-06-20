@@ -4,6 +4,7 @@ import SwiftUI
 /// Top processes by CPU with proportional usage bars.
 struct TopProcessesPanel: View {
     let processes: [ProcessSample]
+    @State private var hoveredPID: Int32?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -33,13 +34,13 @@ struct TopProcessesPanel: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(cornerRadius: Halo.Radius.large)
     }
 
     private func row(_ process: ProcessSample, maxCPU: Double) -> some View {
-        HStack(spacing: 10) {
+        let isHover = hoveredPID == process.pid
+        return HStack(spacing: 10) {
             Text(process.name)
                 .font(.system(size: 12))
                 .foregroundStyle(Halo.textPrimary)
@@ -61,7 +62,7 @@ struct TopProcessesPanel: View {
 
             Text(String(format: "%5.1f%%", process.cpuPercent))
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(Halo.textDim)
+                .foregroundStyle(process.cpuPercent >= 80 ? Halo.amber : Halo.textDim)
                 .frame(width: 48, alignment: .trailing)
 
             Text(ByteFormat.string(process.residentBytes))
@@ -69,6 +70,10 @@ struct TopProcessesPanel: View {
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 64, alignment: .trailing)
         }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(isHover ? Halo.surface2.opacity(0.5) : .clear, in: RoundedRectangle(cornerRadius: Halo.Radius.small))
+        .onHover { hoveredPID = $0 ? process.pid : nil }
     }
 
     private func barGradient(_ cpuPercent: Double) -> LinearGradient {

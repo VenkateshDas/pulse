@@ -67,7 +67,7 @@ struct CleanFooter: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var footerNote: String {

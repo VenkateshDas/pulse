@@ -16,13 +16,13 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .dashboard: "circle.circle"
-        case .storage: "internaldrive"
+        case .dashboard: "heart.fill"
+        case .storage: "internaldrive.fill"
         case .timeline: "chart.xyaxis.line"
-        case .uninstall: "trash.slash"
+        case .uninstall: "trash.slash.fill"
         case .monitor: "waveform.path.ecg"
-        case .health: "heart"
-        case .diagnostics: "stethoscope"
+        case .health: "stethoscope"
+        case .diagnostics: "wrench.and.screwdriver.fill"
         }
     }
 
@@ -35,28 +35,55 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     }
 }
 
+enum SidebarSection: String, CaseIterable {
+    case overview = "OVERVIEW"
+    case insights = "INSIGHTS"
+    case system = "SYSTEM"
+    case tools = "TOOLS"
+
+    var items: [SidebarItem] {
+        switch self {
+        case .overview: [.dashboard]
+        case .insights: [.storage, .timeline]
+        case .system: [.monitor, .health]
+        case .tools: [.uninstall, .diagnostics]
+        }
+    }
+}
+
 struct SidebarView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(StorageModel.self) private var storage
     @Binding var selection: SidebarItem
+    @State private var hoveredItem: SidebarItem?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             logo
-                .padding(.bottom, 24)
+                .padding(.bottom, Halo.Space.xxl)
 
-            ForEach(SidebarItem.allCases) { item in
-                row(item)
+            ForEach(SidebarSection.allCases, id: \.self) { section in
+                Text(section.rawValue)
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(Halo.textDim.opacity(0.6))
+                    .padding(.leading, 10)
+                    .padding(.top, section == .overview ? 0 : Halo.Space.lg)
+                    .padding(.bottom, Halo.Space.xs)
+                ForEach(section.items) { item in
+                    row(item)
+                }
             }
 
             Spacer()
+            Divider().overlay(Halo.borderSubtle).padding(.bottom, Halo.Space.sm)
             footer
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(width: 216)
         .background(Halo.void)
         .overlay(alignment: .trailing) {
-            Rectangle().fill(Halo.border).frame(width: 1)
+            Rectangle().fill(Halo.borderSubtle).frame(width: 1)
         }
     }
 
@@ -67,10 +94,10 @@ struct SidebarView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 34, height: 34)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Halo.interactive)
                         .frame(width: 34, height: 34)
                     Image(systemName: "waveform.path.ecg")
@@ -78,43 +105,48 @@ struct SidebarView: View {
                         .foregroundStyle(.white)
                 }
             }
-            Text("PULSE")
-                .font(.system(size: 17, weight: .bold, design: .monospaced))
-                .tracking(4)
-                .foregroundStyle(Halo.textPrimary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("PULSE")
+                    .font(.system(size: 17, weight: .bold, design: .monospaced))
+                    .tracking(4)
+                    .foregroundStyle(Halo.textPrimary)
+                Text("Command Center")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+            }
         }
     }
 
     private func row(_ item: SidebarItem) -> some View {
-        Button {
-            if item.isAvailable { selection = item }
+        let isSelected = selection == item
+        let isHover = hoveredItem == item && !isSelected
+        return Button {
+            if item.isAvailable {
+                withAnimation(Halo.Motion.snappy) { selection = item }
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: item.symbol)
                     .font(.system(size: 13))
                     .frame(width: 18)
                 Text(item.rawValue)
-                    .font(.system(size: 13, weight: selection == item ? .semibold : .regular))
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
                 Spacer()
                 badge(item)
             }
             .foregroundStyle(rowColor(item))
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.vertical, Halo.Space.sm)
             .background(
-                selection == item ? Halo.surface2 : .clear,
-                in: RoundedRectangle(cornerRadius: 6)
+                isSelected
+                    ? Halo.interactive.opacity(0.10)
+                    : (isHover ? Halo.surface2.opacity(0.6) : .clear),
+                in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
             )
-            .overlay(alignment: .leading) {
-                if selection == item {
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(Halo.ion)
-                        .frame(width: 2, height: 18)
-                }
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hovering in hoveredItem = hovering ? item : nil }
     }
 
     @ViewBuilder
@@ -134,16 +166,17 @@ struct SidebarView: View {
     }
 
     private func rowColor(_ item: SidebarItem) -> Color {
-        if selection == item { return Halo.textPrimary }
+        if selection == item { return Halo.interactive }
         return item.isAvailable ? Halo.textPrimary.opacity(0.8) : Halo.textDim.opacity(0.6)
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Halo.Space.xs) {
             HStack(spacing: 6) {
                 Circle()
                     .fill(statusColor)
-                    .frame(width: 6, height: 6)
+                    .frame(width: 7, height: 7)
+                    .shadow(color: statusColor.opacity(0.5), radius: 4)
                 Text(statusText)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(statusColor)

@@ -28,9 +28,8 @@ struct CoreHeatmap: View {
                 }
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(cornerRadius: Halo.Radius.large)
     }
 
     private func color(for usage: Double) -> Color {

@@ -23,7 +23,7 @@ struct DevModeView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear {
             Task { await model.sample() }
             timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
@@ -39,7 +39,7 @@ struct DevModeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Dev Mode")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text("Raw diagnostic console: full SMC sensor reads, sysctl properties, and per-process file descriptors.")
                 .font(.system(size: 12))
@@ -80,7 +80,7 @@ struct DevModeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var sysctlCard: some View {
@@ -119,7 +119,7 @@ struct DevModeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var processFDCard: some View {
@@ -175,6 +175,6 @@ struct DevModeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 }

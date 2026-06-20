@@ -52,7 +52,7 @@ struct TimelineView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.recordToday(scan: storage.scan) }
     }
 
@@ -61,7 +61,7 @@ struct TimelineView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Timeline")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text("Your Mac's daily health record — disk growth, battery sessions, and notable events.")
                 .font(.system(size: 12))
@@ -95,13 +95,13 @@ struct TimelineView: View {
                 }
                 .padding(.vertical, 8)
                 if anomaly.id != items.last?.id {
-                    Rectangle().fill(Halo.border).frame(height: 1)
+                    Rectangle().fill(Halo.borderSubtle).frame(height: 1)
                 }
             }
         }
         .padding(.horizontal, 14)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .premiumCard(padding: 0)
+        
     }
 
     // MARK: - Data join
@@ -186,7 +186,7 @@ struct TimelineView: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private func summaryCell(label: String, value: String, color: Color) -> some View {
@@ -273,7 +273,7 @@ struct TimelineView: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(Halo.ion.opacity(0.2), lineWidth: 1)
@@ -333,7 +333,7 @@ struct TimelineView: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private func pastDayRow(_ entry: DayEntry, maxDelta: Int64) -> some View {
@@ -450,7 +450,7 @@ struct TimelineView: View {
             .frame(height: 90)
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     // MARK: - Category breakdown
@@ -484,7 +484,7 @@ struct TimelineView: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     // MARK: - Helpers

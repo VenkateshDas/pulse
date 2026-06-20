@@ -30,14 +30,14 @@ struct UninstallView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Uninstall")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text(
                 "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app goes to the Trash and every leftover is staged in the Vault — nothing is ever destroyed."
@@ -105,7 +105,7 @@ struct DropZoneCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .strokeBorder(
@@ -181,7 +181,7 @@ struct InstalledAppsCard: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private func appRow(_ app: InstalledApp) -> some View {
@@ -260,7 +260,7 @@ struct UninstallPlanCard: View {
                 uninstallButton(plan)
             }
             .padding(16)
-            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+            .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
         }
     }
 
@@ -455,7 +455,7 @@ struct UninstallResultCard: View {
                 actions(result)
             }
             .padding(16)
-            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+            .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(Halo.pulseGreen.opacity(0.35), lineWidth: 1))
@@ -761,7 +761,7 @@ struct OrphanScanCard: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private func orphanRow(_ item: CleanItem) -> some View {

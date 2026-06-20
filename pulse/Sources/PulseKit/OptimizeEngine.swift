@@ -177,6 +177,31 @@ public enum OptimizeEngine {
             run: { await PrivilegedRunner.run(.rebuildSpotlightIndex) }),
     ]
 
+    /// Runs all safe (no-sudo) tasks sequentially, skipping any that report
+    /// nothing to do. Returns a human-readable summary.
+    public static func runSafeTasks() async -> String {
+        var completed: [String] = []
+        var totalFreed: Int64 = 0
+        for task in inProcessTasks {
+            if let skip = await task.skipCheck() {
+                completed.append("\(task.label): \(skip)")
+                continue
+            }
+            do {
+                let result = try await task.run()
+                totalFreed += result.bytesFreed
+                completed.append(result.summary)
+            } catch {
+                completed.append("\(task.label): failed")
+            }
+        }
+        if totalFreed > 0 {
+            return "Optimized · freed \(ByteFormat.string(UInt64(totalFreed)))"
+        }
+        let doneCount = completed.filter { !$0.contains("failed") && !$0.contains("Nothing") }.count
+        return doneCount > 0 ? "Optimized \(doneCount) items" : "Already optimized"
+    }
+
     // MARK: Helpers
 
     static var savedStateDir: URL {

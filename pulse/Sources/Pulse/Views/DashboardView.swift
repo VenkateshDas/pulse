@@ -11,28 +11,26 @@ struct DashboardView: View {
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
     var body: some View {
-        // No ScrollView: the layout is designed to fit the window's minimum
-        // size, and the bottom row stretches to absorb extra height.
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Halo.Space.lg) {
             hero
             vitals
             AlertsSection()
-            HStack(alignment: .top, spacing: 16) {
-                VStack(spacing: 16) {
+            HStack(alignment: .top, spacing: Halo.Space.lg) {
+                VStack(spacing: Halo.Space.lg) {
                     chartsPanel
                     CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
                 }
                 .frame(maxHeight: .infinity)
-                
+
                 TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
                     .frame(width: 400)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
     }
 
     // MARK: Hero (greeting + diagnosis verdict + health score)
@@ -48,7 +46,7 @@ struct DashboardView: View {
     private var greeting: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(timeGreeting), \(firstName)")
-                .font(.system(size: 24, weight: .bold, design: .default))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundStyle(Halo.textPrimary)
             DiagnosisBadge(
                 diagnosis: model.diagnosis,
@@ -97,7 +95,7 @@ struct DashboardView: View {
     // MARK: Vitals
 
     private var vitals: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Halo.Space.md) {
             cpuCard
             memoryCard
             diskCard
@@ -132,11 +130,18 @@ struct DashboardView: View {
                     color: busy == cores.count ? Halo.amber : nil))
         }
 
+        let gpuStr: String
+        if let gpu = snapshot?.gpuUsage {
+            gpuStr = String(format: " · GPU %1.0f%%", gpu.deviceUtilization)
+        } else {
+            gpuStr = ""
+        }
+
         return VitalCard(
             title: "CPU",
             fraction: total / 100,
             value: String(format: "%2d%%", Int(total)),
-            line1: split,
+            line1: split + gpuStr,
             line2: String(format: "load %5.2f", snapshot?.loadAverage1m ?? 0),
             history: model.cpuHistory,
             cardTooltip: cpuTooltip,
@@ -368,13 +373,8 @@ struct DashboardView: View {
 
             cpuDayChartRow
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Halo.border, lineWidth: 1)
-        )
+        .premiumCard()
     }
     
     /// 24-hour CPU history — gap-honest (nil minutes render as gaps, never
