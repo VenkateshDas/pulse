@@ -1,4 +1,6 @@
 import Foundation
+import IOBluetooth
+import IOKit
 
 public struct BluetoothDevice: Sendable, Equatable, Identifiable {
     public var id: String { name }
@@ -6,9 +8,6 @@ public struct BluetoothDevice: Sendable, Equatable, Identifiable {
     public let batteryPercent: Int?
 }
 
-/// Polls connected Bluetooth devices for battery percentages.
-/// Relies on `system_profiler SPBluetoothDataType` which can be slow,
-/// so it caches results and only runs in a background task.
 public actor BluetoothSampler {
     private var lastScan: Date = .distantPast
     private var cachedDevices: [BluetoothDevice] = []
@@ -23,12 +22,8 @@ public actor BluetoothSampler {
         isScanning = true
         defer { isScanning = false }
 
-        // Run in detached task so it never blocks an actor executor
         let devices = await Task.detached(priority: .utility) {
-            guard let out = try? await Shell.run("/usr/sbin/system_profiler", ["SPBluetoothDataType"]) else {
-                return [BluetoothDevice]()
-            }
-            return Self.parse(out.stdout)
+            return Self.getConnectedDevices()
         }.value
 
         self.cachedDevices = devices
@@ -36,48 +31,39 @@ public actor BluetoothSampler {
         return devices
     }
 
-    static func parse(_ output: String) -> [BluetoothDevice] {
+    private static func getConnectedDevices() -> [BluetoothDevice] {
         var devices: [BluetoothDevice] = []
-        let lines = output.split(separator: "\n")
         
-        var currentDevice: String?
-        var isConnectedSection = false
-        var currentBattery: Int?
-
-        for rawLine in lines {
-            let line = String(rawLine)
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed == "Connected:" {
-                isConnectedSection = true
-                continue
-            }
-            if trimmed == "Not Connected:" {
-                isConnectedSection = false
-                continue
-            }
-            guard isConnectedSection else { continue }
+        guard let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
+            return []
+        }
+        
+        for device in paired where device.isConnected() {
+            let name = device.name ?? "Unknown Device"
+            var batteryStr: Int? = nil
             
-            let indentCount = line.prefix(while: { $0 == " " }).count
-            if indentCount == 10 {
-                // New device block
-                if let name = currentDevice {
-                    devices.append(BluetoothDevice(name: name, batteryPercent: currentBattery))
-                }
-                currentDevice = String(trimmed.dropLast(1)) // Remove trailing colon
-                currentBattery = nil
-            } else if indentCount > 10 {
-                // Device property
-                if trimmed.contains("Battery Level:") {
-                    if let percentStr = trimmed.split(separator: ":").last?.trimmingCharacters(in: .whitespaces),
-                       let percent = Int(percentStr.dropLast().trimmingCharacters(in: .whitespaces)) {
-                        currentBattery = percent
+            // Attempt to read from IORegistry for battery
+            var iterator: io_iterator_t = 0
+            let matchingDict = IOServiceMatching("AppleDeviceManagementHIDEventService")
+            if IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator) == KERN_SUCCESS {
+                var service = IOIteratorNext(iterator)
+                while service != 0 {
+                    if let p = IORegistryEntryCreateCFProperty(service, "BatteryPercent" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? Int {
+                        if let n = IORegistryEntryCreateCFProperty(service, "Product" as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String, n == name {
+                            batteryStr = p
+                            IOObjectRelease(service)
+                            break
+                        }
                     }
+                    IOObjectRelease(service)
+                    service = IOIteratorNext(iterator)
                 }
+                IOObjectRelease(iterator)
             }
+            
+            devices.append(BluetoothDevice(name: name, batteryPercent: batteryStr))
         }
-        if let name = currentDevice {
-            devices.append(BluetoothDevice(name: name, batteryPercent: currentBattery))
-        }
+        
         return devices
     }
 }
