@@ -82,6 +82,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSDesktopFolderUsageDescription</key><string>Pulse scans your Desktop to map large files and find safe-to-clean space.</string>
     <key>NSDocumentsFolderUsageDescription</key><string>Pulse scans Documents to map large files and find safe-to-clean space.</string>
     <key>NSDownloadsFolderUsageDescription</key><string>Pulse scans Downloads to map large files and find safe-to-clean space.</string>
+    <!-- Bluetooth: battery levels for connected peripherals in the Health tab. -->
+    <key>NSBluetoothAlwaysUsageDescription</key><string>Pulse reads battery levels from your connected Bluetooth peripherals (keyboard, mouse, headphones) to display them in the Health tab.</string>
     <!-- Uninstaller: ask Finder to move protected (App Store / App-Management)
          bundles to the Trash via Apple Events. -->
     <key>NSAppleEventsUsageDescription</key><string>Pulse asks Finder to move an app you’re uninstalling to the Trash.</string>

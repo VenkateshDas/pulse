@@ -32,8 +32,14 @@ public actor BluetoothSampler {
     }
 
     private static func getConnectedDevices() -> [BluetoothDevice] {
+        // macOS 26+ crashes without NSBluetoothAlwaysUsageDescription in Info.plist.
+        // SwiftPM debug builds have no plist, so check the key exists before calling.
+        if Bundle.main.object(forInfoDictionaryKey: "NSBluetoothAlwaysUsageDescription") == nil {
+            return []
+        }
+
         var devices: [BluetoothDevice] = []
-        
+
         guard let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else {
             return []
         }
