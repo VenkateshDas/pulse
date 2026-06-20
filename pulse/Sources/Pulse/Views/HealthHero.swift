@@ -41,14 +41,14 @@ struct HealthScoreRing: View {
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Halo.surface2, lineWidth: lineWidth)
+                .stroke(Halo.surface2, lineWidth: lineWidth - 1)
             Circle()
                 .trim(from: 0, to: CGFloat(score.value) / 100)
                 .stroke(score.band.color,
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(Halo.Motion.ring, value: score.value)
-                .shadow(color: score.band.color.opacity(0.3), radius: 8)
+                .shadow(color: score.band.color.opacity(0.4), radius: 12)
             label
         }
         .frame(width: diameter, height: diameter)
@@ -61,18 +61,18 @@ struct HealthScoreRing: View {
             EmptyView()
         case .scoreOnly:
             Text("\(score.value)")
-                .font(.system(size: diameter * 0.36, weight: .bold, design: .rounded))
+                .font(.system(size: diameter * 0.42, weight: .bold, design: .rounded))
                 .foregroundStyle(Halo.textPrimary)
                 .contentTransition(.numericText())
         case .full:
             VStack(spacing: 0) {
                 Text("\(score.value)")
-                    .font(.system(size: diameter * 0.32, weight: .bold, design: .rounded))
+                    .font(.system(size: diameter * 0.38, weight: .bold, design: .rounded))
                     .foregroundStyle(Halo.textPrimary)
                     .contentTransition(.numericText())
                 Text(score.band.rawValue.uppercased())
-                    .font(.system(size: diameter * 0.1, weight: .semibold))
-                    .tracking(1.5)
+                    .font(.system(size: diameter * 0.1, weight: .bold))
+                    .tracking(2)
                     .foregroundStyle(score.band.color)
             }
         }
@@ -93,11 +93,12 @@ struct DiagnosisBadge: View {
         HStack(spacing: 8) {
             ZStack {
                 Circle()
-                    .fill(diagnosis.severity.color.opacity(0.2))
-                    .frame(width: 16, height: 16)
+                    .fill(diagnosis.severity.color.opacity(0.15))
+                    .frame(width: 18, height: 18)
                 Circle()
                     .fill(diagnosis.severity.color)
                     .frame(width: 8, height: 8)
+                    .shadow(color: diagnosis.severity.color.opacity(0.4), radius: 6)
             }
             Text(diagnosis.line)
                 .font(.system(size: 13, weight: .semibold))

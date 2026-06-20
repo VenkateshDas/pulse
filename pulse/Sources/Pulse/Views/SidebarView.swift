@@ -87,33 +87,21 @@ struct SidebarView: View {
         }
     }
 
+    @ViewBuilder
     private var logo: some View {
-        HStack(spacing: 10) {
-            if let image = Bundle.module.image(forResource: "Logo") ?? NSImage(named: "Logo") {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Halo.interactive)
-                        .frame(width: 34, height: 34)
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                Text("PULSE")
-                    .font(.system(size: 17, weight: .bold, design: .monospaced))
-                    .tracking(4)
-                    .foregroundStyle(Halo.textPrimary)
-                Text("Command Center")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-            }
+        if let image = Bundle.module.image(forResource: "Logo") ?? NSImage(named: "Logo") {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 160, height: 56, alignment: .center)
+                .clipped()
+                .padding(.leading, -8) // slight shift to align the dot nicely with the layout
+        } else {
+            // Fallback if logo not found
+            Text("PULSE")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .tracking(3)
+                .foregroundStyle(Halo.textPrimary)
         }
     }
 
@@ -175,8 +163,8 @@ struct SidebarView: View {
             HStack(spacing: 6) {
                 Circle()
                     .fill(statusColor)
-                    .frame(width: 7, height: 7)
-                    .shadow(color: statusColor.opacity(0.5), radius: 4)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: statusColor.opacity(0.5), radius: 6)
                 Text(statusText)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(statusColor)

@@ -33,6 +33,13 @@ enum Halo {
     static let critical = Color(hex: 0xFF453A)  // Apple Red
     static let interactive = Color(hex: 0x0A84FF) // System Blue
 
+    // MARK: - Brand Teal (landing page accent)
+    static let teal = Color(hex: 0x10B981)
+    static let tealLight = Color(hex: 0x34D399)
+    static let tealDeep = Color(hex: 0x6EE7B7)
+    static let tealSoft = Color(hex: 0x10B981).opacity(0.15)
+    static let tealGlow = Color(hex: 0x10B981).opacity(0.4)
+
     // Legacy names
     static let ion = interactive
     static let volt = Color(hex: 0x5E5CE6) // Indigo
@@ -54,6 +61,11 @@ enum Halo {
         static let cardColor = Color.black.opacity(0.08)
         static let cardRadius: CGFloat = 12
         static let cardY: CGFloat = 4
+        static let elevatedColor = Color.black.opacity(0.15)
+        static let elevatedRadius: CGFloat = 24
+        static let elevatedY: CGFloat = 8
+        static let glowColor = Color(hex: 0x10B981).opacity(0.4)
+        static let glowRadius: CGFloat = 12
     }
 
     // MARK: - Corner Radii
@@ -89,13 +101,11 @@ enum Halo {
         )
     }
 
-    static let meshBackground = LinearGradient(
-        colors: [
-            Color(hex: 0x0A84FF).opacity(0.03),
-            Color(hex: 0x5E5CE6).opacity(0.02),
-            Color.clear
-        ],
-        startPoint: .topLeading, endPoint: .bottomTrailing
+    static let meshBackground = RadialGradient(
+        colors: [Color(hex: 0x10B981).opacity(0.04), .clear],
+        center: .topTrailing,
+        startRadius: 0,
+        endRadius: 500
     )
 }
 
@@ -122,8 +132,8 @@ extension View {
 
     func sectionLabel() -> some View {
         self
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(1.5)
+            .font(.system(size: 11, weight: .bold))
+            .tracking(2)
             .foregroundStyle(Halo.textDim)
     }
 }

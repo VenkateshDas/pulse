@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — See what's really going on with your Mac</title>
+  <meta name="description" content="Health score, hidden storage finder, safe cleanup, live monitoring. One native Mac app. No subscriptions, no telemetry. Free to try.">
+  <meta property="og:title" content="Your Mac is trying to tell you something. Pulse listens.">
+  <meta property="og:description" content="Health score, hidden storage finder, safe cleanup, live monitoring. One native Mac app. No subscriptions, no telemetry.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #05070a;
+      --surface: rgba(20, 26, 34, 0.6);
+      --surface-warm: rgba(26, 34, 48, 0.6);
+      --ink: #f3f4f6;
+      --ink-m: #9ca3af;
+      --ink-s: #6b7280;
+      --teal: #10b981;
+      --teal-light: #34d399;
+      --teal-soft: rgba(16,185,129,0.15);
+      --teal-glow: rgba(16,185,129,0.4);
+      --teal-deep: #6ee7b7;
+      --border: rgba(255,255,255,0.06);
+      --dark-b: rgba(255,255,255,0.08);
+      --red-soft: rgba(220,38,38,0.05);
+      --red-border: rgba(220,38,38,0.15);
+      --red-text: #f87171;
+      --green-soft: rgba(16,185,129,0.05);
+      --green-border: rgba(16,185,129,0.15);
+      --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; background: var(--bg); }
+    body {
+      font-family: var(--font-body);
+      color: var(--ink);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      position: relative;
+    }
+    
+    /* Background Ambience */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: 
+        radial-gradient(circle at 15% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 85% 30%, rgba(16, 185, 129, 0.04) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    /* ===== REVEAL ANIMATION (MODERN CSS) ===== */
+    @media (prefers-reduced-motion: no-preference) {
+      @supports ((animation-timeline: view()) and (animation-range: entry)) {
+        @keyframes reveal-up {
+          from { opacity: 0; transform: translateY(40px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .reveal {
+          animation: reveal-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          animation-timeline: view(block);
+          animation-range: entry 5% cover 25%;
+        }
+      }
+    }
+    /* Fallback for old browsers */
+    .reveal-fallback {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal-fallback.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .reveal-fallback { opacity: 1 !important; transform: none !important; animation: none !important; transition: none !important; }
+    }
+
+    /* Typography Overrides */
+    h1, h2, h3, h4, h5, h6, .nav-logo, .score-num, .stat-num {
+      font-family: var(--font-display);
+    }
+
+    /* ===== NAV ===== */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(5, 7, 10, 0.6);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--dark-b);
+      transition: background 0.3s;
+    }
+    .nav-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 64px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .nav-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 12px var(--teal-glow);
+    }
+    .nav-links {
+      display: flex; gap: 32px; list-style: none;
+    }
+    .nav-links a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink-m);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: #fff; }
+    .nav-cta {
+      font-size: 14px;
+      padding: 8px 20px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #fff;
+      text-decoration: none;
+      font-weight: 500;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-cta:hover {
+      background: var(--teal);
+      border-color: var(--teal-light);
+      box-shadow: 0 0 20px var(--teal-glow);
+      color: #000;
+    }
+    @media (max-width: 640px) { .nav-links { display: none; } }
+
+    /* ===== HERO ===== */
+    .hero {
+      padding: 180px 24px 120px;
+      position: relative;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -10%; left: 50%;
+      transform: translateX(-50%);
+      width: 120%; height: 120%;
+      background: radial-gradient(ellipse at top, rgba(16,185,129,0.12) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .hero-inner {
+      max-width: 1120px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 48px;
+      align-items: center; position: relative; z-index: 1;
+    }
+    .hero-text h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: #fff;
+      margin-bottom: 24px;
+    }
+    .hero-text h1 span { 
+      color: var(--teal-light);
+      background: linear-gradient(135deg, var(--teal-light), var(--teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-text p {
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--ink-m);
+      max-width: 460px;
+      margin-bottom: 36px;
+    }
+    .hero-ctas { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 32px;
+      border-radius: 999px;
+      background: var(--teal);
+      color: #000;
+      font-size: 16px; font-weight: 600;
+      text-decoration: none; border: none; cursor: pointer;
+      box-shadow: 0 4px 14px var(--teal-glow), inset 0 1px 1px rgba(255,255,255,0.4);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-primary:hover {
+      background: var(--teal-light);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--teal-glow), inset 0 1px 1px rgba(255,255,255,0.6);
+    }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-secondary {
+      display: inline-flex; align-items: center;
+      padding: 14px 28px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      color: var(--ink);
+      font-size: 16px; font-weight: 500;
+      text-decoration: none;
+      backdrop-filter: blur(12px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.2);
+    }
+    .hero-micro { font-size: 13px; color: var(--ink-s); margin-top: 20px; }
+
+    /* Hero visual - health ring + vitals */
+    .hero-viz {
+      display: flex; align-items: center; gap: 40px; justify-content: center;
+      position: relative;
+    }
+    .score-ring {
+      width: 180px; height: 180px;
+      border-radius: 50%; position: relative;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      background: radial-gradient(circle at center, rgba(16,185,129,0.05) 0%, transparent 70%);
+    }
+    .score-ring::after {
+      content: '';
+      position: absolute; inset: -20px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent, var(--teal-soft), transparent);
+      animation: spin 8s linear infinite;
+      z-index: 0;
+      filter: blur(12px);
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .score-ring svg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      transform: rotate(-90deg); z-index: 1;
+    }
+    .score-ring .track { fill: none; stroke: var(--border); stroke-width: 3; }
+    .score-ring .progress {
+      fill: none; stroke: var(--teal); stroke-width: 4;
+      stroke-linecap: round; stroke-dasharray: 534; stroke-dashoffset: 42;
+      filter: drop-shadow(0 0 6px var(--teal-glow));
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .score-num {
+      font-size: 56px; font-weight: 700; color: #fff;
+      line-height: 1; position: relative; z-index: 2;
+      text-shadow: 0 0 24px rgba(255,255,255,0.2);
+    }
+    .score-label {
+      font-size: 14px; font-weight: 500; color: var(--teal-light);
+      margin-top: 4px; position: relative; z-index: 2;
+    }
+
+    .vitals {
+      display: flex; flex-direction: column; gap: 16px;
+      background: var(--surface);
+      padding: 24px; border-radius: 20px;
+      border: 1px solid var(--border);
+      backdrop-filter: blur(24px);
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+      z-index: 2;
+    }
+    .vital-row { display: flex; align-items: center; gap: 12px; }
+    .vital-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); flex-shrink: 0; box-shadow: 0 0 8px var(--teal-glow); }
+    .vital-dot.warn { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+    .vital-name { font-size: 14px; color: var(--ink-m); min-width: 72px; }
+    .vital-val { font-size: 14px; font-weight: 600; color: #fff; font-family: var(--font-display); }
+
+    @media (max-width: 860px) {
+      .hero { padding: 140px 20px 80px; }
+      .hero-inner { grid-template-columns: 1fr; text-align: center; }
+      .hero-text p { margin-left: auto; margin-right: auto; }
+      .hero-ctas { justify-content: center; }
+      .hero-viz { justify-content: center; margin-top: 20px; }
+    }
+    @media (max-width: 480px) {
+      .hero-viz { flex-direction: column; gap: 32px; }
+      .score-ring { width: 140px; height: 140px; }
+      .score-num { font-size: 44px; }
+    }
+
+    /* ===== SECTIONS ===== */
+    .section { max-width: 1120px; margin: 0 auto; padding: 100px 24px; }
+    .section-tight { padding: 80px 24px; }
+
+    .section h2 {
+      font-size: clamp(2rem, 3.5vw, 2.5rem);
+      font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;
+      color: #fff; margin-bottom: 20px;
+    }
+    .section p.lead {
+      font-size: 18px; line-height: 1.6; color: var(--ink-m);
+      max-width: 600px;
+    }
+
+    /* ===== PROBLEM ===== */
+    .problem-quote {
+      font-size: 16px; font-style: italic; color: var(--ink-m);
+      border-left: 2px solid var(--teal); padding: 10px 20px;
+      margin-top: 28px; max-width: 500px;
+      background: linear-gradient(90deg, var(--teal-soft), transparent);
+      border-radius: 0 8px 8px 0;
+    }
+
+    /* ===== STATS BAR ===== */
+    .stats-bar {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: var(--border); border-radius: 20px; overflow: hidden;
+      margin-top: 48px; border: 1px solid var(--border);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .stat-item { padding: 32px 24px; background: var(--surface); text-align: center; backdrop-filter: blur(16px); }
+    .stat-num { font-size: 44px; font-weight: 700; color: #fff; line-height: 1; }
+    .stat-num .suffix { font-size: 20px; font-weight: 500; color: var(--teal-light); }
+    .stat-label { font-size: 13px; font-weight: 600; color: var(--ink-m); margin-top: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    @media (max-width: 640px) { .stats-bar { grid-template-columns: 1fr; } }
+
+    /* ===== BENTO FEATURES ===== */
+    .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px; }
+    .bento-tile {
+      padding: 36px; border-radius: 24px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      backdrop-filter: blur(24px);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative; overflow: hidden;
+    }
+    .bento-tile::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.06), transparent 40%);
+      opacity: 0; transition: opacity 0.4s; pointer-events: none;
+    }
+    .bento-tile:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255,255,255,0.15);
+      box-shadow: 0 24px 48px rgba(0,0,0,0.3);
+    }
+    .bento-tile:hover::before { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) { .bento-tile:hover { transform: none; } }
+
+    .bento-tile.accent {
+      background: linear-gradient(135deg, rgba(20,26,34,0.8), rgba(16,185,129,0.05));
+      border-color: rgba(16,185,129,0.2);
+    }
+    .bento-tile.span-2 { grid-column: 1 / -1; }
+    .bento-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 24px; color: #fff;
+    }
+    .bento-tile.accent .bento-icon {
+      background: var(--teal-soft); border-color: rgba(16,185,129,0.3);
+      color: var(--teal-light); box-shadow: 0 0 20px var(--teal-glow);
+    }
+    .bento-tile h3 { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 10px; }
+    .bento-tile p { font-size: 15px; line-height: 1.6; color: var(--ink-m); }
+
+    .bento-wide-inner { display: grid; grid-template-columns: 1fr auto; gap: 48px; align-items: center; }
+    .mini-bars { display: flex; flex-direction: column; gap: 12px; }
+    .mini-bar { display: flex; align-items: center; gap: 12px; }
+    .mini-bar-label { font-size: 13px; font-weight: 500; color: var(--ink-m); min-width: 64px; }
+    .mini-bar-track {
+      width: 140px; height: 6px; background: rgba(255,255,255,0.05);
+      border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .mini-bar-fill {
+      height: 100%; border-radius: 999px;
+      background: linear-gradient(90deg, var(--teal-deep), var(--teal));
+      width: 0%; transition: width 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .mini-bar-fill.animated { width: 100%; }
+
+    @media (max-width: 768px) {
+      .bento { grid-template-columns: 1fr; }
+      .bento-tile.span-2 { grid-column: 1; }
+      .bento-wide-inner { grid-template-columns: 1fr; gap: 24px; }
+    }
+
+    /* ===== TRUST ===== */
+    .trust-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 40px; }
+    .trust-pill {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 24px; border-radius: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      transition: background 0.3s;
+    }
+    .trust-pill:hover { background: rgba(255,255,255,0.03); }
+    .trust-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: #fff;
+    }
+    .trust-pill h4 { font-family: var(--font-display); font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .trust-pill p { font-size: 14px; color: var(--ink-m); line-height: 1.5; }
+    @media (max-width: 640px) { .trust-grid { grid-template-columns: 1fr; } }
+
+    /* ===== BEFORE / AFTER CAROUSEL ===== */
+    .carousel-dots-bar {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-bottom: 32px;
+    }
+    .carousel-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: none; cursor: pointer;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); padding: 0;
+    }
+    .carousel-dot.active {
+      width: 28px; border-radius: 999px;
+      background: var(--teal); box-shadow: 0 0 12px var(--teal-glow);
+    }
+
+    .carousel-wrapper {
+      position: relative;
+      display: flex; align-items: center; gap: 0;
+    }
+    .carousel-btn {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--ink-m); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      backdrop-filter: blur(12px);
+      flex-shrink: 0; z-index: 20;
+      position: relative;
+    }
+    .carousel-btn:hover {
+      background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2);
+      color: #fff; transform: scale(1.1);
+    }
+    .carousel-btn:active { transform: scale(0.95); }
+    .carousel-btn:disabled { opacity: 0.2; cursor: default; transform: none; }
+    @media (max-width: 768px) {
+      .carousel-btn { width: 36px; height: 36px; }
+      .carousel-btn svg { width: 14px; height: 14px; }
+    }
+
+    .carousel-container {
+      width: 100%; overflow: hidden;
+      position: relative; flex: 1; min-width: 0;
+    }
+    .carousel-container::before, .carousel-container::after {
+      content: ''; position: absolute; top: 0; bottom: 0; width: 40px; z-index: 10; pointer-events: none;
+    }
+    .carousel-container::before { left: 0; background: linear-gradient(90deg, var(--bg), transparent); }
+    .carousel-container::after { right: 0; background: linear-gradient(-90deg, var(--bg), transparent); }
+
+    .scroller {
+      display: flex; gap: 24px; overflow-x: auto;
+      scroll-snap-type: x mandatory; padding: 20px 40px 40px 40px;
+      list-style: none; scroll-behavior: smooth;
+    }
+    .scroller::-webkit-scrollbar { height: 0; display: none; }
+
+    .entry {
+      flex: 0 0 min(92%, 960px);
+      scroll-snap-align: center;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .entry { grid-template-columns: 1fr; flex: 0 0 90%; }
+    }
+
+    .ba-card { padding: 40px; border-radius: 24px; position: relative; overflow: hidden; backdrop-filter: blur(12px); display: flex; flex-direction: column; min-height: 360px; }
+    .ba-card h3 { font-family: var(--font-display); font-size: 22px; font-weight: 600; color: #fff; margin-bottom: 12px; }
+    .ba-card p { font-size: 15px; line-height: 1.7; color: var(--ink-m); }
+
+    .ba-card.before { background: linear-gradient(180deg, rgba(220,38,38,0.06), rgba(20,26,34,0.7)); border: 1px solid var(--red-border); }
+    .ba-card.after { background: linear-gradient(180deg, rgba(16,185,129,0.06), rgba(20,26,34,0.7)); border: 1px solid var(--green-border); }
+
+    .ba-illus {
+      width: 100%; height: 120px; margin-bottom: 24px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .ba-card.before .ba-illus { background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.1); }
+    .ba-card.after .ba-illus { background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.1); }
+
+    .ba-tag {
+      display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+      font-weight: 700; margin-bottom: 20px; padding: 5px 14px; border-radius: 999px; align-self: flex-start;
+    }
+    .ba-card.before .ba-tag { color: var(--red-text); background: rgba(248,113,113,0.1); }
+    .ba-card.after .ba-tag { color: var(--teal-light); background: rgba(52,211,153,0.1); }
+
+    /* Scroll-driven animations */
+    @media (prefers-reduced-motion: no-preference) {
+      @supports ((animation-timeline: view()) and (animation-range: entry)) {
+        @keyframes carousel-animate {
+          0% { transform: scale(0.9) translateY(10px); opacity: 0.5; }
+          50% { transform: scale(1) translateY(0); opacity: 1; }
+          100% { transform: scale(0.9) translateY(10px); opacity: 0.5; }
+        }
+        .scroller > .entry {
+          animation: carousel-animate auto linear both;
+          animation-timeline: view(inline);
+        }
+      }
+    }
+
+    /* ===== FAQ ===== */
+    .faq-list { margin-top: 40px; width: 100%; }
+    .faq-item { border-bottom: 1px solid var(--border); padding: 24px 0; }
+    .faq-item:first-child { border-top: 1px solid var(--border); }
+    .faq-q {
+      font-size: 18px; font-weight: 600; color: #fff;
+      cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; background: none; border: none; width: 100%; text-align: left;
+      font-family: var(--font-display); padding: 0; transition: color 0.2s;
+    }
+    .faq-q:hover { color: var(--teal-light); }
+    .faq-q::after {
+      content: "+"; font-size: 24px; font-weight: 400; color: var(--ink-m);
+      flex-shrink: 0; transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .faq-item.open .faq-q::after { transform: rotate(45deg); color: var(--teal); }
+    .faq-a {
+      font-size: 16px; line-height: 1.7; color: var(--ink-m);
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.5s cubic-bezier(0.16, 1, 0.3, 1), padding 0.4s;
+      padding-top: 0;
+    }
+    .faq-item.open .faq-a { max-height: 300px; padding-top: 16px; }
+
+    /* ===== FINAL CTA ===== */
+    .cta-section {
+      padding: 120px 24px; text-align: center; position: relative; overflow: hidden;
+      border-top: 1px solid var(--border);
+      background: linear-gradient(180deg, transparent, rgba(16,185,129,0.03));
+    }
+    .cta-section::before {
+      content: ""; position: absolute; bottom: -50%; left: 50%; transform: translateX(-50%);
+      width: 100vw; height: 100vw; max-height: 800px;
+      background: radial-gradient(circle, var(--teal-glow) 0%, transparent 60%);
+      pointer-events: none; opacity: 0.5;
+    }
+    .cta-inner { max-width: 640px; margin: 0 auto; position: relative; z-index: 1; }
+    .cta-section h2 { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 16px; }
+    .cta-section p { font-size: 18px; color: var(--ink-m); margin-bottom: 36px; }
+    .cta-section .hero-micro { margin-top: 24px; }
+
+    /* ===== FOOTER ===== */
+    .footer { border-top: 1px solid var(--border); padding: 32px 24px; background: rgba(0,0,0,0.5); backdrop-filter: blur(24px); }
+    .footer-inner {
+      max-width: 1120px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;
+      font-size: 14px; color: var(--ink-s);
+    }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { color: var(--ink-m); text-decoration: none; transition: color 0.2s; font-weight: 500; }
+    .footer-links a:hover { color: #fff; }
+    @media (max-width: 480px) { .footer-inner { flex-direction: column; gap: 16px; } }
+
+    /* ===== DIVIDER ===== */
+    .section-sep { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .section-sep hr { border: none; border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav reveal">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <span class="nav-dot"></span>
+        Pulse
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#safety">Safety</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div class="hero-inner">
+      <div class="hero-text reveal">
+        <h1>You paid for a fast Mac.<br><span>Let's keep it that way.</span></h1>
+        <p>See what's slowing things down, find what's eating your storage, and keep everything clean. No subscriptions. No jargon.</p>
+        <div class="hero-ctas">
+          <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
+          <a href="#features" class="btn-secondary">See how it works</a>
+        </div>
+        <p class="hero-micro">No account needed. macOS 14+. Notarized by Apple.</p>
+      </div>
+
+      <div class="hero-viz reveal">
+        <div class="score-ring">
+          <svg viewBox="0 0 160 160">
+            <circle class="track" cx="80" cy="80" r="72" />
+            <circle class="progress" cx="80" cy="80" r="72" />
+          </svg>
+          <span class="score-num" data-count="92">0</span>
+          <span class="score-label">Healthy</span>
+        </div>
+        <div class="vitals">
+          <div class="vital-row">
+            <span class="vital-dot"></span>
+            <span class="vital-name">CPU</span>
+            <span class="vital-val">12%</span>
+          </div>
+          <div class="vital-row">
+            <span class="vital-dot"></span>
+            <span class="vital-name">Memory</span>
+            <span class="vital-val">6.2 GB free</span>
+          </div>
+          <div class="vital-row">
+            <span class="vital-dot warn"></span>
+            <span class="vital-name">Storage</span>
+            <span class="vital-val">34 GB free</span>
+          </div>
+          <div class="vital-row">
+            <span class="vital-dot"></span>
+            <span class="vital-name">GPU</span>
+            <span class="vital-val">19%</span>
+          </div>
+          <div class="vital-row">
+            <span class="vital-dot"></span>
+            <span class="vital-name">Battery</span>
+            <span class="vital-val">812 cycles left</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLEM -->
+  <section class="section" id="problem">
+    <div class="reveal">
+      <h2>"Your disk is almost full."</h2>
+      <p class="lead">Five words. No explanation. No help. You check Storage Settings. There's a grey bar called "System Data" eating 97 GB. You can't click it. You can't delete it. You don't even know what it is.</p>
+      <blockquote class="problem-quote">"170 GB out of 245 GB is System Data. This is absurd."</blockquote>
+    </div>
+
+    <div class="stats-bar reveal">
+      <div class="stat-item">
+        <div class="stat-num"><span data-count="97">0</span><span class="suffix"> GB</span></div>
+        <div class="stat-label">Avg hidden "System Data"</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num"><span data-count="40">0</span><span class="suffix">+</span></div>
+        <div class="stat-label">Cleanup targets</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num"><span data-count="3">0</span><span class="suffix"> sec</span></div>
+        <div class="stat-label">One-click optimize</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-sep"><hr></div>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <h2 class="reveal">One app. Everything about your Mac.</h2>
+
+    <div class="bento">
+      <div class="bento-tile accent reveal">
+        <div class="bento-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+        <h3>See what's eating your storage</h3>
+        <p>Old phone backups, Xcode simulators, Docker volumes, AI tool caches. Visual map, biggest items first.</p>
+      </div>
+      <div class="bento-tile reveal">
+        <div class="bento-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+        </div>
+        <h3>One click. Faster Mac.</h3>
+        <p>Clears stale caches, rebuilds clogged indexes, flushes DNS. Takes 3 seconds. Everything goes to Trash first.</p>
+      </div>
+      <div class="bento-tile reveal">
+        <div class="bento-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        </div>
+        <h3>Actually uninstall apps</h3>
+        <p>Finds every leftover file. Confidence-graded: safe, careful, or review. Plus an orphan scanner for apps you already deleted.</p>
+      </div>
+      <div class="bento-tile accent reveal">
+        <div class="bento-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <h3>Know what's slowing things down</h3>
+        <p>Live CPU, GPU, thermals, battery cycles, Bluetooth device batteries. All in words you understand.</p>
+      </div>
+      <div class="bento-tile span-2 reveal">
+        <div class="bento-wide-inner">
+          <div>
+            <div class="bento-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
+            </div>
+            <h3>Replace five apps with one</h3>
+            <p>System monitor + disk analyzer + app uninstaller + cache cleaner + maintenance toolkit. One download. One price.</p>
+          </div>
+          <div class="mini-bars" id="bars">
+            <div class="mini-bar">
+              <span class="mini-bar-label">Monitor</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
+            </div>
+            <div class="mini-bar">
+              <span class="mini-bar-label">Disk</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
+            </div>
+            <div class="mini-bar">
+              <span class="mini-bar-label">Uninstall</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
+            </div>
+            <div class="mini-bar">
+              <span class="mini-bar-label">Clean</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
+            </div>
+            <div class="mini-bar">
+              <span class="mini-bar-label">Maintain</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-sep"><hr></div>
+
+  <!-- TRUST -->
+  <section class="section section-tight" id="safety">
+    <h2 class="reveal">We know you've been burned before.</h2>
+    <p class="lead reveal">The Mac "cleaner" category is full of junk. Pulse is different, and here's how you can verify it yourself.</p>
+
+    <div class="trust-grid reveal">
+      <div class="trust-pill">
+        <div class="trust-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <div>
+          <h4>Shows before it does</h4>
+          <p>Every file explained and safety-graded. You approve first.</p>
+        </div>
+      </div>
+      <div class="trust-pill">
+        <div class="trust-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div>
+          <h4>Never phones home</h4>
+          <p>Zero analytics. Zero telemetry. Your data stays on your Mac.</p>
+        </div>
+      </div>
+      <div class="trust-pill">
+        <div class="trust-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h4>Notarized by Apple</h4>
+          <p>Apple verified it's free of malware.</p>
+        </div>
+      </div>
+      <div class="trust-pill">
+        <div class="trust-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        </div>
+        <div>
+          <h4>No subscription. Ever.</h4>
+          <p>One price. Lifetime updates. No trial pop-ups.</p>
+        </div>
+      </div>
+      <div class="trust-pill">
+        <div class="trust-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        </div>
+        <div>
+          <h4>30-day undo journal</h4>
+          <p>Every action logged. Restore from Trash anytime.</p>
+        </div>
+      </div>
+      <div class="trust-pill">
+        <div class="trust-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m15 9-6 6"/></svg>
+        </div>
+        <div>
+          <h4>Refuses 5 risky operations</h4>
+          <p>Fewer features is better than risking your data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-sep"><hr></div>
+
+  <!-- BEFORE / AFTER CAROUSEL -->
+  <section class="section section-tight" id="scenarios">
+    <div class="carousel-dots-bar reveal" id="carousel-dots">
+      <button class="carousel-dot active" data-index="0"></button>
+      <button class="carousel-dot" data-index="1"></button>
+      <button class="carousel-dot" data-index="2"></button>
+      <button class="carousel-dot" data-index="3"></button>
+    </div>
+    <div class="carousel-wrapper reveal">
+      <button class="carousel-btn" id="carousel-prev" aria-label="Previous">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="carousel-container">
+      <ul class="scroller">
+        
+        <li class="entry">
+          <div class="ba-card before">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="20" y="20" width="240" height="14" rx="7" fill="rgba(255,255,255,0.06)"/>
+                <rect x="20" y="20" width="200" height="14" rx="7" fill="rgba(220,38,38,0.25)"/>
+                <text x="225" y="31" font-size="10" fill="#f87171" font-family="var(--font-display)" font-weight="600">97 GB</text>
+                <rect x="20" y="42" width="240" height="14" rx="7" fill="rgba(255,255,255,0.06)"/>
+                <rect x="20" y="42" width="160" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
+                <text x="185" y="53" font-size="10" fill="rgba(255,255,255,0.3)" font-family="var(--font-display)">System Data</text>
+                <rect x="20" y="64" width="240" height="14" rx="7" fill="rgba(255,255,255,0.06)"/>
+                <rect x="20" y="64" width="40" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
+                <text x="65" y="75" font-size="10" fill="rgba(255,255,255,0.2)" font-family="var(--font-display)">???</text>
+                <text x="140" y="96" font-size="9" fill="rgba(248,113,113,0.5)" font-family="var(--font-body)" text-anchor="middle">No breakdown. No explanation.</text>
+              </svg>
+            </div>
+            <div class="ba-tag">Without Pulse</div>
+            <h3>The "System Data" Black Hole</h3>
+            <p>97 GB of "System Data" you can't click, can't understand, and can't delete. Completely blind.</p>
+          </div>
+          <div class="ba-card after">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="20" y="15" width="72" height="32" rx="8" fill="rgba(16,185,129,0.12)" stroke="rgba(16,185,129,0.25)" stroke-width="1"/>
+                <text x="56" y="35" font-size="9" fill="#34d399" font-family="var(--font-display)" font-weight="600" text-anchor="middle">Docker 18G</text>
+                <rect x="100" y="15" width="56" height="32" rx="8" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+                <text x="128" y="35" font-size="9" fill="#34d399" font-family="var(--font-display)" font-weight="600" text-anchor="middle">Xcode 14G</text>
+                <rect x="164" y="15" width="50" height="32" rx="8" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.15)" stroke-width="1"/>
+                <text x="189" y="35" font-size="9" fill="#6ee7b7" font-family="var(--font-display)" font-weight="500" text-anchor="middle">Logs 8G</text>
+                <rect x="222" y="15" width="42" height="32" rx="8" fill="rgba(16,185,129,0.04)" stroke="rgba(16,185,129,0.1)" stroke-width="1"/>
+                <text x="243" y="35" font-size="8" fill="#6ee7b7" font-family="var(--font-display)" font-weight="500" text-anchor="middle">Caches</text>
+                <rect x="20" y="55" width="100" height="28" rx="8" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+                <text x="70" y="73" font-size="9" fill="#34d399" font-family="var(--font-display)" font-weight="600" text-anchor="middle">iOS Backups 22G</text>
+                <rect x="128" y="55" width="64" height="28" rx="8" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.12)" stroke-width="1"/>
+                <text x="160" y="73" font-size="9" fill="#6ee7b7" font-family="var(--font-display)" font-weight="500" text-anchor="middle">npm 6G</text>
+                <text x="140" y="96" font-size="9" fill="rgba(52,211,153,0.5)" font-family="var(--font-body)" text-anchor="middle">Every byte mapped. One-click cleanup.</text>
+              </svg>
+            </div>
+            <div class="ba-tag">With Pulse</div>
+            <h3>Crystal Clear Storage Map</h3>
+            <p>Visual treemap reveals forgotten Docker images, Xcode caches, old iOS backups. Remove in one click.</p>
+          </div>
+        </li>
+
+        <li class="entry">
+          <div class="ba-card before">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <text x="20" y="22" font-size="9" fill="rgba(255,255,255,0.25)" font-family="monospace">PID  CPU%  NAME</text>
+                <text x="20" y="36" font-size="8" fill="rgba(255,255,255,0.15)" font-family="monospace">443  0.2   WindowServer</text>
+                <text x="20" y="47" font-size="8" fill="rgba(255,255,255,0.15)" font-family="monospace">891  0.1   loginwindow</text>
+                <text x="20" y="58" font-size="8" fill="rgba(255,255,255,0.15)" font-family="monospace">1204 0.0   mds_stores</text>
+                <text x="20" y="69" font-size="8" fill="rgba(255,255,255,0.15)" font-family="monospace">2891 0.0   com.apple.bird</text>
+                <text x="20" y="80" font-size="8" fill="rgba(248,113,113,0.6)" font-family="monospace">9102 89.4  ??? some_proc</text>
+                <text x="140" y="96" font-size="9" fill="rgba(248,113,113,0.5)" font-family="var(--font-body)" text-anchor="middle">Hundreds of rows. Which one matters?</text>
+              </svg>
+            </div>
+            <div class="ba-tag">Without Pulse</div>
+            <h3>The Mystery Slowdown</h3>
+            <p>Mac sounds like a jet engine. Activity Monitor shows hundreds of cryptic processes. Good luck finding the culprit.</p>
+          </div>
+          <div class="ba-card after">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="60" y="8" width="160" height="84" rx="12" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+                <circle cx="100" cy="36" r="14" fill="rgba(251,191,36,0.15)" stroke="rgba(251,191,36,0.4)" stroke-width="1.5"/>
+                <text x="100" y="40" font-size="10" fill="#fbbf24" font-family="var(--font-display)" font-weight="700" text-anchor="middle">!</text>
+                <text x="122" y="33" font-size="10" fill="#fff" font-family="var(--font-display)" font-weight="600">CPU spike</text>
+                <text x="122" y="45" font-size="9" fill="rgba(255,255,255,0.4)" font-family="var(--font-body)">node (webpack) — 89%</text>
+                <rect x="80" y="60" width="56" height="22" rx="6" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" stroke-width="1"/>
+                <text x="108" y="75" font-size="9" fill="#34d399" font-family="var(--font-display)" font-weight="600" text-anchor="middle">Quit</text>
+                <rect x="144" y="60" width="56" height="22" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                <text x="172" y="75" font-size="9" fill="rgba(255,255,255,0.4)" font-family="var(--font-display)" font-weight="500" text-anchor="middle">Ignore</text>
+              </svg>
+            </div>
+            <div class="ba-tag">With Pulse</div>
+            <h3>Instant Diagnostics</h3>
+            <p>Menu bar turns amber. One click shows exactly which process is eating CPU. Kill it right there.</p>
+          </div>
+        </li>
+
+        <li class="entry">
+          <div class="ba-card before">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="100" y="10" width="44" height="44" rx="10" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+                <text x="122" y="37" font-size="18" text-anchor="middle">A</text>
+                <path d="M150 32 L180 60" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <rect x="170" y="50" width="32" height="32" rx="6" fill="rgba(255,255,255,0.04)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+                <text x="186" y="70" font-size="8" fill="rgba(248,113,113,0.5)" font-family="var(--font-display)" text-anchor="middle">plist</text>
+                <path d="M150 36 L200 20" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <rect x="192" y="8" width="40" height="26" rx="6" fill="rgba(255,255,255,0.04)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+                <text x="212" y="25" font-size="8" fill="rgba(248,113,113,0.5)" font-family="var(--font-display)" text-anchor="middle">cache</text>
+                <path d="M100 40 L60 65" stroke="rgba(255,255,255,0.15)" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <rect x="36" y="55" width="48" height="26" rx="6" fill="rgba(255,255,255,0.04)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+                <text x="60" y="72" font-size="8" fill="rgba(248,113,113,0.5)" font-family="var(--font-display)" text-anchor="middle">agent</text>
+                <text x="140" y="96" font-size="9" fill="rgba(248,113,113,0.5)" font-family="var(--font-body)" text-anchor="middle">App gone. Leftovers stay forever.</text>
+              </svg>
+            </div>
+            <div class="ba-tag">Without Pulse</div>
+            <h3>The Illusion of Uninstalling</h3>
+            <p>Drag to Trash. Done? No — gigabytes of preference files, caches, and launch agents left behind. Invisible.</p>
+          </div>
+          <div class="ba-card after">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="30" y="14" width="220" height="26" rx="8" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.15)" stroke-width="1"/>
+                <circle cx="48" cy="27" r="7" fill="rgba(16,185,129,0.2)" stroke="rgba(16,185,129,0.4)" stroke-width="1"/>
+                <path d="M45 27 L47 29 L51 25" stroke="#34d399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <text x="62" y="30" font-size="9" fill="rgba(255,255,255,0.5)" font-family="var(--font-body)">com.app.plist</text>
+                <text x="210" y="30" font-size="8" fill="#34d399" font-family="var(--font-display)" font-weight="600">Safe</text>
+                <rect x="30" y="46" width="220" height="26" rx="8" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.15)" stroke-width="1"/>
+                <circle cx="48" cy="59" r="7" fill="rgba(16,185,129,0.2)" stroke="rgba(16,185,129,0.4)" stroke-width="1"/>
+                <path d="M45 59 L47 61 L51 57" stroke="#34d399" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <text x="62" y="62" font-size="9" fill="rgba(255,255,255,0.5)" font-family="var(--font-body)">Application Support/</text>
+                <text x="210" y="62" font-size="8" fill="#34d399" font-family="var(--font-display)" font-weight="600">Safe</text>
+                <rect x="30" y="78" width="220" height="18" rx="6" fill="rgba(251,191,36,0.06)" stroke="rgba(251,191,36,0.15)" stroke-width="1"/>
+                <text x="62" y="90" font-size="9" fill="rgba(255,255,255,0.4)" font-family="var(--font-body)">LaunchAgent</text>
+                <text x="210" y="90" font-size="8" fill="#fbbf24" font-family="var(--font-display)" font-weight="600">Review</text>
+              </svg>
+            </div>
+            <div class="ba-tag">With Pulse</div>
+            <h3>True App Removal</h3>
+            <p>Detects uninstallation, finds every leftover, safety-grades each file. You approve, Pulse cleans.</p>
+          </div>
+        </li>
+
+        <li class="entry">
+          <div class="ba-card before">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="70" y="12" width="140" height="56" rx="12" fill="rgba(255,255,255,0.04)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+                <text x="140" y="34" font-size="11" fill="rgba(255,255,255,0.5)" font-family="var(--font-display)" font-weight="600" text-anchor="middle">Delete 47 files?</text>
+                <text x="140" y="50" font-size="9" fill="rgba(255,255,255,0.2)" font-family="var(--font-body)" text-anchor="middle">This can't be undone.</text>
+                <rect x="90" y="76" width="48" height="20" rx="6" fill="rgba(248,113,113,0.1)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+                <text x="114" y="90" font-size="9" fill="#f87171" font-family="var(--font-display)" font-weight="600" text-anchor="middle">Delete</text>
+                <rect x="146" y="76" width="48" height="20" rx="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+                <text x="170" y="90" font-size="9" fill="rgba(255,255,255,0.3)" font-family="var(--font-display)" font-weight="500" text-anchor="middle">Cancel</text>
+              </svg>
+            </div>
+            <div class="ba-tag">Without Pulse</div>
+            <h3>The Fear of Deleting</h3>
+            <p>Too afraid to clean manually. What if you break macOS? What if something important vanishes? So nothing gets cleaned.</p>
+          </div>
+          <div class="ba-card after">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="50" y="10" width="180" height="50" rx="12" fill="rgba(16,185,129,0.06)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+                <circle cx="80" cy="35" r="12" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" stroke-width="1.5"/>
+                <path d="M75 35 L78 38 L85 31" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <text x="100" y="32" font-size="10" fill="#fff" font-family="var(--font-display)" font-weight="600">47 files cleaned</text>
+                <text x="100" y="44" font-size="9" fill="rgba(255,255,255,0.4)" font-family="var(--font-body)">All in Trash. 30-day undo log.</text>
+                <rect x="70" y="70" width="140" height="22" rx="8" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                <path d="M90 81 L95 81 L95 76 M95 81 L100 76" stroke="rgba(255,255,255,0.3)" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+                <text x="108" y="84" font-size="9" fill="rgba(255,255,255,0.35)" font-family="var(--font-body)">Undo anytime from journal</text>
+              </svg>
+            </div>
+            <div class="ba-tag">With Pulse</div>
+            <h3>The 30-Day Safety Net</h3>
+            <p>Everything goes to Trash. Every action logged in a 30-day undo journal. Mistake? Just put it back.</p>
+          </div>
+        </li>
+
+      </ul>
+    </div>
+      <button class="carousel-btn" id="carousel-next" aria-label="Next">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <div class="section-sep"><hr></div>
+
+  <!-- FAQ -->
+  <section class="section section-tight" id="faq">
+    <h2 class="reveal">Questions you're already asking</h2>
+    <div class="faq-list reveal">
+
+      <div class="faq-item">
+        <button class="faq-q">"Apple says I don't need a Mac cleaner."</button>
+        <div class="faq-a">They're right. You don't need the scammy ones. Pulse doesn't claim to "boost" anything. It gives you a dashboard for your Mac, like the one your car has. It shows you what's happening, lets you decide what to do, and puts everything in Trash so you can undo it.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"What if I delete something important?"</button>
+        <div class="faq-a">Everything Pulse removes goes to your Trash. Every action is recorded in a 30-day undo log so you can track what was removed. Files stay recoverable until you empty Trash yourself. And every file is labeled by safety level before you touch it.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"I'm not a tech person. Will I understand it?"</button>
+        <div class="faq-a">That's exactly who Pulse is for. No terminal commands. No settings panels with 50 checkboxes. Your Mac's health is one number. Your storage is a visual map. Cleanup is one button. If your Mac needs attention, Pulse tells you in a sentence.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"Is this going to charge me every month?"</button>
+        <div class="faq-a">No. One price. One time. Lifetime updates included. No trial that expires. No features locked behind a paywall. No "upgrade to Pro" pop-ups.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"Will it slow my Mac down?"</button>
+        <div class="faq-a">Pulse samples every 2 seconds, then goes back to sleep. When you're not looking at it, it uses near-zero resources. It's built with native Swift and Apple's own frameworks, not a web browser wrapped in a window.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section" id="download">
+    <div class="cta-inner reveal">
+      <h2>Stop Googling "why is my Mac slow."</h2>
+      <p>See your Mac clearly for the first time. Free to try. One price to keep.</p>
+      <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
+      <p class="hero-micro">macOS 14+. Apple Silicon and Intel. Notarized by Apple.</p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Pulse</span>
+      <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Support</a>
+        <a href="https://github.com/VenkateshDas/mac-monitor">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Scroll reveal fallback via Intersection Observer
+    if (!CSS.supports('(animation-timeline: view()) and (animation-range: entry)')) {
+      const revealEls = document.querySelectorAll('.reveal');
+      revealEls.forEach(el => {
+        el.classList.remove('reveal');
+        el.classList.add('reveal-fallback');
+      });
+
+      const revealObs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            revealObs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15 });
+
+      document.querySelectorAll('.reveal-fallback').forEach(function(el) { 
+        revealObs.observe(el); 
+      });
+    }
+
+    // Count-up numbers
+    function countUp(el, target, duration) {
+      var start = 0;
+      var startTime = null;
+      function step(ts) {
+        if (!startTime) startTime = ts;
+        var progress = Math.min((ts - startTime) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 4);
+        el.textContent = Math.round(eased * target);
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    var countEls = document.querySelectorAll('[data-count]');
+    var countObs = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          var target = parseInt(entry.target.getAttribute('data-count'));
+          countUp(entry.target, target, 1200);
+          countObs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.5 });
+
+    countEls.forEach(function(el) { countObs.observe(el); });
+
+    // Mini bars animation
+    var barsSection = document.getElementById('bars');
+    if (barsSection) {
+      var barsObs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            var fills = entry.target.querySelectorAll('.mini-bar-fill');
+            fills.forEach(function(fill, i) {
+              setTimeout(function() {
+                fill.classList.add('animated');
+              }, i * 120);
+            });
+            barsObs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.3 });
+      barsObs.observe(barsSection);
+    }
+
+    // Carousel Scroll-driven animations fallback
+    if (!CSS.supports('(animation-timeline: view()) and (animation-range: entry)')) {
+      const scroller = document.querySelector('.scroller');
+      const entries = document.querySelectorAll('.entry');
+      const animations = new Map();
+
+      entries.forEach(entry => {
+        const animation = entry.animate(
+          { transform: ['scale(0.9) translateY(10px)', 'scale(1) translateY(0)', 'scale(0.9) translateY(10px)'], opacity: [0.5, 1, 0.5] },
+          { duration: 1, fill: 'both' }
+        );
+        animation.pause();
+        animations.set(entry, animation);
+      });
+
+      const tick = () => {
+        if(!scroller) return;
+        const scrollerRect = scroller.getBoundingClientRect();
+        entries.forEach(entry => {
+          const animation = animations.get(entry);
+          if (!animation) return;
+          const entryRect = entry.getBoundingClientRect();
+          const progress = (entryRect.left + entryRect.width / 2 - scrollerRect.left) / scrollerRect.width;
+          // Clamp progress between 0 and 1
+          animation.currentTime = Math.max(0, Math.min(1, progress));
+        });
+      };
+      
+      if(scroller) {
+        scroller.addEventListener('scroll', tick);
+        tick(); // Initial call
+        window.addEventListener('resize', tick);
+      }
+    }
+
+    // Carousel navigation
+    (function() {
+      var scroller = document.querySelector('.scroller');
+      var entries = document.querySelectorAll('.entry');
+      var dots = document.querySelectorAll('.carousel-dot');
+      var prevBtn = document.getElementById('carousel-prev');
+      var nextBtn = document.getElementById('carousel-next');
+      var current = 0;
+
+      function goTo(i) {
+        i = Math.max(0, Math.min(i, entries.length - 1));
+        entries[i].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        current = i;
+        updateDots();
+      }
+
+      function updateDots() {
+        dots.forEach(function(d, i) {
+          d.classList.toggle('active', i === current);
+        });
+        if (prevBtn) prevBtn.disabled = current === 0;
+        if (nextBtn) nextBtn.disabled = current === entries.length - 1;
+      }
+
+      if (prevBtn) prevBtn.addEventListener('click', function() { goTo(current - 1); });
+      if (nextBtn) nextBtn.addEventListener('click', function() { goTo(current + 1); });
+      dots.forEach(function(dot) {
+        dot.addEventListener('click', function() { goTo(parseInt(dot.dataset.index)); });
+      });
+
+      if (scroller) {
+        var scrollTimer;
+        scroller.addEventListener('scroll', function() {
+          clearTimeout(scrollTimer);
+          scrollTimer = setTimeout(function() {
+            var scrollerRect = scroller.getBoundingClientRect();
+            var center = scrollerRect.left + scrollerRect.width / 2;
+            var closest = 0, closestDist = Infinity;
+            entries.forEach(function(entry, i) {
+              var rect = entry.getBoundingClientRect();
+              var dist = Math.abs(rect.left + rect.width / 2 - center);
+              if (dist < closestDist) { closestDist = dist; closest = i; }
+            });
+            current = closest;
+            updateDots();
+          }, 80);
+        });
+      }
+
+      updateDots();
+    })();
+
+    // FAQ accordion
+    document.querySelectorAll('.faq-q').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var item = btn.parentElement;
+        var wasOpen = item.classList.contains('open');
+        document.querySelectorAll('.faq-item.open').forEach(function(el) {
+          el.classList.remove('open');
+        });
+        if (!wasOpen) item.classList.add('open');
+      });
+    });
+
+    // Bento tiles glow hover effect
+    document.querySelectorAll('.bento-tile').forEach(function(tile) {
+      tile.addEventListener('mousemove', function(e) {
+        var rect = tile.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+        tile.style.setProperty('--mouse-x', x + 'px');
+        tile.style.setProperty('--mouse-y', y + 'px');
+      });
+    });
+
+    // Resolve latest release DMG from GitHub API
+    fetch('https://api.github.com/repos/VenkateshDas/pulse/releases')
+      .then(function(r) { return r.json(); })
+      .then(function(releases) {
+        if (!releases.length) return;
+        var dmg;
+        for (var i = 0; i < releases.length; i++) {
+          var assets = releases[i].assets || [];
+          for (var j = 0; j < assets.length; j++) {
+            if (assets[j].name.endsWith('.dmg')) { dmg = assets[j].browser_download_url; break; }
+          }
+          if (dmg) break;
+        }
+        if (!dmg) return;
+        document.querySelectorAll('[data-download]').forEach(function(a) {
+          a.href = dmg;
+        });
+      });
+  </script>
+</body>
+</html>
