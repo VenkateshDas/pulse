@@ -114,7 +114,7 @@ struct VitalCard: View {
         .padding(Halo.Space.md)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background {
-            RoundedRectangle(cornerRadius: Halo.Radius.card, style: .continuous)
+            RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
                 .fill(Halo.surface1)
                 .shadow(
                     color: isHovered
@@ -125,7 +125,7 @@ struct VitalCard: View {
                 )
         }
         .overlay {
-            RoundedRectangle(cornerRadius: Halo.Radius.card, style: .continuous)
+            RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
                 .strokeBorder(
                     isHovered ? color.opacity(0.25) : Halo.borderSubtle,
                     lineWidth: isHovered ? 1 : 0.5
@@ -134,7 +134,7 @@ struct VitalCard: View {
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .animation(Halo.Motion.snappy, value: isHovered)
         .onHover { hovering in isHovered = hovering }
-        .contentShape(RoundedRectangle(cornerRadius: Halo.Radius.card))
+        .contentShape(RoundedRectangle(cornerRadius: Halo.Radius.medium))
         .help(cardTooltip ?? "")
     }
 

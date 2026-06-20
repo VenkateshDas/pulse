@@ -107,7 +107,7 @@ struct DropZoneCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
-        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
+        .premiumCard(padding: 0)
         .overlay(
             RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous)
                 .strokeBorder(
@@ -183,7 +183,7 @@ struct InstalledAppsCard: View {
             }
         }
         .padding(Halo.Space.lg)
-        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
+        .premiumCard(padding: 0)
     }
 
     private func appRow(_ app: InstalledApp) -> some View {
@@ -262,7 +262,7 @@ struct UninstallPlanCard: View {
                 uninstallButton(plan)
             }
             .padding(Halo.Space.lg)
-            .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
+            .premiumCard(padding: 0)
         }
     }
 
@@ -457,7 +457,7 @@ struct UninstallResultCard: View {
                 actions(result)
             }
             .padding(Halo.Space.lg)
-            .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
+            .premiumCard(padding: 0)
             .overlay(
                 RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous)
                     .strokeBorder(Halo.pulseGreen.opacity(0.35), lineWidth: 1))
@@ -763,7 +763,7 @@ struct OrphanScanCard: View {
             }
         }
         .padding(Halo.Space.lg)
-        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
+        .premiumCard(padding: 0)
     }
 
     private func orphanRow(_ item: CleanItem) -> some View {
