@@ -85,6 +85,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <!-- Uninstaller: ask Finder to move protected (App Store / App-Management)
          bundles to the Trash via Apple Events. -->
     <key>NSAppleEventsUsageDescription</key><string>Pulse asks Finder to move an app you’re uninstalling to the Trash.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key><string>Pulse reads battery levels from connected Bluetooth peripherals.</string>
     <!-- Sparkle auto-update (P0-8): disabled until a real appcast is hosted.
          Before enabling, host appcast.xml (e.g. via GitHub Releases/Pages),
          set SUFeedURL + SUPublicEDKey, flip SUEnableAutomaticChecks to true,
