@@ -237,6 +237,27 @@ Implemented `docs/pulse-mole-super-spec.html` one phase per PR (branch → CI gr
 - **#8 lazy size**: installedApps() no longer walks every bundle tree; size computed on selection (describeApp). List load is fast; list omits size until selected.
 - Also: extracted shared perform() helper (uninstall/retry dedup). 86 tests green.
 
+## [2026-06-20] feat | Premium HIG redesign with HALO design token system (PR #29)
+- **Context**: Full UI overhaul following Apple Human Interface Guidelines research. Created `.claude/skills/macos-design/SKILL.md` — a reusable macOS HIG skill covering typography, colors, spacing, shadows, radii, animations, navigation, accessibility, SF Symbols, and Liquid Glass (WWDC25).
+- **Theme.swift**: Upgraded `Halo` enum with full design token system — `Shadow` (card shadow), `Radius` (small/medium/large/xl), `Space` (xs through xxl), `Motion` (snappy spring/smooth easeInOut/ring easeOut). Added `borderSubtle`, `textSecondary` surface tokens. Added `accentGradient()`, `meshBackground` gradient. Added `premiumCard(padding:cornerRadius:)` and `sectionLabel()` view modifiers.
+- **SidebarView**: Complete rewrite — `SidebarSection` enum grouping items (Overview/Insights/System/Tools), filled SF Symbol variants, hover states, blue tint active indicator in capsule, "Command Center" subtitle, section headers with tracking.
+- **VitalCard**: Hover micro-interaction (glow shadow, scale 1.01, border color shift), fill gradient on MiniLine, rounded rectangle legend items, `.continuous` corners throughout.
+- **DashboardView**: 26pt greeting, mesh gradient background, `premiumCard()` for charts panel, all `Halo.Space` tokens.
+- **AlertsSection**: Simplified header, LIVE dot shadow glow, 28×28 tinted icon containers, circular dismiss button, `premiumCard()` wrapper.
+- **14 secondary views** migrated to `premiumCard()`, `borderSubtle`, mesh backgrounds, 24pt headers: TopProcessesPanel, CoreHeatmap, HealthHero, HistoryChart, Sparkline, CommandPaletteView, MenuBarContent, DiskView, MonitorView, DevModeView, OnboardingView, UninstallView, TimelineView, StorageDetailPanel/Components.
+- **MenuBarContent**: Metric labels → `Halo.textSecondary`, dividers → `Halo.borderSubtle`. "Open Command Center" moved from large button to subtle 26×26 grid icon in HUD header adjacent to health score ring.
+- **DiskView**: Capsule pill-style tabs with hover states, animated tab switching.
+- **RootView**: View transitions (opacity + move), command palette scale transition.
+
+## [2026-06-20] fix | Guard Bluetooth API against missing TCC description on macOS 26
+- **Root cause**: `IOBluetoothDevice.pairedDevices()` triggers `__TCC_CRASHING_DUE_TO_PRIVACY_VIOLATION__` on macOS 26 when binary lacks `NSBluetoothAlwaysUsageDescription` in Info.plist. SwiftPM debug builds (`make run`) have no Info.plist.
+- **BluetoothSampler.swift**: Added guard — returns empty if `NSBluetoothAlwaysUsageDescription` key missing from main bundle.
+- **bundle.sh**: Added `NSBluetoothAlwaysUsageDescription` key to generated Info.plist.
+
+## [2026-06-20] fix | BundleGuard case-sensitivity bypass
+- **Root cause**: `isProtected()` lowercased input via `bundleID.lowercased()`, but 14 of 22 entries in `protectedBundleIDs` set had mixed case (e.g. "com.apple.Safari"). Swift `Set.contains` is case-sensitive, so these never matched — Safari, Preview, Photos, Notes, etc. were unprotected.
+- **BundleGuard.swift**: Lowercased all 22 entries to match the lowercased check.
+
 ## [2026-06-20] docs | Added Agent Optimization Modes to AGENTS.md
 - **AGENTS.md**: Added Section 7 detailing concise guidelines for using Caveman (communication style) and Ponytail (code structure) agent modes before starting coding work.
 - **Global Config**: Installed Ponytail skills suite globally in the user's config directory (~/.gemini/config/skills/).

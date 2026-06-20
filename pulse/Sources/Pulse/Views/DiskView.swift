@@ -23,6 +23,9 @@ struct DiskView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToOptimize)) { _ in
+            withAnimation(Halo.Motion.snappy) { selectedTab = 4 }
+        }
     }
 
     private var tabBar: some View {

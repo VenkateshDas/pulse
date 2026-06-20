@@ -2,6 +2,10 @@ import AppKit
 import PulseKit
 import SwiftUI
 
+extension Notification.Name {
+    static let navigateToOptimize = Notification.Name("PulseNavigateToOptimize")
+}
+
 /// Compact popover shown from the menu bar item: live vitals with 30s
 /// sparklines, top processes, the 7-day disk delta, and quick actions
 /// (Open Command Center, Quick Clean, Empty Trash).
@@ -12,6 +16,9 @@ struct MenuBarContent: View {
     @Environment(Updater.self) private var updater
     @Environment(\.openWindow) private var openWindow
 
+    @State private var isOptimizing = false
+    @State private var optimizeReport: String?
+
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
     private static let sparkSamples = 15
 
@@ -19,8 +26,10 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 12) {
             hud
             if let snapshot = model.snapshot {
+                let cpuLabel = snapshot.gpuUsage.map { String(format: "%.0f%% · GPU %.0f%%", snapshot.cpuTotalPercent, $0.deviceUtilization) }
+                    ?? String(format: "%.0f%%", snapshot.cpuTotalPercent)
                 metricRow(
-                    "CPU", String(format: "%.0f%%", snapshot.cpuTotalPercent),
+                    "CPU", cpuLabel,
                     fraction: snapshot.cpuTotalPercent / 100,
                     spark: model.cpuHistory)
                 metricRow(
@@ -232,15 +241,21 @@ struct MenuBarContent: View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
                 Button {
-                    clean.runNow()
+                    isOptimizing = true
+                    optimizeReport = nil
+                    Task {
+                        let report = await OptimizeEngine.runSafeTasks()
+                        isOptimizing = false
+                        optimizeReport = report
+                    }
                 } label: {
-                    Label(clean.isRunning ? "Cleaning…" : "Quick Clean", systemImage: "sparkles")
+                    Label(isOptimizing ? "Optimizing…" : "Optimize", systemImage: "bolt.heart.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .controlSize(.regular)
                 .buttonStyle(.bordered)
                 .tint(Halo.pulseGreen)
-                .disabled(clean.isRunning)
+                .disabled(isOptimizing)
 
                 Button {
                     storage.emptyTrash()
@@ -254,7 +269,20 @@ struct MenuBarContent: View {
                 .disabled(storage.trashItemCount == 0 || storage.isCleaning)
             }
 
-            if let report = clean.report {
+            if isOptimizing {
+                Text("Running safe optimizations…")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+            } else if let report = optimizeReport {
+                Text(report)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.pulseGreen)
+                    .lineLimit(2)
+            } else if storage.isCleaning {
+                Text("Emptying Trash…")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+            } else if let report = storage.cleanReport {
                 Text(report)
                     .font(.system(size: 10))
                     .foregroundStyle(Halo.pulseGreen)
