@@ -9,7 +9,7 @@
 [![Release](https://img.shields.io/github/v/release/VenkateshDas/pulse?include_prereleases&label=release)](https://github.com/VenkateshDas/pulse/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[**Download for Mac →**](https://github.com/VenkateshDas/pulse/releases/latest)
+[**Website**](https://venkateshdas.github.io/pulse/) · [**Download for Mac →**](https://github.com/VenkateshDas/pulse/releases/latest)
 
 </div>
 
