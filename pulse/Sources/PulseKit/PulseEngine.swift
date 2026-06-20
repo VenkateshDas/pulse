@@ -13,6 +13,7 @@ public actor PulseEngine {
     private let sleepAssertions = SleepAssertionReader()
     private let diskHistory = DiskHistoryStore()
     private let health = HealthSampler()
+    private let gpu = GPUSampler()
     // lazy: key-space enumeration takes a beat; runs on first sample
     // (actor context, off the main thread), not at app init.
     private lazy var smc = SMCSensors()
@@ -27,6 +28,7 @@ public actor PulseEngine {
         let (netIn, netOut) = network.sample()
         let top = processes.sample(limit: topProcessLimit)
         let batteryHealth = await health.sampleBattery()
+        let gpuUsage = await gpu.sample()
 
         let diskUsed = diskTotal > diskFree ? diskTotal - diskFree : 0
         diskHistory.record(usedBytes: diskUsed)
@@ -59,7 +61,8 @@ public actor PulseEngine {
             sleepAssertions: sleepAssertions.sample(),
             topProcesses: top,
             uptime: ProcessInfo.processInfo.systemUptime,
-            battery: batteryHealth
+            battery: batteryHealth,
+            gpuUsage: gpuUsage
         )
     }
 }

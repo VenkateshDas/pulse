@@ -130,11 +130,18 @@ struct DashboardView: View {
                     color: busy == cores.count ? Halo.amber : nil))
         }
 
+        let gpuStr: String
+        if let gpu = snapshot?.gpuUsage {
+            gpuStr = String(format: " · GPU %1.0f%%", gpu.deviceUtilization)
+        } else {
+            gpuStr = ""
+        }
+
         return VitalCard(
             title: "CPU",
             fraction: total / 100,
             value: String(format: "%2d%%", Int(total)),
-            line1: split,
+            line1: split + gpuStr,
             line2: String(format: "load %5.2f", snapshot?.loadAverage1m ?? 0),
             history: model.cpuHistory,
             cardTooltip: cpuTooltip,

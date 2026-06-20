@@ -93,6 +93,7 @@ public struct SystemSnapshot: Sendable, Equatable {
     public let topProcesses: [ProcessSample]
     public let uptime: TimeInterval
     public let battery: BatteryHealth?
+    public let gpuUsage: GPUUsage?
 
     public var memoryUsedFraction: Double {
         memoryTotalBytes == 0 ? 0 : Double(memoryUsedBytes) / Double(memoryTotalBytes)
@@ -126,7 +127,8 @@ public struct SystemSnapshot: Sendable, Equatable {
         sleepAssertions: [SleepAssertion],
         topProcesses: [ProcessSample],
         uptime: TimeInterval,
-        battery: BatteryHealth? = nil
+        battery: BatteryHealth? = nil,
+        gpuUsage: GPUUsage? = nil
     ) {
         self.timestamp = timestamp
         self.cpuTotalPercent = cpuTotalPercent
@@ -152,5 +154,6 @@ public struct SystemSnapshot: Sendable, Equatable {
         self.topProcesses = topProcesses
         self.uptime = uptime
         self.battery = battery
+        self.gpuUsage = gpuUsage
     }
 }
