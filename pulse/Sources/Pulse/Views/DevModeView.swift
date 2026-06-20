@@ -21,9 +21,9 @@ struct DevModeView: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear {
             Task { await model.sample() }
             timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
@@ -39,7 +39,7 @@ struct DevModeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Dev Mode")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text("Raw diagnostic console: full SMC sensor reads, sysctl properties, and per-process file descriptors.")
                 .font(.system(size: 12))
@@ -78,9 +78,9 @@ struct DevModeView: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private var sysctlCard: some View {
@@ -117,9 +117,9 @@ struct DevModeView: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private var processFDCard: some View {
@@ -173,8 +173,8 @@ struct DevModeView: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 }

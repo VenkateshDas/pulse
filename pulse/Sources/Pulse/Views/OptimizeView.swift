@@ -21,7 +21,7 @@ struct OptimizeView: View {
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.loadIfNeeded() }
     }
 
@@ -29,7 +29,7 @@ struct OptimizeView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Optimize")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(Halo.textPrimary)
                 Text("Safe maintenance tasks. Removals go to the Trash — reversible.")
                     .font(.system(size: 12))
@@ -60,7 +60,7 @@ struct OptimizeView: View {
                 .foregroundStyle(Halo.textDim)
             Spacer()
         }
-        .padding(12)
+        .padding(Halo.Space.md)
         .background(Halo.volt.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.volt.opacity(0.3), lineWidth: 1))
     }
@@ -101,7 +101,7 @@ struct OptimizeView: View {
         }
         .padding(14)
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.borderSubtle, lineWidth: 1))
     }
 
     @ViewBuilder
@@ -184,7 +184,7 @@ struct OptimizeView: View {
             }
         }
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.borderSubtle, lineWidth: 1))
     }
 
     private func tag(_ text: String, _ color: Color) -> some View {

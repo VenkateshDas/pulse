@@ -7,7 +7,7 @@ struct AlertsSection: View {
     @Environment(DashboardModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Halo.Space.md) {
             header
             if model.alerts.isEmpty {
                 allClear
@@ -22,17 +22,15 @@ struct AlertsSection: View {
                     .foregroundStyle(Halo.ion)
             }
         }
-        .padding(16)
+        .premiumCard()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
     }
 
     private var header: some View {
         HStack {
             HStack(spacing: 4) {
-                Text("NEEDS ATTENTION — CAUSE → FIX")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("NEEDS ATTENTION")
+                    .sectionLabel()
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .help("System alerts that require your attention to fix performance or safety issues")
@@ -40,7 +38,10 @@ struct AlertsSection: View {
             .foregroundStyle(Halo.textDim)
             Spacer()
             HStack(spacing: 5) {
-                Circle().fill(Halo.pulseGreen).frame(width: 5, height: 5)
+                Circle()
+                    .fill(Halo.pulseGreen)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: Halo.pulseGreen.opacity(0.5), radius: 4)
                 Text("LIVE")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.pulseGreen)
@@ -49,14 +50,20 @@ struct AlertsSection: View {
     }
 
     private var allClear: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "checkmark.seal.fill")
-                .foregroundStyle(Halo.pulseGreen)
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Halo.pulseGreen.opacity(0.12))
+                    .frame(width: 28, height: 28)
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Halo.pulseGreen)
+            }
             Text("All systems nominal — nothing needs attention")
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textPrimary.opacity(0.85))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Halo.textSecondary)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, Halo.Space.sm)
     }
 }
 
@@ -66,14 +73,19 @@ private struct AlertCard: View {
 
     @State private var expandedDetails: String?
     @State private var confirmQuit: (pid: Int32, name: String)?
+    @State private var isHovered = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Halo.Space.sm) {
             HStack(spacing: 12) {
-                Image(systemName: alert.symbol)
-                    .font(.system(size: 15))
-                    .foregroundStyle(severityColor)
-                    .frame(width: 22)
+                ZStack {
+                    Circle()
+                        .fill(severityColor.opacity(0.12))
+                        .frame(width: 30, height: 30)
+                    Image(systemName: alert.symbol)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(severityColor)
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(alert.title)
@@ -91,7 +103,8 @@ private struct AlertCard: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Halo.textDim)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 22, height: 22)
+                        .background(Halo.surface2.opacity(0.5), in: Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Dismiss — hides until this condition clears and recurs")
@@ -100,19 +113,28 @@ private struct AlertCard: View {
                 Text(details)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
-                    .padding(10)
+                    .padding(Halo.Space.md)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Halo.void, in: RoundedRectangle(cornerRadius: 8))
+                    .background(Halo.void, in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous))
             }
         }
-        .padding(12)
-        .background(Halo.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(severityColor)
-                .frame(width: 3)
-                .padding(.vertical, 8)
+        .padding(Halo.Space.md)
+        .background {
+            RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
+                .fill(isHovered ? Halo.surface2.opacity(0.7) : Halo.surface2.opacity(0.4))
         }
+        .overlay(alignment: .leading) {
+            UnevenRoundedRectangle(
+                topLeadingRadius: Halo.Radius.medium,
+                bottomLeadingRadius: Halo.Radius.medium,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 0
+            )
+            .fill(severityColor)
+            .frame(width: 3)
+        }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .onHover { isHovered = $0 }
         .confirmationDialog(
             "Quit \(confirmQuit?.name ?? "")?",
             isPresented: Binding(
@@ -132,7 +154,7 @@ private struct AlertCard: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Halo.Space.sm) {
             ForEach(Array(alert.actions.enumerated()), id: \.offset) { _, action in
                 switch action {
                 case .quitProcess(let pid, let name):
@@ -144,7 +166,7 @@ private struct AlertCard: View {
                     .controlSize(.small)
                 case .showDetails(let text):
                     Button(expandedDetails == nil ? "Details" : "Hide") {
-                        withAnimation(.spring(duration: 0.25)) {
+                        withAnimation(Halo.Motion.snappy) {
                             expandedDetails = expandedDetails == nil ? text : nil
                         }
                     }

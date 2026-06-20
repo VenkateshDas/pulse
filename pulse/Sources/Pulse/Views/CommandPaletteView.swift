@@ -80,8 +80,9 @@ struct CommandPaletteView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Halo.textDim)
                 TextField("Search commands…", text: $query)
                     .textFieldStyle(.plain)
@@ -90,13 +91,16 @@ struct CommandPaletteView: View {
                     .focused($searchFocused)
                     .onSubmit { runHighlighted() }
                 Text("esc")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 4))
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
             }
-            .padding(14)
-            Divider().overlay(Halo.surface2)
+            .padding(.horizontal, Halo.Space.lg)
+            .padding(.vertical, Halo.Space.md)
+
+            Divider().overlay(Halo.borderSubtle)
+
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(filtered.enumerated()), id: \.element.id) { index, command in
@@ -104,36 +108,52 @@ struct CommandPaletteView: View {
                             .onTapGesture { run(command) }
                     }
                 }
-                .padding(8)
+                .padding(Halo.Space.sm)
             }
-            .frame(maxHeight: 320)
+            .frame(maxHeight: 340)
         }
-        .frame(width: 480)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Halo.surface2, lineWidth: 1))
+        .frame(width: 500)
+        .background {
+            RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous)
+                .fill(Halo.surface1)
+                .shadow(color: .black.opacity(0.2), radius: 30, y: 10)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous)
+                .strokeBorder(Halo.borderSubtle, lineWidth: 0.5)
+        }
         .onChange(of: query) { _, _ in highlighted = 0 }
         .onAppear { searchFocused = true }
     }
 
     private func row(_ command: Command, active: Bool) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: command.symbol)
-                .font(.system(size: 13))
-                .foregroundStyle(active ? Halo.ion : Halo.textDim)
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 1) {
+            ZStack {
+                RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
+                    .fill(active ? Halo.interactive.opacity(0.12) : Halo.surface2.opacity(0.5))
+                    .frame(width: 28, height: 28)
+                Image(systemName: command.symbol)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(active ? Halo.ion : Halo.textDim)
+            }
+            VStack(alignment: .leading, spacing: 2) {
                 Text(command.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Halo.textPrimary)
                 Text(command.subtitle)
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundStyle(Halo.textDim)
             }
             Spacer()
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(active ? Halo.surface2 : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, Halo.Space.md)
+        .padding(.vertical, Halo.Space.sm)
+        .background {
+            if active {
+                RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
+                    .fill(Halo.surface2.opacity(0.6))
+            }
+        }
         .contentShape(Rectangle())
     }
 

@@ -37,9 +37,9 @@ struct HealthView: View {
             BenchmarkCard()
                 .frame(height: 180)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
     }
@@ -47,7 +47,7 @@ struct HealthView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Health")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text("Battery, startup agents, and repeatable performance benchmarks.")
                 .font(.system(size: 12))
@@ -101,7 +101,7 @@ private struct HealthScoreCard: View {
         .padding(20)
         .frame(maxWidth: .infinity)
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.borderSubtle, lineWidth: 1))
     }
 
     private func factorRow(_ factor: HealthFactor, lost: Double) -> some View {
@@ -150,9 +150,9 @@ private struct BatteryCard: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     @ViewBuilder
@@ -311,9 +311,9 @@ private struct BluetoothCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 }
 
@@ -355,7 +355,7 @@ private struct BatteryStatsCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private var divider: some View {
@@ -437,9 +437,9 @@ private struct CapacityTrendCard: View {
                 HistoryChart(values: series, color: Halo.volt, maxValue: scale)
             }
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 }
 
@@ -471,9 +471,9 @@ private struct BatteryConsumptionCard: View {
                 .scrollIndicators(.never)
             }
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private func row(for entry: BatteryHistoryStore.Entry) -> some View {
@@ -581,9 +581,9 @@ private struct StartupItemsCard: View {
                 .scrollIndicators(.never)
             }
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private var columnHeader: some View {
@@ -712,9 +712,9 @@ private struct BenchmarkCard: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private var runButton: some View {

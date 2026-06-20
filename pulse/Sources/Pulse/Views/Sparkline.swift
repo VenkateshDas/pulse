@@ -12,12 +12,15 @@ struct Sparkline: View {
                     fillPath(points, size: geo.size)
                         .fill(
                             LinearGradient(
-                                colors: [Halo.ion.opacity(0.25), .clear],
+                                colors: [Halo.ion.opacity(0.20), Halo.ion.opacity(0.02)],
                                 startPoint: .top, endPoint: .bottom
                             )
                         )
                     linePath(points)
-                        .stroke(Halo.ion, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                        .stroke(
+                            Halo.ion,
+                            style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+                        )
                 }
             }
         }

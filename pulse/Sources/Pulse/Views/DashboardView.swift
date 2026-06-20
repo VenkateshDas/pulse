@@ -11,34 +11,37 @@ struct DashboardView: View {
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
     var body: some View {
-        // No ScrollView: the layout is designed to fit the window's minimum
-        // size, and the bottom row stretches to absorb extra height.
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Halo.Space.xl) {
             hero
             vitals
             AlertsSection()
-            HStack(alignment: .top, spacing: 16) {
-                VStack(spacing: 16) {
+            HStack(alignment: .top, spacing: Halo.Space.lg) {
+                VStack(spacing: Halo.Space.lg) {
                     chartsPanel
                     CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
                 }
                 .frame(maxHeight: .infinity)
-                
+
                 TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
                     .frame(width: 400)
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background {
+            ZStack {
+                Halo.void
+                Halo.meshBackground
+            }
+        }
     }
 
     // MARK: Hero (greeting + diagnosis verdict + health score)
 
     private var hero: some View {
-        HStack(alignment: .center, spacing: 20) {
+        HStack(alignment: .center, spacing: Halo.Space.xl) {
             greeting
             Spacer()
             HealthScoreRing(score: model.healthScore)
@@ -46,9 +49,9 @@ struct DashboardView: View {
     }
 
     private var greeting: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Halo.Space.sm) {
             Text("\(timeGreeting), \(firstName)")
-                .font(.system(size: 24, weight: .bold, design: .default))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundStyle(Halo.textPrimary)
             DiagnosisBadge(
                 diagnosis: model.diagnosis,
@@ -83,8 +86,6 @@ struct DashboardView: View {
 
     private var statusLine: String {
         let issues = model.alerts.count
-        // Info-level alerts are FYIs, not problems — only warning+ changes
-        // the health verdict (the sidebar footer uses the same rule).
         let hasProblems = model.alerts.contains { $0.severity != .info }
         let health = hasProblems ? "Your Mac needs a look" : "Your Mac is healthy"
         let attention =
@@ -97,7 +98,7 @@ struct DashboardView: View {
     // MARK: Vitals
 
     private var vitals: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Halo.Space.md) {
             cpuCard
             memoryCard
             diskCard
@@ -108,8 +109,6 @@ struct DashboardView: View {
     private var cpuCard: some View {
         let snapshot = model.snapshot
         let total = snapshot?.cpuTotalPercent ?? 0
-        // Fixed-width formats keep text intrinsic size constant between
-        // samples, so value changes redraw without relaying out the window.
         let split: String
         if let e = snapshot?.cpuEfficiencyPercent, let p = snapshot?.cpuPerformancePercent {
             split = String(format: "E %2d%% · P %2d%%", Int(e), Int(p))
@@ -118,8 +117,6 @@ struct DashboardView: View {
         }
         let cpuTooltip = snapshot?.cpuPerCore.enumerated().map { "Core \($0.offset): \(Int($0.element))%" }.joined(separator: "\n")
 
-        // Footer chips: the biggest CPU consumer right now, and how many cores
-        // are actually loaded — the two things you reach for when CPU is high.
         var cpuStats: [VitalCard.Stat] = []
         if let top = snapshot?.topProcesses.first, top.cpuPercent >= 1 {
             let name = top.name.count > 12 ? String(top.name.prefix(11)) + "…" : top.name
@@ -219,8 +216,6 @@ struct DashboardView: View {
             "Free Space: \(ByteFormat.string(free))"
         ].joined(separator: "\n")
 
-        // Footer chips: free space, and — projecting the weekly growth trend
-        // forward — roughly when the disk runs out.
         var diskStats: [VitalCard.Stat] = [.init(label: "FREE", value: ByteFormat.string(free))]
         if let weekly = snapshot?.diskWeeklyGrowthBytes {
             if weekly > 0, free > 0 {
@@ -256,8 +251,6 @@ struct DashboardView: View {
         let hottest = [sensors.cpuTempC, sensors.gpuTempC].compactMap { $0 }.max()
 
         guard let hottest else {
-            // No SMC on this machine (or access denied): fall back to the
-            // macOS thermal state, which is always available.
             let thermal = model.snapshot?.thermal ?? .nominal
             let (label, fraction, color): (String, Double, Color) =
                 switch thermal {
@@ -278,8 +271,6 @@ struct DashboardView: View {
             )
         }
 
-        // Ring maps 20–110 °C; color thresholds follow Apple Silicon
-        // norms (sustained >90 °C is throttling territory).
         let color: Color = hottest < 70 ? Halo.volt : (hottest < 90 ? Halo.amber : Halo.flare)
         let line1 = [
             sensors.cpuTempC.map { String(format: "CPU %2.0f°", $0) },
@@ -307,8 +298,6 @@ struct DashboardView: View {
         if let batt = sensors.batteryTempC { thermalLines.append(String(format: "Battery: %.0f°C", batt)) }
         let thermalTooltip = thermalLines.isEmpty ? nil : thermalLines.joined(separator: "\n")
 
-        // Footer chips: degrees of headroom before throttling (~90 °C on Apple
-        // Silicon) and whether temps are climbing — context a bare number lacks.
         let headroom = max(0, 90 - hottest)
         var thermalStats: [VitalCard.Stat] = [
             .init(
@@ -340,8 +329,8 @@ struct DashboardView: View {
     // MARK: Performance Charts
 
     private var chartsPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: Halo.Space.lg) {
+            HStack(spacing: Halo.Space.lg) {
                 chartRow(
                     title: "CPU · 30M", topLabel: "100%", bottomLabel: "0%",
                     history: paddedHistory(model.cpuHistory),
@@ -353,8 +342,8 @@ struct DashboardView: View {
                     color: Halo.volt, maxValue: 100
                 )
             }
-            
-            HStack(spacing: 16) {
+
+            HStack(spacing: Halo.Space.lg) {
                 networkChartRow
 
                 let maxPower = max(model.powerHistory.compactMap { $0 }.max() ?? 50, 10)
@@ -368,23 +357,14 @@ struct DashboardView: View {
 
             cpuDayChartRow
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Halo.border, lineWidth: 1)
-        )
+        .premiumCard()
     }
-    
-    /// 24-hour CPU history — gap-honest (nil minutes render as gaps, never
-    /// interpolated), persisted across launches via MinuteHistoryStore.
+
     private var cpuDayChartRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Halo.Space.sm) {
             HStack(spacing: 4) {
                 Text("CPU · 24H")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .sectionLabel()
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .help("Minute-averaged CPU over the last 24 hours. Gaps (sleep, app closed) are shown honestly — never interpolated.")
@@ -433,17 +413,16 @@ struct DashboardView: View {
         .font(.system(size: 9, weight: .semibold, design: .monospaced))
         .foregroundStyle(Halo.textDim)
     }
-    
+
     private var networkChartRow: some View {
         let maxIn = model.networkInHistory.compactMap { $0 }.max() ?? 1024
         let maxOut = model.networkOutHistory.compactMap { $0 }.max() ?? 1024
-        let maxValue = max(maxIn, maxOut, 1024) * 1.2 // Scale to fit
-        
-        return VStack(alignment: .leading, spacing: 8) {
+        let maxValue = max(maxIn, maxOut, 1024) * 1.2
+
+        return VStack(alignment: .leading, spacing: Halo.Space.sm) {
             HStack(spacing: 4) {
                 Text("NETWORK · 30M")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .sectionLabel()
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .help("Network throughput over the last 30 minutes (Blue = In, Orange = Out)")
@@ -458,24 +437,23 @@ struct DashboardView: View {
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 50, alignment: .trailing)
-                
+
                 ZStack {
                     HistoryChart(values: paddedHistory(model.networkInHistory), color: Halo.ion, maxValue: maxValue)
                     HistoryChart(values: paddedHistory(model.networkOutHistory), color: Halo.flare, maxValue: maxValue)
                 }
             }
             .frame(maxHeight: .infinity)
-            
+
             xAxis
         }
     }
 
     private func chartRow(title: String, topLabel: String, bottomLabel: String, history: [Double?], color: Color, maxValue: Double) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Halo.Space.sm) {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .sectionLabel()
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .help(title.contains("CPU") ? "CPU utilization history over the last 30 minutes" : "System memory utilization history over the last 30 minutes")
@@ -493,11 +471,11 @@ struct DashboardView: View {
                 HistoryChart(values: history, color: color, maxValue: maxValue)
             }
             .frame(maxHeight: .infinity)
-            
+
             xAxis
         }
     }
-    
+
     private func paddedHistory(_ buffer: [Double]) -> [Double?] {
         let missing = 900 - buffer.count
         if missing <= 0 { return buffer.map { $0 } }

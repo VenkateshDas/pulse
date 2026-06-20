@@ -18,20 +18,11 @@ struct RootView: View {
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selection: $selection)
-            switch selection {
-            case .storage: DiskView()
-            case .timeline: TimelineView()
-            case .uninstall: UninstallView()
-            case .monitor: MonitorView()
-            case .health: HealthView()
-            case .diagnostics: DevModeView()
-            default: DashboardView()
-            }
+            contentArea
         }
         .frame(minWidth: 1080, minHeight: 720)
         .background(Halo.void)
         .background {
-            // Hidden ⌘K hotkey for the command palette (no visible chrome).
             Button("") { showPalette = true }
                 .keyboardShortcut("k", modifiers: .command)
                 .opacity(0)
@@ -44,17 +35,15 @@ struct RootView: View {
             clean.start()
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
-            selection = .storage
+            withAnimation(Halo.Motion.snappy) { selection = .storage }
         }
         .onReceive(NotificationCenter.default.publisher(for: DashboardView.navigateToMonitor)) { _ in
-            selection = .monitor
+            withAnimation(Halo.Motion.snappy) { selection = .monitor }
         }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)
         ) { note in
-            // SwiftUI doesn't expose the scene id on NSWindow reliably;
-            // the title is stable and unique to this window.
             guard let window = note.object as? NSWindow,
                 window.title.hasPrefix("Pulse")
             else { return }
@@ -67,6 +56,22 @@ struct RootView: View {
         }
     }
 
+    private var contentArea: some View {
+        Group {
+            switch selection {
+            case .storage: DiskView()
+            case .timeline: TimelineView()
+            case .uninstall: UninstallView()
+            case .monitor: MonitorView()
+            case .health: HealthView()
+            case .diagnostics: DevModeView()
+            default: DashboardView()
+            }
+        }
+        .transition(.opacity.combined(with: .move(edge: .bottom).animation(.easeOut(duration: 0.15))))
+        .animation(Halo.Motion.smooth, value: selection)
+    }
+
     @ViewBuilder
     private var commandPaletteOverlay: some View {
         if showPalette {
@@ -77,6 +82,7 @@ struct RootView: View {
                 CommandPaletteView(isPresented: $showPalette, selection: $selection)
                     .padding(.top, 80)
                     .frame(maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
             }
             .onExitCommand { showPalette = false }
             .transition(.opacity)

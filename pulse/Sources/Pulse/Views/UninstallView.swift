@@ -28,16 +28,16 @@ struct UninstallView: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Uninstall")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text(
                 "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app goes to the Trash and every leftover is staged in the Vault — nothing is ever destroyed."
@@ -52,16 +52,18 @@ struct UninstallView: View {
             ForEach(UninstallModel.Tab.allCases) { tab in
                 let selected = model.tab == tab
                 Button {
-                    model.tab = tab
+                    withAnimation(Halo.Motion.snappy) { model.tab = tab }
                 } label: {
                     Text(tab.rawValue.uppercased())
                         .font(.system(size: 10, weight: .bold))
                         .tracking(0.5)
-                        .foregroundStyle(selected ? Halo.void : Halo.textDim)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
+                        .foregroundStyle(selected ? .white : Halo.textDim)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
                         .background(
-                            selected ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2),
+                            selected
+                                ? AnyShapeStyle(Halo.accentGradient(Halo.ion))
+                                : AnyShapeStyle(Halo.surface2),
                             in: Capsule())
                 }
                 .buttonStyle(.plain)
@@ -105,9 +107,9 @@ struct DropZoneCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 30)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous)
                 .strokeBorder(
                     targeted ? Halo.ion : Halo.surface2,
                     style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
@@ -180,8 +182,8 @@ struct InstalledAppsCard: View {
                 }
             }
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private func appRow(_ app: InstalledApp) -> some View {
@@ -259,8 +261,8 @@ struct UninstallPlanCard: View {
                 }
                 uninstallButton(plan)
             }
-            .padding(16)
-            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+            .padding(Halo.Space.lg)
+            .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
         }
     }
 
@@ -454,10 +456,10 @@ struct UninstallResultCard: View {
                 notes(result)
                 actions(result)
             }
-            .padding(16)
-            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+            .padding(Halo.Space.lg)
+            .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
+                RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous)
                     .strokeBorder(Halo.pulseGreen.opacity(0.35), lineWidth: 1))
         }
     }
@@ -760,8 +762,8 @@ struct OrphanScanCard: View {
                 removeButton
             }
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private func orphanRow(_ item: CleanItem) -> some View {

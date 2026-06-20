@@ -16,9 +16,10 @@ struct MenuBarContent: View {
     private static let sparkSamples = 15
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Halo.Space.md) {
             hud
             if let snapshot = model.snapshot {
+                Divider().overlay(Halo.borderSubtle)
                 metricRow(
                     "CPU", String(format: "%.0f%%", snapshot.cpuTotalPercent),
                     fraction: snapshot.cpuTotalPercent / 100,
@@ -32,7 +33,7 @@ struct MenuBarContent: View {
                 if let battery = snapshot.battery {
                     batteryRow(battery)
                 }
-                Divider().overlay(Halo.surface2)
+                Divider().overlay(Halo.borderSubtle)
                 topProcesses(snapshot)
             } else {
                 Text("Sampling…")
@@ -40,25 +41,25 @@ struct MenuBarContent: View {
                     .foregroundStyle(Halo.textDim)
             }
 
-            Divider().overlay(Halo.surface2)
+            Divider().overlay(Halo.borderSubtle)
             actions
         }
         .onAppear {
             model.viewAppeared()
             storage.refreshTrashInfo()
-            updater.checkForUpdates()  // throttled background check
+            updater.checkForUpdates()
         }
         .onDisappear { model.viewDisappeared() }
-        .padding(14)
-        .frame(width: 280)
+        .padding(Halo.Space.lg)
+        .frame(width: 290)
         .background(Halo.void)
     }
 
     // MARK: HUD (live verdict + score)
 
     private var hud: some View {
-        HStack(spacing: 10) {
-            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, labelMode: .scoreOnly)
+        HStack(spacing: Halo.Space.md) {
+            HealthScoreRing(score: model.healthScore, diameter: 46, lineWidth: 5, labelMode: .scoreOnly)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.diagnosis.line)
                     .font(.system(size: 12, weight: .semibold))
@@ -79,8 +80,8 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.textDim)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Halo.textSecondary)
                 Spacer()
                 Text(value)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
@@ -100,8 +101,8 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Disk free")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.textDim)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Halo.textSecondary)
                 Spacer()
                 Text("\(ByteFormat.string(snapshot.diskFreeBytes)) / \(ByteFormat.string(snapshot.diskTotalBytes))")
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
@@ -109,7 +110,7 @@ struct MenuBarContent: View {
             }
             bar(snapshot.diskUsedFraction)
             if let weekly = snapshot.diskWeeklyGrowthBytes {
-                let sign = weekly >= 0 ? "−" : "+"  // growth shrinks free space
+                let sign = weekly >= 0 ? "−" : "+"
                 Text("\(sign)\(ByteFormat.string(UInt64(abs(weekly)))) this week")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(weekly >= 0 ? Halo.amber : Halo.pulseGreen)
@@ -117,8 +118,6 @@ struct MenuBarContent: View {
         }
     }
 
-    /// Temperature + thermal-pressure state. Shows the SMC reading when this
-    /// Mac exposes one; otherwise falls back to the kernel thermal level word.
     private func thermalRow(_ snapshot: SystemSnapshot) -> some View {
         let temp = [snapshot.sensors.cpuTempC, snapshot.sensors.gpuTempC]
             .compactMap { $0 }.max()
@@ -138,12 +137,11 @@ struct MenuBarContent: View {
             color: Halo.textPrimary)
     }
 
-    /// Compact label/value row (no bar/sparkline) for the secondary metrics.
     private func infoRow(_ label: String, _ value: String, color: Color) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.textDim)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Halo.textSecondary)
             Spacer()
             Text(value)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
@@ -179,6 +177,7 @@ struct MenuBarContent: View {
             }
         }
         .frame(height: 4)
+        .clipShape(Capsule())
     }
 
     // MARK: Top processes
@@ -187,7 +186,7 @@ struct MenuBarContent: View {
     private func topProcesses(_ snapshot: SystemSnapshot) -> some View {
         let top = Array(snapshot.topProcesses.prefix(3))
         if !top.isEmpty {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("TOP PROCESSES")
                     .font(.system(size: 9, weight: .semibold))
                     .tracking(1.5)
@@ -201,7 +200,7 @@ struct MenuBarContent: View {
                             .truncationMode(.middle)
                         Spacer()
                         Text(String(format: "%.0f%%", proc.cpuPercent))
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundStyle(Halo.ion)
                             .frame(width: 38, alignment: .trailing)
                         Text(ByteFormat.string(proc.residentBytes))
@@ -217,19 +216,19 @@ struct MenuBarContent: View {
     // MARK: Actions
 
     private var actions: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Halo.Space.sm) {
             Button {
                 openWindow(id: "dashboard")
                 NSApp.activate(ignoringOtherApps: true)
             } label: {
-                Label("Open Command Center", systemImage: "rectangle.grid.2x2")
+                Label("Open Command Center", systemImage: "square.grid.2x2")
                     .frame(maxWidth: .infinity)
             }
             .controlSize(.large)
             .buttonStyle(.borderedProminent)
-            .tint(Halo.ion.opacity(0.8))
+            .tint(Halo.ion)
 
-            HStack(spacing: 8) {
+            HStack(spacing: Halo.Space.sm) {
                 Button {
                     clean.runNow()
                 } label: {
@@ -263,8 +262,6 @@ struct MenuBarContent: View {
             updateRow
 
             Button("Quit Pulse") {
-                // The one true exit. Cmd-Q only closes the window (stays in the
-                // menu bar); this actually terminates Pulse.
                 AppActivation.shared.quit()
             }
             .buttonStyle(.plain)
@@ -274,8 +271,6 @@ struct MenuBarContent: View {
         }
     }
 
-    /// Update nudge / "Check for Updates…" control. Shows a prominent download
-    /// button when a newer GitHub release exists, otherwise a quiet check link.
     @ViewBuilder private var updateRow: some View {
         switch updater.status {
         case .available(let release):

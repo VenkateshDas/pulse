@@ -44,10 +44,13 @@ struct HealthScoreRing: View {
                 .stroke(Halo.surface2, lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: CGFloat(score.value) / 100)
-                .stroke(score.band.color,
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .stroke(
+                    score.band.color,
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                )
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.4), value: score.value)
+                .animation(Halo.Motion.ring, value: score.value)
+                .shadow(color: score.band.color.opacity(0.3), radius: 8)
             label
         }
         .frame(width: diameter, height: diameter)
@@ -64,7 +67,7 @@ struct HealthScoreRing: View {
                 .foregroundStyle(Halo.textPrimary)
                 .contentTransition(.numericText())
         case .full:
-            VStack(spacing: 0) {
+            VStack(spacing: 1) {
                 Text("\(score.value)")
                     .font(.system(size: diameter * 0.32, weight: .bold, design: .rounded))
                     .foregroundStyle(Halo.textPrimary)
@@ -89,10 +92,16 @@ struct DiagnosisBadge: View {
     var onCulpritTap: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(diagnosis.severity.color)
-                .frame(width: 8, height: 8)
+        HStack(spacing: Halo.Space.sm) {
+            ZStack {
+                Circle()
+                    .fill(diagnosis.severity.color.opacity(0.15))
+                    .frame(width: 16, height: 16)
+                Circle()
+                    .fill(diagnosis.severity.color)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: diagnosis.severity.color.opacity(0.4), radius: 4)
+            }
             Text(diagnosis.line)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
@@ -107,10 +116,16 @@ struct DiagnosisBadge: View {
                     }
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(diagnosis.severity.color)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(diagnosis.severity.color.opacity(0.15),
-                                in: Capsule())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        diagnosis.severity.color.opacity(0.12),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(diagnosis.severity.color.opacity(0.2), lineWidth: 0.5)
+                    }
                 }
                 .buttonStyle(.plain)
                 .help("Show \(name) in Monitor")

@@ -20,11 +20,11 @@ struct TrashView: View {
                 Text("Pulse History").tag(Tab.history)
             }
             .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Halo.surface2)
+            .padding(.horizontal, Halo.Space.lg)
+            .padding(.vertical, Halo.Space.sm)
+            .background(Halo.surface2.opacity(0.5))
             
-            Divider().background(Halo.border)
+            Divider().background(Halo.borderSubtle)
             
             if selectedTab == .raw {
                 if storage.trashAccessError {
@@ -43,7 +43,7 @@ struct TrashView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear {
             storage.refreshTrashInfo()
             storage.refreshUndoHistory()
@@ -203,7 +203,7 @@ private struct UndoEntryRow: View {
             .background(Halo.surface1)
             
             if isExpanded {
-                Divider().background(Halo.border)
+                Divider().background(Halo.borderSubtle)
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(entry.items.prefix(10), id: \.originalPath) { item in
                         Text(URL(fileURLWithPath: item.originalPath).lastPathComponent)

@@ -18,9 +18,9 @@ struct MonitorView: View {
             NetworkCard()
                 .frame(height: 190)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
     }
@@ -28,7 +28,7 @@ struct MonitorView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Monitor")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text(
                 "Every process with CPU, memory, threads and page-fault rates, plus live per-interface network throughput. Per-process network needs private Apple entitlements — Pulse won't pretend otherwise."
@@ -79,9 +79,9 @@ private struct ProcessListCard: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     /// Tree rows flattened with depth; a non-empty filter always shows the
@@ -309,9 +309,9 @@ private struct ProcessDetailCard: View {
                 placeholder
             }
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private var placeholder: some View {
@@ -458,9 +458,9 @@ private struct NetworkCard: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(16)
+        .padding(Halo.Space.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private func legend(_ label: String, _ color: Color) -> some View {

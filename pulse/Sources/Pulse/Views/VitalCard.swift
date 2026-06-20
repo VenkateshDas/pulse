@@ -40,18 +40,20 @@ struct VitalCard: View {
     }
     var segments: [Segment]? = nil
 
+    @State private var isHovered = false
+
     private var clamped: Double { min(max(fraction, 0), 1) }
     private var color: Color { ringColor ?? Halo.statusColor(clamped) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: Halo.Space.sm) {
+            HStack(spacing: 12) {
                 ring
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(alignment: .center, spacing: 3) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .center, spacing: 4) {
                         Text(title)
                             .font(.system(size: 10, weight: .semibold))
-                            .tracking(2)
+                            .tracking(1.5)
                         if cardTooltip != nil {
                             Image(systemName: "info.circle")
                                 .font(.system(size: 9))
@@ -71,14 +73,17 @@ struct VitalCard: View {
                 }
                 Spacer(minLength: 0)
             }
+
             sparkline
-                .frame(height: 14)
-            
+                .frame(height: 18)
+
             if let legend = legend {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ForEach(Array(legend.enumerated()), id: \.offset) { index, item in
-                        HStack(spacing: 3) {
-                            Circle().fill(item.color).frame(width: 5, height: 5)
+                        HStack(spacing: 4) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(item.color)
+                                .frame(width: 8, height: 4)
                             Text(item.label)
                                 .font(.system(size: 9, weight: .medium, design: .monospaced))
                                 .foregroundStyle(Halo.textDim)
@@ -106,20 +111,37 @@ struct VitalCard: View {
                 }
             }
         }
-        .padding(10)
+        .padding(Halo.Space.md)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .contentShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Halo.border, lineWidth: 1)
-        )
+        .background {
+            RoundedRectangle(cornerRadius: Halo.Radius.card, style: .continuous)
+                .fill(Halo.surface1)
+                .shadow(
+                    color: isHovered
+                        ? color.opacity(0.12)
+                        : Halo.Shadow.cardColor,
+                    radius: isHovered ? 16 : Halo.Shadow.cardRadius,
+                    y: isHovered ? 6 : Halo.Shadow.cardY
+                )
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: Halo.Radius.card, style: .continuous)
+                .strokeBorder(
+                    isHovered ? color.opacity(0.25) : Halo.borderSubtle,
+                    lineWidth: isHovered ? 1 : 0.5
+                )
+        }
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .animation(Halo.Motion.snappy, value: isHovered)
+        .onHover { hovering in isHovered = hovering }
+        .contentShape(RoundedRectangle(cornerRadius: Halo.Radius.card))
         .help(cardTooltip ?? "")
     }
 
     private var ring: some View {
         ZStack {
-            Circle().stroke(Halo.surface2, lineWidth: 5)
+            Circle()
+                .stroke(Halo.surface2, lineWidth: 5)
             if let segments = segments {
                 ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
                     Circle()
@@ -130,14 +152,18 @@ struct VitalCard: View {
             } else {
                 Circle()
                     .trim(from: 0, to: clamped)
-                    .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .stroke(
+                        color,
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
                     .rotationEffect(.degrees(-90))
+                    .animation(Halo.Motion.ring, value: clamped)
             }
             Text(value)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(Halo.textPrimary)
         }
-        .frame(width: 46, height: 46)
+        .frame(width: 48, height: 48)
     }
 
     @ViewBuilder
@@ -158,17 +184,49 @@ struct MiniLine: View {
 
     var body: some View {
         GeometryReader { geo in
-            Path { path in
-                let stepX = geo.size.width / CGFloat(max(values.count - 1, 1))
-                for (index, value) in values.enumerated() {
-                    let point = CGPoint(
-                        x: CGFloat(index) * stepX,
-                        y: geo.size.height * (1 - min(max(value / scale, 0), 1))
+            ZStack {
+                fillPath(in: geo.size)
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.12), color.opacity(0.0)],
+                            startPoint: .top, endPoint: .bottom
+                        )
                     )
-                    if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
-                }
+                linePath(in: geo.size)
+                    .stroke(
+                        color.opacity(0.7),
+                        style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round)
+                    )
             }
-            .stroke(color.opacity(0.8), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+        }
+    }
+
+    private func linePath(in size: CGSize) -> Path {
+        Path { path in
+            let stepX = size.width / CGFloat(max(values.count - 1, 1))
+            for (index, value) in values.enumerated() {
+                let point = CGPoint(
+                    x: CGFloat(index) * stepX,
+                    y: size.height * (1 - min(max(value / scale, 0), 1))
+                )
+                if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+        }
+    }
+
+    private func fillPath(in size: CGSize) -> Path {
+        Path { path in
+            let stepX = size.width / CGFloat(max(values.count - 1, 1))
+            path.move(to: CGPoint(x: 0, y: size.height))
+            for (index, value) in values.enumerated() {
+                let point = CGPoint(
+                    x: CGFloat(index) * stepX,
+                    y: size.height * (1 - min(max(value / scale, 0), 1))
+                )
+                path.addLine(to: point)
+            }
+            path.addLine(to: CGPoint(x: CGFloat(values.count - 1) * stepX, y: size.height))
+            path.closeSubpath()
         }
     }
 }

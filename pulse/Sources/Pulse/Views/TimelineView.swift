@@ -50,9 +50,9 @@ struct TimelineView: View {
             }
             .scrollIndicators(.never)
         }
-        .padding(24)
+        .padding(Halo.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.recordToday(scan: storage.scan) }
     }
 
@@ -61,7 +61,7 @@ struct TimelineView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Timeline")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text("Your Mac's daily health record — disk growth, battery sessions, and notable events.")
                 .font(.system(size: 12))
@@ -95,13 +95,13 @@ struct TimelineView: View {
                 }
                 .padding(.vertical, 8)
                 if anomaly.id != items.last?.id {
-                    Rectangle().fill(Halo.border).frame(height: 1)
+                    Rectangle().fill(Halo.borderSubtle).frame(height: 1)
                 }
             }
         }
         .padding(.horizontal, 14)
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.borderSubtle, lineWidth: 1))
     }
 
     // MARK: - Data join
@@ -185,8 +185,8 @@ struct TimelineView: View {
                 }
             }
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private func summaryCell(label: String, value: String, color: Color) -> some View {
@@ -199,7 +199,7 @@ struct TimelineView: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(Halo.Space.md)
         .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 10))
     }
 
@@ -272,10 +272,10 @@ struct TimelineView: View {
                 .background(Halo.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
             }
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous)
                 .strokeBorder(Halo.ion.opacity(0.2), lineWidth: 1)
         )
     }
@@ -332,8 +332,8 @@ struct TimelineView: View {
                 pastDayRow(entry, maxDelta: maxDelta)
             }
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     private func pastDayRow(_ entry: DayEntry, maxDelta: Int64) -> some View {
@@ -449,8 +449,8 @@ struct TimelineView: View {
             }
             .frame(height: 90)
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     // MARK: - Category breakdown
@@ -483,8 +483,8 @@ struct TimelineView: View {
                 }
             }
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .padding(Halo.Space.lg)
+        .background { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).fill(Halo.surface1).shadow(color: Halo.Shadow.cardColor, radius: Halo.Shadow.cardRadius, y: Halo.Shadow.cardY) } .overlay { RoundedRectangle(cornerRadius: Halo.Radius.large, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5) }
     }
 
     // MARK: - Helpers

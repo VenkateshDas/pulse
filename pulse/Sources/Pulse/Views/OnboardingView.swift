@@ -12,15 +12,16 @@ struct OnboardingView: View {
     @State private var notificationsAsked = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Halo.Space.xxl) {
+            VStack(alignment: .leading, spacing: Halo.Space.sm) {
                 Text("Welcome to Pulse")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 28, weight: .bold, design: .default))
                     .foregroundStyle(Halo.textPrimary)
                 Text("Two quick permissions and you're set. Pulse never moves a file without staging it in the Vault first — everything is restorable.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Halo.textDim)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(Halo.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(2)
             }
 
             step(
@@ -38,7 +39,7 @@ struct OnboardingView: View {
                                 string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(Halo.ion.opacity(0.8))
+                        .tint(Halo.ion)
                         Button("Re-check") { fdaGranted = FullDiskAccess.isGranted }
                             .buttonStyle(.bordered)
                     }
@@ -70,33 +71,40 @@ struct OnboardingView: View {
                 Button(fdaGranted ? "Start Pulse" : "Continue anyway") { finish() }
                     .buttonStyle(.borderedProminent)
                     .tint(Halo.pulseGreen)
+                    .controlSize(.large)
             }
         }
-        .padding(32)
+        .padding(36)
         .frame(width: 560, height: 520)
-        .background(Halo.void)
+        .background {
+            ZStack {
+                Halo.void
+                Halo.meshBackground
+            }
+        }
     }
 
     private func step<Content: View>(
         number: Int, title: String, body: String, granted: Bool,
         @ViewBuilder action: () -> Content
     ) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Halo.Space.lg) {
             ZStack {
                 Circle()
                     .fill(granted ? Halo.pulseGreen : Halo.surface2)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 32, height: 32)
+                    .shadow(color: granted ? Halo.pulseGreen.opacity(0.3) : .clear, radius: 6)
                 if granted {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Halo.void)
+                        .foregroundStyle(.white)
                 } else {
                     Text("\(number)")
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Halo.textPrimary)
                 }
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Halo.Space.sm) {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
@@ -104,13 +112,13 @@ struct OnboardingView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(1)
                 action()
                     .padding(.top, 2)
             }
             Spacer()
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 12))
+        .premiumCard()
     }
 
     private func requestNotifications() {

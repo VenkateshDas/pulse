@@ -35,7 +35,7 @@ struct StorageView: View {
                 Rectangle().fill(Halo.surface2).frame(height: 1)
                 bottomBar
             }
-            .background(Halo.void)
+            .background { ZStack { Halo.void; Halo.meshBackground } }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { storage.appeared() }
@@ -226,7 +226,7 @@ struct StorageView: View {
                 storage.pushDirectory(node)
                 selectedID = nil
             }
-            .padding(12)
+            .padding(Halo.Space.md)
         }
     }
 
