@@ -70,6 +70,18 @@ struct MenuBarContent: View {
                     .foregroundStyle(Halo.textDim)
             }
             Spacer()
+            Button {
+                openWindow(id: "dashboard")
+                NSApp.activate(ignoringOtherApps: true)
+            } label: {
+                Image(systemName: "rectangle.grid.2x2")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Halo.textSecondary)
+                    .frame(width: 26, height: 26)
+                    .background(Halo.surface2, in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("Open Command Center")
         }
     }
 
@@ -218,17 +230,6 @@ struct MenuBarContent: View {
 
     private var actions: some View {
         VStack(spacing: 8) {
-            Button {
-                openWindow(id: "dashboard")
-                NSApp.activate(ignoringOtherApps: true)
-            } label: {
-                Label("Open Command Center", systemImage: "rectangle.grid.2x2")
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
-            .tint(Halo.ion.opacity(0.8))
-
             HStack(spacing: 8) {
                 Button {
                     clean.runNow()
