@@ -106,21 +106,26 @@ struct CommandPaletteView: View {
                 }
                 .padding(8)
             }
-            .frame(maxHeight: 320)
+            .frame(maxHeight: 340)
         }
-        .frame(width: 480)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Halo.surface2, lineWidth: 1))
+        .frame(width: 500)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.2), radius: 30, y: 10)
         .onChange(of: query) { _, _ in highlighted = 0 }
         .onAppear { searchFocused = true }
     }
 
     private func row(_ command: Command, active: Bool) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: command.symbol)
-                .font(.system(size: 13))
-                .foregroundStyle(active ? Halo.ion : Halo.textDim)
-                .frame(width: 20)
+            ZStack {
+                RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
+                    .fill((active ? Halo.ion : Halo.textDim).opacity(0.12))
+                    .frame(width: 28, height: 28)
+                Image(systemName: command.symbol)
+                    .font(.system(size: 12))
+                    .foregroundStyle(active ? Halo.ion : Halo.textDim)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(command.title)
                     .font(.system(size: 13, weight: .semibold))

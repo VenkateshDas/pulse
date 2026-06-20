@@ -47,7 +47,8 @@ struct HealthScoreRing: View {
                 .stroke(score.band.color,
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.4), value: score.value)
+                .animation(Halo.Motion.ring, value: score.value)
+                .shadow(color: score.band.color.opacity(0.3), radius: 8)
             label
         }
         .frame(width: diameter, height: diameter)
@@ -90,9 +91,14 @@ struct DiagnosisBadge: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(diagnosis.severity.color)
-                .frame(width: 8, height: 8)
+            ZStack {
+                Circle()
+                    .fill(diagnosis.severity.color.opacity(0.2))
+                    .frame(width: 16, height: 16)
+                Circle()
+                    .fill(diagnosis.severity.color)
+                    .frame(width: 8, height: 8)
+            }
             Text(diagnosis.line)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
@@ -111,6 +117,7 @@ struct DiagnosisBadge: View {
                     .padding(.vertical, 2)
                     .background(diagnosis.severity.color.opacity(0.15),
                                 in: Capsule())
+                    .overlay(Capsule().strokeBorder(diagnosis.severity.color.opacity(0.3), lineWidth: 0.5))
                 }
                 .buttonStyle(.plain)
                 .help("Show \(name) in Monitor")

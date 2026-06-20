@@ -23,7 +23,7 @@ struct InsightsView: View {
             .padding(28)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { if !model.hasScanned { model.scan() } }
     }
 
@@ -31,7 +31,7 @@ struct InsightsView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Hidden Space")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(Halo.textPrimary)
                 Text("Big, easy-to-forget locations. Not all safe to delete — read each hint.")
                     .font(.system(size: 12))
@@ -95,8 +95,8 @@ struct InsightsView: View {
             .help("Reveal in Finder")
         }
         .padding(14)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .premiumCard(padding: 0)
+        
     }
 
     private var scanning: some View {

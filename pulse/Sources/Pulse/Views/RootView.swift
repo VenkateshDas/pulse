@@ -18,15 +18,18 @@ struct RootView: View {
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selection: $selection)
-            switch selection {
-            case .storage: DiskView()
-            case .timeline: TimelineView()
-            case .uninstall: UninstallView()
-            case .monitor: MonitorView()
-            case .health: HealthView()
-            case .diagnostics: DevModeView()
-            default: DashboardView()
+            Group {
+                switch selection {
+                case .storage: DiskView()
+                case .timeline: TimelineView()
+                case .uninstall: UninstallView()
+                case .monitor: MonitorView()
+                case .health: HealthView()
+                case .diagnostics: DevModeView()
+                default: DashboardView()
+                }
             }
+            .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
         .frame(minWidth: 1080, minHeight: 720)
         .background(Halo.void)
@@ -79,7 +82,7 @@ struct RootView: View {
                     .frame(maxHeight: .infinity, alignment: .top)
             }
             .onExitCommand { showPalette = false }
-            .transition(.opacity)
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
         }
     }
 }

@@ -43,7 +43,7 @@ struct CleanView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { storage.appeared() }
     }
 
@@ -210,7 +210,7 @@ struct AutoCleanCard: View {
             }
         }
         .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var frequencyPicker: some View {

@@ -24,7 +24,7 @@ struct TrashView: View {
             .padding(.vertical, 8)
             .background(Halo.surface2)
             
-            Divider().background(Halo.border)
+            Divider().background(Halo.borderSubtle)
             
             if selectedTab == .raw {
                 if storage.trashAccessError {
@@ -203,7 +203,7 @@ private struct UndoEntryRow: View {
             .background(Halo.surface1)
             
             if isExpanded {
-                Divider().background(Halo.border)
+                Divider().background(Halo.borderSubtle)
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(entry.items.prefix(10), id: \.originalPath) { item in
                         Text(URL(fileURLWithPath: item.originalPath).lastPathComponent)

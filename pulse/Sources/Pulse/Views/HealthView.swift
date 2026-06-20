@@ -39,7 +39,7 @@ struct HealthView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
     }
@@ -47,7 +47,7 @@ struct HealthView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Health")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text("Battery, startup agents, and repeatable performance benchmarks.")
                 .font(.system(size: 12))
@@ -100,8 +100,8 @@ private struct HealthScoreCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Halo.border, lineWidth: 1))
+        .premiumCard(padding: 0)
+        
     }
 
     private func factorRow(_ factor: HealthFactor, lost: Double) -> some View {
@@ -152,7 +152,7 @@ private struct BatteryCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     @ViewBuilder
@@ -313,7 +313,7 @@ private struct BluetoothCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 }
 
@@ -355,7 +355,7 @@ private struct BatteryStatsCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var divider: some View {
@@ -439,7 +439,7 @@ private struct CapacityTrendCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 }
 
@@ -473,7 +473,7 @@ private struct BatteryConsumptionCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private func row(for entry: BatteryHistoryStore.Entry) -> some View {
@@ -583,7 +583,7 @@ private struct StartupItemsCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var columnHeader: some View {
@@ -714,7 +714,7 @@ private struct BenchmarkCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var runButton: some View {

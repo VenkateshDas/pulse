@@ -20,12 +20,12 @@ struct HistoryChart: View {
                         fillPath(points, size: geo.size)
                             .fill(
                                 LinearGradient(
-                                    colors: [color.opacity(0.25), .clear],
+                                    colors: [color.opacity(0.20), .clear],
                                     startPoint: .top, endPoint: .bottom
                                 )
                             )
                         linePath(points)
-                            .stroke(color, style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                            .stroke(color, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
                     } else if let only = points.first {
                         // Isolated minute (gap on both sides): a dot, not nothing.
                         Circle()
@@ -70,7 +70,7 @@ struct HistoryChart: View {
                 path.addLine(to: CGPoint(x: size.width, y: y))
             }
         }
-        .stroke(Halo.textDim.opacity(0.12), lineWidth: 1)
+        .stroke(Halo.textDim.opacity(0.08), style: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
     }
 
     private func linePath(_ points: [CGPoint]) -> Path {

@@ -20,7 +20,7 @@ struct MonitorView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
     }
@@ -28,7 +28,7 @@ struct MonitorView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Monitor")
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
             Text(
                 "Every process with CPU, memory, threads and page-fault rates, plus live per-interface network throughput. Per-process network needs private Apple entitlements — Pulse won't pretend otherwise."
@@ -81,7 +81,7 @@ private struct ProcessListCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     /// Tree rows flattened with depth; a non-empty filter always shows the
@@ -311,7 +311,7 @@ private struct ProcessDetailCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private var placeholder: some View {
@@ -460,7 +460,7 @@ private struct NetworkCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
     private func legend(_ label: String, _ color: Color) -> some View {

@@ -32,7 +32,7 @@ struct MenuBarContent: View {
                 if let battery = snapshot.battery {
                     batteryRow(battery)
                 }
-                Divider().overlay(Halo.surface2)
+                Divider().overlay(Halo.borderSubtle)
                 topProcesses(snapshot)
             } else {
                 Text("Sampling…")
@@ -40,7 +40,7 @@ struct MenuBarContent: View {
                     .foregroundStyle(Halo.textDim)
             }
 
-            Divider().overlay(Halo.surface2)
+            Divider().overlay(Halo.borderSubtle)
             actions
         }
         .onAppear {
@@ -80,7 +80,7 @@ struct MenuBarContent: View {
             HStack {
                 Text(label)
                     .font(.system(size: 11))
-                    .foregroundStyle(Halo.textDim)
+                    .foregroundStyle(Halo.textSecondary)
                 Spacer()
                 Text(value)
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))

@@ -22,17 +22,15 @@ struct AlertsSection: View {
                     .foregroundStyle(Halo.ion)
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 14))
+        .premiumCard(cornerRadius: Halo.Radius.large)
     }
 
     private var header: some View {
         HStack {
             HStack(spacing: 4) {
-                Text("NEEDS ATTENTION — CAUSE → FIX")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("NEEDS ATTENTION")
+                    .sectionLabel()
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
                     .help("System alerts that require your attention to fix performance or safety issues")
@@ -41,6 +39,7 @@ struct AlertsSection: View {
             Spacer()
             HStack(spacing: 5) {
                 Circle().fill(Halo.pulseGreen).frame(width: 5, height: 5)
+                    .shadow(color: Halo.pulseGreen.opacity(0.5), radius: 4)
                 Text("LIVE")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.pulseGreen)
@@ -70,10 +69,14 @@ private struct AlertCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                Image(systemName: alert.symbol)
-                    .font(.system(size: 15))
-                    .foregroundStyle(severityColor)
-                    .frame(width: 22)
+                ZStack {
+                    RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
+                        .fill(severityColor.opacity(0.12))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: alert.symbol)
+                        .font(.system(size: 13))
+                        .foregroundStyle(severityColor)
+                }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(alert.title)
@@ -89,9 +92,10 @@ private struct AlertCard: View {
                     model.dismissAlert(id: alert.id)
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(Halo.textDim)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 22, height: 22)
+                        .background(Halo.surface2, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Dismiss — hides until this condition clears and recurs")

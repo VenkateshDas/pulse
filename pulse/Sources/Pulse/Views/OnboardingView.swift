@@ -15,7 +15,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 22) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Welcome to Pulse")
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Halo.textPrimary)
                 Text("Two quick permissions and you're set. Pulse never moves a file without staging it in the Vault first — everything is restorable.")
                     .font(.system(size: 13))
@@ -74,7 +74,7 @@ struct OnboardingView: View {
         }
         .padding(32)
         .frame(width: 560, height: 520)
-        .background(Halo.void)
+        .background { ZStack { Halo.void; Halo.meshBackground } }
     }
 
     private func step<Content: View>(
@@ -86,6 +86,7 @@ struct OnboardingView: View {
                 Circle()
                     .fill(granted ? Halo.pulseGreen : Halo.surface2)
                     .frame(width: 30, height: 30)
+                    .shadow(color: granted ? Halo.pulseGreen.opacity(0.4) : .clear, radius: 6)
                 if granted {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .bold))
@@ -109,8 +110,7 @@ struct OnboardingView: View {
             }
             Spacer()
         }
-        .padding(16)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 12))
+        .premiumCard(cornerRadius: Halo.Radius.medium)
     }
 
     private func requestNotifications() {
