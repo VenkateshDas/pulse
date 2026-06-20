@@ -600,7 +600,7 @@
         <li><a href="#safety">Safety</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
-      <a href="https://github.com/VenkateshDas/pulse/releases/download/v0.1.0-beta.9/Pulse-0.1.0-beta.9.dmg" class="nav-cta">Download</a>
+      <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="nav-cta">Download</a>
     </div>
   </nav>
 
@@ -611,7 +611,7 @@
         <h1>You paid for a fast Mac.<br><span>Let's keep it that way.</span></h1>
         <p>See what's slowing things down, find what's eating your storage, and keep everything clean. No subscriptions. No jargon.</p>
         <div class="hero-ctas">
-          <a href="https://github.com/VenkateshDas/pulse/releases/download/v0.1.0-beta.9/Pulse-0.1.0-beta.9.dmg" class="btn-primary">Download free</a>
+          <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
           <a href="#features" class="btn-secondary">See how it works</a>
         </div>
         <p class="hero-micro">No account needed. macOS 14+. Notarized by Apple.</p>
@@ -1045,7 +1045,7 @@
     <div class="cta-inner reveal">
       <h2>Stop Googling "why is my Mac slow."</h2>
       <p>See your Mac clearly for the first time. Free to try. One price to keep.</p>
-      <a href="https://github.com/VenkateshDas/pulse/releases/download/v0.1.0-beta.9/Pulse-0.1.0-beta.9.dmg" class="btn-primary">Download free</a>
+      <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
       <p class="hero-micro">macOS 14+. Apple Silicon and Intel. Notarized by Apple.</p>
     </div>
   </section>
@@ -1240,6 +1240,25 @@
         tile.style.setProperty('--mouse-y', y + 'px');
       });
     });
+
+    // Resolve latest release DMG from GitHub API
+    fetch('https://api.github.com/repos/VenkateshDas/pulse/releases')
+      .then(function(r) { return r.json(); })
+      .then(function(releases) {
+        if (!releases.length) return;
+        var dmg;
+        for (var i = 0; i < releases.length; i++) {
+          var assets = releases[i].assets || [];
+          for (var j = 0; j < assets.length; j++) {
+            if (assets[j].name.endsWith('.dmg')) { dmg = assets[j].browser_download_url; break; }
+          }
+          if (dmg) break;
+        }
+        if (!dmg) return;
+        document.querySelectorAll('[data-download]').forEach(function(a) {
+          a.href = dmg;
+        });
+      });
   </script>
 </body>
 </html>
