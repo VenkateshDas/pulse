@@ -39,14 +39,14 @@ struct DashboardView: View {
         HStack(alignment: .center, spacing: 20) {
             greeting
             Spacer()
-            HealthScoreRing(score: model.healthScore)
+            HealthScoreRing(score: model.healthScore, labelMode: .scoreOnly)
         }
     }
 
     private var greeting: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(timeGreeting), \(firstName)")
-                .font(.system(size: 26, weight: .bold, design: .default))
+                .font(.system(size: 26, weight: .bold, design: .rounded))
                 .foregroundStyle(Halo.textPrimary)
             DiagnosisBadge(
                 diagnosis: model.diagnosis,

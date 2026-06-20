@@ -73,7 +73,7 @@ private struct HealthScoreCard: View {
 
         return HStack(alignment: .center, spacing: 24) {
             VStack(spacing: 6) {
-                HealthScoreRing(score: score, diameter: 96)
+                HealthScoreRing(score: score, diameter: 96, labelMode: .scoreOnly)
                 Text(model.diagnosis.line)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Halo.textDim)

@@ -107,8 +107,8 @@ struct SidebarView: View {
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text("PULSE")
-                    .font(.system(size: 17, weight: .bold, design: .monospaced))
-                    .tracking(4)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .tracking(3)
                     .foregroundStyle(Halo.textPrimary)
                 Text("Command Center")
                     .font(.system(size: 10))
@@ -175,8 +175,8 @@ struct SidebarView: View {
             HStack(spacing: 6) {
                 Circle()
                     .fill(statusColor)
-                    .frame(width: 7, height: 7)
-                    .shadow(color: statusColor.opacity(0.5), radius: 4)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: statusColor.opacity(0.5), radius: 6)
                 Text(statusText)
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(statusColor)

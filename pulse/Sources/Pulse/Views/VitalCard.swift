@@ -118,10 +118,10 @@ struct VitalCard: View {
                 .fill(Halo.surface1)
                 .shadow(
                     color: isHovered
-                        ? color.opacity(0.12)
+                        ? color.opacity(0.15)
                         : Halo.Shadow.cardColor,
-                    radius: isHovered ? 16 : Halo.Shadow.cardRadius,
-                    y: isHovered ? 6 : Halo.Shadow.cardY
+                    radius: isHovered ? Halo.Shadow.elevatedRadius : Halo.Shadow.cardRadius,
+                    y: isHovered ? Halo.Shadow.elevatedY : Halo.Shadow.cardY
                 )
         }
         .overlay {
@@ -141,12 +141,12 @@ struct VitalCard: View {
     private var ring: some View {
         ZStack {
             Circle()
-                .stroke(Halo.surface2, lineWidth: 5)
+                .stroke(Halo.surface2, lineWidth: 3)
             if let segments = segments {
                 ForEach(Array(segments.enumerated()), id: \.offset) { index, segment in
                     Circle()
                         .trim(from: segment.start, to: segment.end)
-                        .stroke(segment.color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .stroke(segment.color, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
             } else {
@@ -154,10 +154,11 @@ struct VitalCard: View {
                     .trim(from: 0, to: clamped)
                     .stroke(
                         color,
-                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
                     .animation(Halo.Motion.ring, value: clamped)
+                    .shadow(color: color.opacity(0.3), radius: 6)
             }
             Text(value)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
