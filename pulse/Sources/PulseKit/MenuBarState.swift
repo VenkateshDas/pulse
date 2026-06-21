@@ -19,8 +19,8 @@ public struct MenuBarState: Sendable {
         min(screenWidth * 2, 10_000)
     }
 
-    /// Normal separator width (visible divider).
-    public static let separatorWidth: CGFloat = 20
+    /// Normal separator width (visible divider — fits an SF Symbol icon).
+    public static let separatorWidth: CGFloat = 24
 
     /// Chevron symbol for current state.
     public var chevronSymbol: String {

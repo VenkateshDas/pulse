@@ -89,19 +89,21 @@ final class MenuBarManager {
     private func setUp() {
         guard separator == nil else { return }
 
-        let sep = NSStatusBar.system.statusItem(withLength: state.separatorLength)
-        sep.autosaveName = "PulseMenuBarSeparator"
-        sep.button?.title = "│"
-        sep.button?.sendAction(on: [])
-        separator = sep
-
+        // Create chevron FIRST — macOS inserts new items at the leftmost
+        // position, so the chevron lands further left. Then the separator is
+        // created and appears to the LEFT of the chevron. This gives us:
+        //   [...hidden...] [separator] [chevron ‹›] [...visible...] [Pulse]
         let chev = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         chev.autosaveName = "PulseMenuBarChevron"
         chev.button?.target = self
         chev.button?.action = #selector(chevronClicked(_:))
         chev.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         chevron = chev
-        updateChevronImage()
+
+        let sep = NSStatusBar.system.statusItem(withLength: MenuBarState.separatorWidth)
+        sep.autosaveName = "PulseMenuBarSeparator"
+        sep.button?.sendAction(on: [])
+        separator = sep
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -110,9 +112,12 @@ final class MenuBarManager {
             Task { @MainActor in self?.handleScreenChange() }
         }
 
-        if state.isCollapsed {
-            applySeparatorLength()
-        }
+        // Start expanded so user sees the separator and understands the layout.
+        state.expand()
+        applySeparatorLength()
+        updateSeparatorAppearance()
+        updateChevronImage()
+        resetAutoHideTimer()
     }
 
     private func tearDown() {
@@ -135,10 +140,21 @@ final class MenuBarManager {
 
     private func applySeparatorLength() {
         separator?.length = state.separatorLength
+        updateSeparatorAppearance()
+    }
+
+    private func updateSeparatorAppearance() {
+        guard let btn = separator?.button else { return }
         if state.isExpanded && state.showSeparator {
-            separator?.button?.title = "│"
-        } else if state.isExpanded {
-            separator?.button?.title = ""
+            btn.image = NSImage(
+                systemSymbolName: "line.3.horizontal",
+                accessibilityDescription: "Menu bar divider"
+            )
+            btn.image?.isTemplate = true
+            btn.title = ""
+        } else {
+            btn.image = nil
+            btn.title = ""
         }
     }
 

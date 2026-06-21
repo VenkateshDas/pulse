@@ -37,11 +37,11 @@ struct MenuBarStateTests {
         #expect(state.separatorLength == 3840)
     }
 
-    @Test("separator length is 20 when expanded with separator visible")
+    @Test("separator length is 24 when expanded with separator visible")
     func separatorLengthExpanded() {
         var state = MenuBarState(showSeparator: true)
         state.expand()
-        #expect(state.separatorLength == MenuBarState.separatorWidth)
+        #expect(state.separatorLength == 24)
     }
 
     @Test("separator length is 0 when expanded with separator hidden")
