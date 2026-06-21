@@ -42,9 +42,14 @@ final class MenuBarManager {
     /// Safety check: if the chevron is placed to the left of the separator, collapsing
     /// would push the chevron itself off-screen, trapping the user.
     private var isBtnSeparateValidPosition: Bool {
+        // ponytail: best-effort trap check. Status-item button windows can be
+        // transiently nil after App Nap / display sleep while backgrounded; if
+        // we can't read positions, ALLOW the collapse rather than dead-locking
+        // the chevron (the only failure this guards — a ⌘-dragged-left chevron —
+        // is rare, and expand() always works to recover).
         guard let chevronX = btnExpandCollapse?.button?.window?.frame.origin.x,
               let separateX = btnSeparate?.button?.window?.frame.origin.x else {
-            return false
+            return true
         }
         if NSApp.userInterfaceLayoutDirection == .rightToLeft {
             return chevronX <= separateX
