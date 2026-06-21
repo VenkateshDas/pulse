@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pulse — See what's really going on with your Mac</title>
-  <meta name="description" content="Health score, hidden storage finder, safe cleanup, live monitoring. One native Mac app. No subscriptions, no telemetry. Free to try.">
-  <meta property="og:title" content="Your Mac is trying to tell you something. Pulse listens.">
-  <meta property="og:description" content="Health score, hidden storage finder, safe cleanup, live monitoring. One native Mac app. No subscriptions, no telemetry.">
+  <title>Pulse — The one app that runs your whole Mac</title>
+  <meta name="description" content="Performance monitor, storage cleaner, app uninstaller, menu bar tidier, and brightness control for every display. Seven Mac tools in one native app. No subscriptions, no telemetry. Free to try.">
+  <meta property="og:title" content="Seven Mac apps, one download. No subscriptions.">
+  <meta property="og:description" content="Performance monitor, storage cleaner, app uninstaller, menu bar tidier, and brightness control for every display. Built in native Swift. No subscriptions, no telemetry.">
   <meta property="og:type" content="website">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -609,7 +609,7 @@
     <div class="hero-inner">
       <div class="hero-text reveal">
         <h1>You paid for a fast Mac.<br><span>Let's keep it that way.</span></h1>
-        <p>See what's slowing things down, find what's eating your storage, and keep everything clean. No subscriptions. No jargon.</p>
+        <p><strong style="color:var(--ink);font-weight:600;">Seven Mac utilities, now one app.</strong> See what's slowing it down, clear hidden storage, uninstall apps for real, tidy your menu bar, and fix brightness on every display. No subscriptions. No jargon.</p>
         <div class="hero-ctas">
           <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
           <a href="#features" class="btn-secondary">See how it works</a>
@@ -652,6 +652,11 @@
             <span class="vital-name">Battery</span>
             <span class="vital-val">812 cycles left</span>
           </div>
+          <div class="vital-row">
+            <span class="vital-dot"></span>
+            <span class="vital-name">Displays</span>
+            <span class="vital-val">2 · brightness synced</span>
+          </div>
         </div>
       </div>
     </div>
@@ -671,8 +676,8 @@
         <div class="stat-label">Avg hidden "System Data"</div>
       </div>
       <div class="stat-item">
-        <div class="stat-num"><span data-count="40">0</span><span class="suffix">+</span></div>
-        <div class="stat-label">Cleanup targets</div>
+        <div class="stat-num"><span data-count="7">0</span></div>
+        <div class="stat-label">Mac tools in one</div>
       </div>
       <div class="stat-item">
         <div class="stat-num"><span data-count="3">0</span><span class="suffix"> sec</span></div>
@@ -716,14 +721,28 @@
         <h3>Know what's slowing things down</h3>
         <p>Live CPU, GPU, thermals, battery cycles, Bluetooth device batteries. All in words you understand.</p>
       </div>
+      <div class="bento-tile reveal">
+        <div class="bento-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><circle cx="7" cy="10" r="1"/><circle cx="11" cy="10" r="1"/><path d="M15 9.5 19 9.5"/></svg>
+        </div>
+        <h3>Tame your menu bar</h3>
+        <p>Push the icon clutter off the bar behind a chevron. Click to bring it back, or let it auto-hide on a timer. No extra app. No permissions to grant.</p>
+      </div>
+      <div class="bento-tile accent reveal">
+        <div class="bento-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </div>
+        <h3>Brightness keys that finally work</h3>
+        <p>They control external monitors too, not just the built-in screen. One slider per display. And when a monitor won't dim far enough on its own, Pulse takes it lower in software.</p>
+      </div>
       <div class="bento-tile span-2 reveal">
         <div class="bento-wide-inner">
           <div>
             <div class="bento-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
             </div>
-            <h3>Replace five apps with one</h3>
-            <p>System monitor + disk analyzer + app uninstaller + cache cleaner + maintenance toolkit. One download. One price.</p>
+            <h3>Replace seven apps with one</h3>
+            <p>System monitor + disk analyzer + app uninstaller + cache cleaner + maintenance toolkit + menu bar manager + brightness control. One download. One price. No stack of subscriptions.</p>
           </div>
           <div class="mini-bars" id="bars">
             <div class="mini-bar">
@@ -743,7 +762,11 @@
               <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
             </div>
             <div class="mini-bar">
-              <span class="mini-bar-label">Maintain</span>
+              <span class="mini-bar-label">Menu bar</span>
+              <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
+            </div>
+            <div class="mini-bar">
+              <span class="mini-bar-label">Brightness</span>
               <div class="mini-bar-track"><div class="mini-bar-fill" data-width="100"></div></div>
             </div>
           </div>
@@ -826,6 +849,8 @@
       <button class="carousel-dot" data-index="1"></button>
       <button class="carousel-dot" data-index="2"></button>
       <button class="carousel-dot" data-index="3"></button>
+      <button class="carousel-dot" data-index="4"></button>
+      <button class="carousel-dot" data-index="5"></button>
     </div>
     <div class="carousel-wrapper reveal">
       <button class="carousel-btn" id="carousel-prev" aria-label="Previous">
@@ -997,6 +1022,101 @@
           </div>
         </li>
 
+        <li class="entry">
+          <div class="ba-card before">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="60" y="14" width="160" height="60" rx="6" fill="rgba(255,255,255,0.04)" stroke="rgba(248,113,113,0.2)" stroke-width="1"/>
+                <rect x="120" y="74" width="40" height="6" rx="2" fill="rgba(255,255,255,0.06)"/>
+                <text x="140" y="40" font-size="9" fill="rgba(255,255,255,0.3)" font-family="var(--font-display)" font-weight="600" text-anchor="middle">External monitor</text>
+                <circle cx="118" cy="62" r="3" fill="rgba(248,113,113,0.3)"/>
+                <circle cx="130" cy="62" r="3" fill="rgba(248,113,113,0.3)"/>
+                <circle cx="142" cy="62" r="3" fill="rgba(248,113,113,0.3)"/>
+                <circle cx="154" cy="62" r="3" fill="rgba(248,113,113,0.3)"/>
+                <text x="140" y="96" font-size="9" fill="rgba(248,113,113,0.5)" font-family="var(--font-body)" text-anchor="middle">Brightness keys do nothing. Hunt for buttons.</text>
+              </svg>
+            </div>
+            <div class="ba-tag">Without Pulse</div>
+            <h3>The Dead Brightness Key</h3>
+            <p>Plug in an external monitor and your brightness keys stop working. Crouch behind the screen, poke tiny hardware buttons, navigate a 1990s on-screen menu.</p>
+          </div>
+          <div class="ba-card after">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <text x="20" y="28" font-size="9" fill="rgba(255,255,255,0.5)" font-family="var(--font-body)">Built-in</text>
+                <rect x="80" y="22" width="180" height="8" rx="4" fill="rgba(255,255,255,0.06)"/>
+                <rect x="80" y="22" width="120" height="8" rx="4" fill="rgba(16,185,129,0.4)"/>
+                <circle cx="200" cy="26" r="7" fill="#34d399"/>
+                <text x="20" y="56" font-size="9" fill="rgba(255,255,255,0.5)" font-family="var(--font-body)">Studio</text>
+                <rect x="80" y="50" width="180" height="8" rx="4" fill="rgba(255,255,255,0.06)"/>
+                <rect x="80" y="50" width="150" height="8" rx="4" fill="rgba(16,185,129,0.4)"/>
+                <circle cx="230" cy="54" r="7" fill="#34d399"/>
+                <rect x="80" y="76" width="120" height="18" rx="6" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.25)" stroke-width="1"/>
+                <text x="140" y="88" font-size="9" fill="#34d399" font-family="var(--font-display)" font-weight="600" text-anchor="middle">☀ keys → both displays</text>
+              </svg>
+            </div>
+            <div class="ba-tag">With Pulse</div>
+            <h3>One Slider Per Display</h3>
+            <p>Now the keys just work. They control whatever screen your cursor sits on, built-in or external. And if a monitor won't go dark enough, software dimming picks up where the hardware stops.</p>
+          </div>
+        </li>
+
+        <li class="entry">
+          <div class="ba-card before">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="34" width="264" height="28" rx="7" fill="rgba(255,255,255,0.03)" stroke="rgba(248,113,113,0.18)" stroke-width="1"/>
+                <g fill="rgba(255,255,255,0.14)">
+                  <rect x="16" y="42" width="12" height="12" rx="3"/>
+                  <rect x="34" y="42" width="12" height="12" rx="3"/>
+                  <rect x="52" y="42" width="12" height="12" rx="3"/>
+                  <rect x="70" y="42" width="12" height="12" rx="3"/>
+                  <rect x="88" y="42" width="12" height="12" rx="3"/>
+                  <rect x="106" y="42" width="12" height="12" rx="3"/>
+                  <rect x="124" y="42" width="12" height="12" rx="3"/>
+                  <rect x="142" y="42" width="12" height="12" rx="3"/>
+                  <rect x="160" y="42" width="12" height="12" rx="3"/>
+                  <rect x="178" y="42" width="12" height="12" rx="3"/>
+                  <rect x="196" y="42" width="12" height="12" rx="3"/>
+                </g>
+                <g fill="rgba(248,113,113,0.3)">
+                  <rect x="214" y="42" width="12" height="12" rx="3"/>
+                  <rect x="232" y="42" width="12" height="12" rx="3"/>
+                  <rect x="250" y="42" width="12" height="12" rx="3"/>
+                </g>
+                <text x="140" y="86" font-size="9" fill="rgba(248,113,113,0.5)" font-family="var(--font-body)" text-anchor="middle">Fourteen icons. None where you'd look.</text>
+              </svg>
+            </div>
+            <div class="ba-tag">Without Pulse</div>
+            <h3>The Overflowing Menu Bar</h3>
+            <p>A dozen icons crammed across the top, some of them swallowed by the notch. The one you actually need is never where you left it.</p>
+          </div>
+          <div class="ba-card after">
+            <div class="ba-illus">
+              <svg viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="34" width="264" height="28" rx="7" fill="rgba(16,185,129,0.05)" stroke="rgba(16,185,129,0.18)" stroke-width="1"/>
+                <g fill="rgba(255,255,255,0.06)">
+                  <rect x="18" y="42" width="12" height="12" rx="3"/>
+                  <rect x="36" y="42" width="12" height="12" rx="3"/>
+                  <rect x="54" y="42" width="12" height="12" rx="3"/>
+                </g>
+                <path d="M96 44 l-6 4 l6 4" stroke="#34d399" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <rect x="110" y="40" width="2" height="16" rx="1" fill="rgba(16,185,129,0.4)"/>
+                <g fill="rgba(255,255,255,0.5)">
+                  <rect x="126" y="42" width="12" height="12" rx="3"/>
+                  <rect x="150" y="42" width="12" height="12" rx="3"/>
+                  <rect x="174" y="42" width="12" height="12" rx="3"/>
+                </g>
+                <text x="252" y="52" font-size="13" fill="#34d399" font-family="var(--font-display)" text-anchor="middle">♡</text>
+                <text x="140" y="86" font-size="9" fill="rgba(52,211,153,0.5)" font-family="var(--font-body)" text-anchor="middle">One click tucks the rest away.</text>
+              </svg>
+            </div>
+            <div class="ba-tag">With Pulse</div>
+            <h3>A Menu Bar You Control</h3>
+            <p>Push the icons you rarely touch behind a chevron. Click to bring them back when you need them. Or set a timer and let them tuck away on their own.</p>
+          </div>
+        </li>
+
       </ul>
     </div>
       <button class="carousel-btn" id="carousel-next" aria-label="Next">
@@ -1035,6 +1155,21 @@
       <div class="faq-item">
         <button class="faq-q">"Will it slow my Mac down?"</button>
         <div class="faq-a">Pulse samples every 2 seconds, then goes back to sleep. When you're not looking at it, it uses near-zero resources. It's built with native Swift and Apple's own frameworks, not a web browser wrapped in a window.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"Do I still need Bartender, Ice, or Lunar?"</button>
+        <div class="faq-a">Probably not. Hiding menu bar icons is what people buy Bartender or Ice for, and Pulse does it built in. Same with brightness on external monitors, which is why people install Lunar or MonitorControl. Two fewer apps to keep updated, and nothing extra to pay for.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"My brightness keys never worked on my external monitor."</button>
+        <div class="faq-a">They will now. Pulse talks to the monitor directly and sends your Brightness Up/Down keys to whichever screen your cursor is on. If a display can't go dark enough on its own, a dimming layer takes it lower. Sending the keys needs Accessibility access; the sliders work without it.</div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q">"Does hiding my menu bar need special permissions?"</button>
+        <div class="faq-a">No. It's built on standard AppKit, so there's no Accessibility prompt, no private APIs, and no second app running in the background. Flip it on in the popover and a chevron shows up. Click it to hide or show the icons next to it, or set a timer to tuck them away on their own.</div>
       </div>
 
     </div>
