@@ -50,6 +50,8 @@ struct MenuBarContent: View {
             }
 
             Divider().overlay(Halo.borderSubtle)
+            menuBarManagerRow
+            Divider().overlay(Halo.borderSubtle)
             actions
         }
         .onAppear {
@@ -232,6 +234,27 @@ struct MenuBarContent: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: Menu Bar Manager
+
+    private var menuBarManagerRow: some View {
+        HStack {
+            Image(systemName: "menubar.rectangle")
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textSecondary)
+            Text("Menu Bar Manager")
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textSecondary)
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { MenuBarManager.shared.isEnabled },
+                set: { MenuBarManager.shared.isEnabled = $0 }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .labelsHidden()
         }
     }
 
