@@ -18,7 +18,9 @@ final class MenuBarManager {
     private static let enabledKey = "PulseMenuBarManagementEnabled"
     private static let autoHideKey = "PulseMenuBarAutoHideDelay"
     private static let showSeparatorKey = "PulseMenuBarShowSeparator"
-    private static let onboardedKey = "PulseMenuBarManagerOnboarded"
+    // V2: bumped alongside the versioned autosave names so the refreshed
+    // onboarding (with the new layout) shows once after this change.
+    private static let onboardedKey = "PulseMenuBarManagerOnboardedV2"
 
     var isEnabled: Bool {
         get { state.isEnabled }
@@ -68,14 +70,22 @@ final class MenuBarManager {
     // MARK: - Toggle
 
     func toggle() {
-        state.toggle()
-        applySeparatorLength()
-        updateChevronImage()
-        resetAutoHideTimer()
+        if state.isExpanded {
+            collapse()
+        } else {
+            expand()
+        }
     }
 
     func collapse() {
         guard state.isExpanded else { return }
+        // Refuse to collapse if the user dragged the separator to the wrong
+        // side of the chevron — collapsing then would hide the chevron and the
+        // visible items instead of the intended ones.
+        guard isSeparatorValidPosition else {
+            warnInvalidPosition()
+            return
+        }
         state.collapse()
         applySeparatorLength()
         updateChevronImage()
@@ -95,19 +105,25 @@ final class MenuBarManager {
     private func setUp() {
         guard separator == nil else { return }
 
-        // Create chevron FIRST — macOS inserts new items at the leftmost
-        // position, so the chevron lands further left. Then the separator is
-        // created and appears to the LEFT of the chevron. This gives us:
-        //   [...hidden...] [separator] [chevron ‹›] [...visible...] [Pulse]
+        // macOS inserts each new status item at the LEFTMOST slot. Create the
+        // chevron FIRST so the separator (created second) lands to its LEFT:
+        //   [...items to hide...] [separator ▏] [chevron «] [...] [Pulse]
+        // Collapsing inflates the separator, pushing everything to its LEFT
+        // off-screen; the chevron stays visible because it is to its RIGHT.
+        //
+        // autosaveName is versioned (V2) so saved positions from earlier builds
+        // — which could leave the separator on the wrong side of the chevron —
+        // are discarded and the items start fresh in the order above.
         let chev = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        chev.autosaveName = "PulseMenuBarChevron"
+        chev.autosaveName = "PulseMenuBarChevronV2"
         chev.button?.target = self
         chev.button?.action = #selector(chevronClicked(_:))
         chev.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         chevron = chev
 
         let sep = NSStatusBar.system.statusItem(withLength: MenuBarState.separatorWidth)
-        sep.autosaveName = "PulseMenuBarSeparator"
+        sep.autosaveName = "PulseMenuBarSeparatorV2"
+        sep.button?.image = Self.separatorImage
         sep.button?.sendAction(on: [])
         separator = sep
 
@@ -118,13 +134,27 @@ final class MenuBarManager {
             Task { @MainActor in self?.handleScreenChange() }
         }
 
-        // Start expanded so user sees the separator and understands the layout.
+        // Start expanded so the user sees the separator and can drag items
+        // across it before collapsing.
         state.expand()
         applySeparatorLength()
-        updateSeparatorAppearance()
         updateChevronImage()
         resetAutoHideTimer()
     }
+
+    /// A bold vertical divider bar, drawn programmatically so it always renders
+    /// (a template SF Symbol like `line.diagonal` was too faint to find in the
+    /// menu bar). Template image → tints correctly for light/dark menu bars.
+    private static let separatorImage: NSImage = {
+        let size = NSSize(width: 6, height: 16)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSColor.black.setFill()
+        NSRect(x: size.width / 2 - 1, y: 1, width: 2, height: size.height - 2).fill()
+        image.unlockFocus()
+        image.isTemplate = true
+        return image
+    }()
 
     private func tearDown() {
         cancelAutoHideTimer()
@@ -146,22 +176,17 @@ final class MenuBarManager {
 
     private func applySeparatorLength() {
         separator?.length = state.separatorLength
-        updateSeparatorAppearance()
     }
 
-    private func updateSeparatorAppearance() {
-        guard let btn = separator?.button else { return }
-        if state.isExpanded && state.showSeparator {
-            btn.image = NSImage(
-                systemSymbolName: "line.diagonal",
-                accessibilityDescription: "Menu bar section divider"
-            )
-            btn.image?.isTemplate = true
-            btn.title = ""
-        } else {
-            btn.image = nil
-            btn.title = ""
-        }
+    /// True when the chevron sits to the right of (or level with) the separator
+    /// — the only arrangement where collapsing hides the intended items rather
+    /// than the chevron itself. Mirrors HiddenBar's `isBtnSeparateValidPosition`.
+    /// Returns true if either window isn't laid out yet (don't block first use).
+    private var isSeparatorValidPosition: Bool {
+        guard let chevronX = chevron?.button?.window?.frame.origin.x,
+              let separatorX = separator?.button?.window?.frame.origin.x
+        else { return true }
+        return chevronX >= separatorX
     }
 
     private func updateChevronImage() {
@@ -247,19 +272,19 @@ final class MenuBarManager {
         UserDefaults.standard.set(true, forKey: Self.onboardedKey)
 
         let alert = NSAlert()
-        alert.messageText = "Menu Bar Manager"
+        alert.messageText = "Menu Bar Manager is on"
         alert.informativeText = """
-        Two new icons appeared in your menu bar:
+        Two icons were added to your menu bar:
 
-        ≡  Separator — the divider between visible and hidden items
-        «  Chevron — click to hide/show items
+        ▏  a thin vertical divider
+        «  a chevron (click to hide / show)
 
-        To choose which items to hide:
-        ⌘ + drag menu bar icons to the LEFT of the ≡ separator.
+        How to hide an icon:
+        1. Hold ⌘ and drag any menu bar icon so it sits to the LEFT of the ▏ divider.
+        2. Click the « chevron. Everything left of the divider collapses out of sight.
+        3. Click it again to bring them back.
 
-        Then click the « chevron to collapse — items left of the separator will be hidden.
-
-        Right-click the chevron for auto-hide settings.
+        Tip: only icons LEFT of the divider hide. Icons to its right (including the clock and Control Center) always stay visible.
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Got it")
@@ -267,6 +292,25 @@ final class MenuBarManager {
                              accessibilityDescription: nil)
 
         // Run on next tick so the status items are visible before the alert.
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
+    /// The separator was dragged to the right of the chevron — collapsing would
+    /// hide the wrong items. Tell the user how to fix it instead of doing nothing.
+    private func warnInvalidPosition() {
+        let alert = NSAlert()
+        alert.messageText = "Move the divider first"
+        alert.informativeText = """
+        The « chevron is currently to the LEFT of the ▏ divider, so collapsing \
+        would hide the wrong icons.
+
+        Hold ⌘ and drag the chevron back to the right of the divider, then try again.
+        """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
