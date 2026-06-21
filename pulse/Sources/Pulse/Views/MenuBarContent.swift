@@ -18,6 +18,7 @@ struct MenuBarContent: View {
 
     @State private var isOptimizing = false
     @State private var optimizeReport: String?
+    @State private var menuBarCollapsed = false
 
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
     private static let sparkSamples = 15
@@ -240,7 +241,7 @@ struct MenuBarContent: View {
     // MARK: Menu Bar Manager
 
     private var menuBarManagerRow: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: "menubar.rectangle")
                     .font(.system(size: 11))
@@ -251,18 +252,34 @@ struct MenuBarContent: View {
                 Spacer()
                 Toggle("", isOn: Binding(
                     get: { MenuBarManager.shared.isEnabled },
-                    set: { MenuBarManager.shared.isEnabled = $0 }
+                    set: {
+                        MenuBarManager.shared.isEnabled = $0
+                        menuBarCollapsed = MenuBarManager.shared.isCollapsed
+                    }
                 ))
                 .toggleStyle(.switch)
                 .controlSize(.mini)
                 .labelsHidden()
             }
             if MenuBarManager.shared.isEnabled {
-                Text("Click the ‹ chevron to hide icons on its left")
+                Button {
+                    MenuBarManager.shared.toggle()
+                    menuBarCollapsed = MenuBarManager.shared.isCollapsed
+                } label: {
+                    Label(menuBarCollapsed ? "Show hidden icons" : "Hide icons",
+                          systemImage: menuBarCollapsed ? "eye" : "eye.slash")
+                        .frame(maxWidth: .infinity)
+                }
+                .controlSize(.small)
+                .buttonStyle(.bordered)
+                .tint(Halo.ion)
+
+                Text("Or click the ‹ chevron in the menu bar. ⌘-drag an icon right of it to keep it always visible.")
                     .font(.system(size: 9))
                     .foregroundStyle(Halo.textDim)
             }
         }
+        .onAppear { menuBarCollapsed = MenuBarManager.shared.isCollapsed }
     }
 
     // MARK: Actions

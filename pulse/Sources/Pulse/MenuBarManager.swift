@@ -27,10 +27,11 @@ final class MenuBarManager {
     private static let onboardedKey = "PulseMenuBarManagerOnboardedV4"
     private static let autosaveName = "PulseMenuBarControlV4"
 
-    /// Chevron glyphs. Expanded points left ("click to hide to the left");
-    /// collapsed points right ("click to reveal").
+    /// Chevron shown while expanded — points left ("click to hide to the left").
     private static let expandedGlyph = "‹"
-    private static let collapsedGlyph = "›"
+
+    /// Whether the menu bar is currently collapsed (icons hidden).
+    var isCollapsed: Bool { state.isCollapsed }
 
     var isEnabled: Bool {
         get { state.isEnabled }
@@ -135,14 +136,18 @@ final class MenuBarManager {
     private func applyControl() {
         guard let item = control, let button = item.button else { return }
         if state.isExpanded {
-            // Auto-size to the glyph; sits as a normal small menu bar item.
+            // Small, normal-sized item showing the chevron. Click to collapse.
             item.length = NSStatusItem.variableLength
             button.title = Self.expandedGlyph
+            button.toolTip = "Hide the menu bar icons on the left"
         } else {
-            // Inflate to push everything on the item's left off-screen. The
-            // right-aligned glyph stays visible at the item's right edge.
+            // Inflate to push everything on the item's left off-screen. An
+            // inflated status item does not render its own button content (an
+            // AppKit limit at large widths), so there is no glyph here — the
+            // whole emptied strip is one big click target that expands again.
             item.length = state.collapseWidth
-            button.title = Self.collapsedGlyph
+            button.title = ""
+            button.toolTip = "Show the hidden menu bar icons"
         }
     }
 
@@ -216,15 +221,15 @@ final class MenuBarManager {
         let alert = NSAlert()
         alert.messageText = "Menu Bar Manager"
         alert.informativeText = """
-        A small chevron ( ‹ ) was added near the right of your menu bar.
+        A small chevron ( ‹ ) was added to your menu bar. Everything to its \
+        LEFT is the "hidden" zone.
 
-        Everything to the LEFT of the chevron is the "hidden" zone:
+        • Click the ‹ chevron to collapse — every icon to its left disappears.
+        • To bring them back, click the empty strip where they were, or use \
+        the Show/Hide button in Pulse's menu bar popover.
 
-        • Click the chevron to collapse — every icon to its left disappears.
-        • Click it again ( › ) to reveal them.
-
-        To keep an icon always visible, hold ⌘ and drag it to the RIGHT of \
-        the chevron. Anything left of the chevron hides; anything right of it \
+        To keep an icon always visible, hold ⌘ and drag it to the RIGHT of the \
+        chevron. Anything left of the chevron hides; anything right of it \
         (including the clock and Control Center) always stays.
         """
         alert.alertStyle = .informational
