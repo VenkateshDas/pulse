@@ -18,13 +18,19 @@ final class MenuBarManager {
     private static let enabledKey = "PulseMenuBarManagementEnabled"
     private static let autoHideKey = "PulseMenuBarAutoHideDelay"
     private static let showSeparatorKey = "PulseMenuBarShowSeparator"
+    private static let onboardedKey = "PulseMenuBarManagerOnboarded"
 
     var isEnabled: Bool {
         get { state.isEnabled }
         set {
             state.isEnabled = newValue
             UserDefaults.standard.set(newValue, forKey: Self.enabledKey)
-            newValue ? setUp() : tearDown()
+            if newValue {
+                setUp()
+                showOnboardingIfNeeded()
+            } else {
+                tearDown()
+            }
         }
     }
 
@@ -147,8 +153,8 @@ final class MenuBarManager {
         guard let btn = separator?.button else { return }
         if state.isExpanded && state.showSeparator {
             btn.image = NSImage(
-                systemSymbolName: "line.3.horizontal",
-                accessibilityDescription: "Menu bar divider"
+                systemSymbolName: "line.diagonal",
+                accessibilityDescription: "Menu bar section divider"
             )
             btn.image?.isTemplate = true
             btn.title = ""
@@ -232,6 +238,39 @@ final class MenuBarManager {
 
     @objc private func disableFeature() {
         isEnabled = false
+    }
+
+    // MARK: - Onboarding
+
+    private func showOnboardingIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.onboardedKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.onboardedKey)
+
+        let alert = NSAlert()
+        alert.messageText = "Menu Bar Manager"
+        alert.informativeText = """
+        Two new icons appeared in your menu bar:
+
+        ≡  Separator — the divider between visible and hidden items
+        «  Chevron — click to hide/show items
+
+        To choose which items to hide:
+        ⌘ + drag menu bar icons to the LEFT of the ≡ separator.
+
+        Then click the « chevron to collapse — items left of the separator will be hidden.
+
+        Right-click the chevron for auto-hide settings.
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Got it")
+        alert.icon = NSImage(systemSymbolName: "menubar.rectangle",
+                             accessibilityDescription: nil)
+
+        // Run on next tick so the status items are visible before the alert.
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     // MARK: - Auto-hide Timer

@@ -240,21 +240,28 @@ struct MenuBarContent: View {
     // MARK: Menu Bar Manager
 
     private var menuBarManagerRow: some View {
-        HStack {
-            Image(systemName: "menubar.rectangle")
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.textSecondary)
-            Text("Menu Bar Manager")
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.textSecondary)
-            Spacer()
-            Toggle("", isOn: Binding(
-                get: { MenuBarManager.shared.isEnabled },
-                set: { MenuBarManager.shared.isEnabled = $0 }
-            ))
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .labelsHidden()
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: "menubar.rectangle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Halo.textSecondary)
+                Text("Menu Bar Manager")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Halo.textSecondary)
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { MenuBarManager.shared.isEnabled },
+                    set: { MenuBarManager.shared.isEnabled = $0 }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+            }
+            if MenuBarManager.shared.isEnabled {
+                Text("⌘+drag icons left of the divider to hide them")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.textDim)
+            }
         }
     }
 
