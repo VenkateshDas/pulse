@@ -100,11 +100,13 @@ enum PulsePermission: String, CaseIterable, Identifiable, Sendable {
     @MainActor func status() async -> PermissionStatus {
         switch self {
         case .notifications:
+            // current() throws when the app has no bundle id (unbundled dev run).
+            guard Bundle.main.bundleIdentifier != nil else { return .unknown }
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             switch settings.authorizationStatus {
             case .authorized, .provisional, .ephemeral: return .granted
-            case .denied: return .denied
-            default: return .unknown
+            case .denied, .notDetermined: return .denied   // never-asked → actionable
+            @unknown default: return .unknown
             }
         default:
             return syncStatus
