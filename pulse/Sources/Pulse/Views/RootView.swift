@@ -13,7 +13,7 @@ struct RootView: View {
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
     @State private var windowVisible = true
     @State private var showPalette = false
-    @State private var showOnboarding = !OnboardingView.isComplete
+    @State private var showOnboarding = PermissionsGate.shouldPromptOnLaunch()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -26,6 +26,7 @@ struct RootView: View {
                 case .monitor: MonitorView()
                 case .displays: DisplaysView()
                 case .health: HealthView()
+                case .permissions: PermissionsView()
                 case .diagnostics: DevModeView()
                 default: DashboardView()
                 }
@@ -46,6 +47,8 @@ struct RootView: View {
         }
         .onAppear {
             clean.start()
+            // Record this build so a post-update re-prompt fires at most once.
+            PermissionsGate.markPrompted()
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
             selection = .storage
