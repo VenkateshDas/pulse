@@ -52,4 +52,15 @@ enum {
     kPulseSMCGetKeyInfo = 9,
 };
 
+#include <CoreGraphics/CoreGraphics.h>
+#include "DDC.h"
+
+extern double CoreDisplay_Display_GetUserBrightness(CGDirectDisplayID display) __attribute__((weak_import));
+extern void CoreDisplay_Display_SetUserBrightness(CGDirectDisplayID display, double brightness) __attribute__((weak_import));
+
+extern int DisplayServicesCanChangeBrightness(CGDirectDisplayID display) __attribute__((weak_import));
+extern int DisplayServicesGetBrightness(CGDirectDisplayID display, float *brightness) __attribute__((weak_import));
+extern int DisplayServicesSetBrightness(CGDirectDisplayID display, float brightness) __attribute__((weak_import));
+extern int DisplayServicesSetLinearBrightness(CGDirectDisplayID display, float brightness) __attribute__((weak_import));
+
 #endif /* CPULSE_H */

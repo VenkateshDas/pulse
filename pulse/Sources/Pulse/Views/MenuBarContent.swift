@@ -43,6 +43,8 @@ struct MenuBarContent: View {
                     batteryRow(battery)
                 }
                 Divider().overlay(Halo.borderSubtle)
+                DisplaysPopoverSection()
+                Divider().overlay(Halo.borderSubtle)
                 topProcesses(snapshot)
             } else {
                 Text("Sampling…")

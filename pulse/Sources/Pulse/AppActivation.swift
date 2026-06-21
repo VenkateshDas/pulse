@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import PulseKit
 
 /// Governs Pulse's Dock presence. Pulse is fundamentally a menu-bar app: it
 /// samples and serves its popover from the background with no Dock tile. The
@@ -78,6 +79,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppActivation.shared.applyInitialPolicy()
         MenuBarManager.shared.start()
+        
+        // Brightness media-key interception.
+        // Prompt for Accessibility if not yet trusted (system dialog, once).
+        // Always call start() — the manager installs a global-monitor fallback
+        // that works without Accessibility; the CGEvent tap adds full control
+        // (blocking the macOS OSD) when the permission IS granted.
+        if !MediaKeyManager.shared.isTrusted(prompt: false) {
+            let _ = MediaKeyManager.shared.isTrusted(prompt: true)
+        }
+        MediaKeyManager.shared.start()
     }
 
     /// Closing the Command Center must not quit Pulse — it returns to the menu

@@ -12,14 +12,24 @@ let package = Package(
     // `#if canImport(Sparkle)`, so enabling is a two-line change here —
     // uncomment the dependency and add the product to the Pulse target.
     // Left off by default so the patched-CLT build resolves with no network.
-    // dependencies: [
-    //     .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
-    // ],
+    dependencies: [
+        .package(url: "https://github.com/alin23/MediaKeyTap", branch: "dev"),
+    ],
     targets: [
         // C shim exposing libproc (per-process CPU/memory) to Swift.
-        .target(name: "CPulse"),
+        .target(
+            name: "CPulse",
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedFramework("ApplicationServices"),
+                .unsafeFlags(["-F/System/Library/PrivateFrameworks", "-framework", "CoreDisplay", "-framework", "DisplayServices"])
+            ]
+        ),
         // UI-independent system data collection core.
-        .target(name: "PulseKit", dependencies: ["CPulse"]),
+        .target(name: "PulseKit", dependencies: [
+            "CPulse",
+            .product(name: "MediaKeyTap", package: "MediaKeyTap")
+        ]),
         // SwiftUI app: menu bar extra + dashboard window.
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [
             .process("Resources")

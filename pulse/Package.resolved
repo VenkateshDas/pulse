@@ -1,0 +1,24 @@
+{
+  "originHash" : "abfb2595c8eb13430ee1812e3124729836c453cc504e41db3ca2c8e399d42ce7",
+  "pins" : [
+    {
+      "identity" : "mediakeytap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/alin23/MediaKeyTap",
+      "state" : {
+        "branch" : "dev",
+        "revision" : "5b8ee686bc90d917cba4f029b47c2a8541a4f58d"
+      }
+    },
+    {
+      "identity" : "swift-atomics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-atomics",
+      "state" : {
+        "revision" : "b601256eab081c0f92f059e12818ac1d4f178ff7",
+        "version" : "1.3.0"
+      }
+    }
+  ],
+  "version" : 3
+}
