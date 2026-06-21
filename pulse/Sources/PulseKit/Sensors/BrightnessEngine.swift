@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import CoreGraphics
 import CPulse
 
@@ -22,9 +23,21 @@ public class BrightnessEngine: ObservableObject {
     @Published public var brightnessMap: [CGDirectDisplayID: Double] = [:]
     private var ddcFailures: [CGDirectDisplayID: Int] = [:]
 
+    private var screenObserver: Any?
+
     private init() {
         loadBrightnessMap()
         refreshMonitors()
+        // Display IDs are reassigned on sleep/wake and connect/disconnect. Without
+        // this, `monitors` goes stale and the media-key router can't resolve the
+        // display under the cursor — brightness keys then miss external monitors.
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshMonitors() }
+        }
     }
     
     public func saveBrightnessMap() {
