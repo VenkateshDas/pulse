@@ -24,6 +24,7 @@ struct RootView: View {
                 case .timeline: TimelineView()
                 case .uninstall: UninstallView()
                 case .monitor: MonitorView()
+                case .displays: DisplaysView()
                 case .health: HealthView()
                 case .diagnostics: DevModeView()
                 default: DashboardView()
@@ -59,13 +60,10 @@ struct RootView: View {
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)
         ) { note in
-            // SwiftUI doesn't expose the scene id on NSWindow reliably;
-            // the title is stable and unique to this window.
             guard let window = note.object as? NSWindow,
-                window.title.hasPrefix("Pulse")
+                window.title == "Pulse — Command Center"
             else { return }
             let visible = window.occlusionState.contains(.visible)
-            guard visible != windowVisible else { return }
             windowVisible = visible
             visible ? model.viewAppeared() : model.viewDisappeared()
             monitorModel.windowVisibilityChanged(visible)
