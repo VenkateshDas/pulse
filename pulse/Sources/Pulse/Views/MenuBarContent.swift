@@ -274,7 +274,7 @@ struct MenuBarContent: View {
                 .buttonStyle(.bordered)
                 .tint(Halo.ion)
 
-                Text("Or click the ‹ chevron in the menu bar. ⌘-drag an icon right of it to keep it always visible.")
+                Text("Or click the ‹ chevron in the menu bar. ⌘-drag an icon right of the | separator to keep it always visible.")
                     .font(.system(size: 9))
                     .foregroundStyle(Halo.textDim)
             }

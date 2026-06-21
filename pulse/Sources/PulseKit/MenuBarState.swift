@@ -1,9 +1,9 @@
 import Foundation
 
 /// Pure state machine for menu bar item hiding. Separates logic from AppKit
-/// so it can be unit-tested without NSStatusItem. Drives a single status item
-/// that inflates to `collapseWidth` when collapsed (pushing items off-screen)
-/// and auto-sizes when expanded.
+/// so it can be unit-tested without NSStatusItem. Drives the two-item mechanism
+/// (chevron + separator), inflating the separator to `collapseWidth` when
+/// collapsed (pushing items off-screen) and auto-sizing when expanded.
 public struct MenuBarState: Sendable {
     public enum Phase: Sendable { case collapsed, expanded }
 

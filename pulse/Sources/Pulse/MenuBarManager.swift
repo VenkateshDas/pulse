@@ -18,17 +18,40 @@ final class MenuBarManager {
 
     private(set) var state = MenuBarState()
 
-    private var control: NSStatusItem?
+    private var btnExpandCollapse: NSStatusItem?
+    private var btnSeparate: NSStatusItem?
     private var autoHideTimer: Timer?
     private var screenObserver: Any?
+    
+    private var isToggle = false
 
     private static let enabledKey = "PulseMenuBarManagementEnabled"
     private static let autoHideKey = "PulseMenuBarAutoHideDelay"
-    private static let onboardedKey = "PulseMenuBarManagerOnboardedV4"
-    private static let autosaveName = "PulseMenuBarControlV4"
+    private static let onboardedKey = "PulseMenuBarManagerOnboardedV5"
+    private static let expandCollapseAutosaveName = "PulseMenuBarExpandCollapse"
+    private static let separateAutosaveName = "PulseMenuBarSeparate"
+    private static let v4LegacyAutosaveName = "PulseMenuBarControlV4"
 
-    /// Chevron shown while expanded — points left ("click to hide to the left").
+    /// Chevron shown while expanded
     private static let expandedGlyph = "‹"
+    /// Chevron shown while collapsed
+    private static let collapsedGlyph = "›"
+    
+    private let btnHiddenLength: CGFloat = 20
+
+    /// Safety check: if the chevron is placed to the left of the separator, collapsing
+    /// would push the chevron itself off-screen, trapping the user.
+    private var isBtnSeparateValidPosition: Bool {
+        guard let chevronX = btnExpandCollapse?.button?.window?.frame.origin.x,
+              let separateX = btnSeparate?.button?.window?.frame.origin.x else {
+            return false
+        }
+        if NSApp.userInterfaceLayoutDirection == .rightToLeft {
+            return chevronX <= separateX
+        } else {
+            return chevronX >= separateX
+        }
+    }
 
     /// Whether the menu bar is currently collapsed (icons hidden).
     var isCollapsed: Bool { state.isCollapsed }
@@ -61,6 +84,16 @@ final class MenuBarManager {
         state.isEnabled = defaults.object(forKey: Self.enabledKey) as? Bool ?? false
         state.autoHideDelay = defaults.object(forKey: Self.autoHideKey) as? TimeInterval ?? 10
         updateScreenWidth()
+        upgradeFromV4()
+    }
+
+    private func upgradeFromV4() {
+        // macOS persists status items by autosave name. Since we changed to a 2-item 
+        // architecture, the old invisible 10,000pt item remains permanently stuck in 
+        // the user's menubar. We claim its name and remove it.
+        let orphanedItem = NSStatusBar.system.statusItem(withLength: 1)
+        orphanedItem.autosaveName = Self.v4LegacyAutosaveName
+        NSStatusBar.system.removeStatusItem(orphanedItem)
     }
 
     func start() {
@@ -71,11 +104,23 @@ final class MenuBarManager {
     // MARK: - Toggle
 
     func toggle() {
+        if isToggle { return }
+        isToggle = true
+        
         if state.isExpanded { collapse() } else { expand() }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.isToggle = false
+        }
     }
 
     func collapse() {
         guard state.isExpanded else { return }
+        guard isBtnSeparateValidPosition else {
+            // If the user dragged them into an invalid order, auto-hide is 
+            // still allowed to fire but we refuse to collapse to prevent trapping.
+            return
+        }
         state.collapse()
         applyControl()
         cancelAutoHideTimer()
@@ -91,20 +136,36 @@ final class MenuBarManager {
     // MARK: - Setup / Teardown
 
     private func setUp() {
-        guard control == nil else { return }
+        guard btnExpandCollapse == nil else { return }
 
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.autosaveName = Self.autosaveName
-        if let button = item.button {
+        // Expand/Collapse Chevron
+        let expandItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        expandItem.autosaveName = Self.expandCollapseAutosaveName
+        if let button = expandItem.button {
             button.target = self
             button.action = #selector(controlClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.font = .systemFont(ofSize: 15, weight: .bold)
-            // Right-align so the glyph stays pinned to the item's right edge
-            // even when the item is inflated thousands of points wide.
             button.alignment = .right
         }
-        control = item
+        btnExpandCollapse = expandItem
+
+        // Separator Line
+        let separateItem = NSStatusBar.system.statusItem(withLength: btnHiddenLength)
+        separateItem.autosaveName = Self.separateAutosaveName
+        if let button = separateItem.button {
+            button.title = "|"
+            // Optionally set image if we had ic_line, but title "|" works
+            // Right-click context menu
+            let menu = getContextMenu()
+            separateItem.menu = menu
+        }
+        btnSeparate = separateItem
+
+        // Self-Healing UI: Cmd-dragging a status item off the bar is persisted 
+        // by macOS. Force visibility so the user is never permanently locked out.
+        btnExpandCollapse?.isVisible = true
+        btnSeparate?.isVisible = true
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -121,9 +182,13 @@ final class MenuBarManager {
 
     private func tearDown() {
         cancelAutoHideTimer()
-        if let item = control {
+        if let item = btnExpandCollapse {
             NSStatusBar.system.removeStatusItem(item)
-            control = nil
+            btnExpandCollapse = nil
+        }
+        if let item = btnSeparate {
+            NSStatusBar.system.removeStatusItem(item)
+            btnSeparate = nil
         }
         if let obs = screenObserver {
             NotificationCenter.default.removeObserver(obs)
@@ -134,33 +199,36 @@ final class MenuBarManager {
     // MARK: - Rendering
 
     private func applyControl() {
-        guard let item = control, let button = item.button else { return }
+        guard let chevron = btnExpandCollapse, let cBtn = chevron.button else { return }
+        guard let sep = btnSeparate else { return }
+        
         if state.isExpanded {
-            // Small, normal-sized item showing the chevron. Click to collapse.
-            item.length = NSStatusItem.variableLength
-            button.title = Self.expandedGlyph
-            button.toolTip = "Hide the menu bar icons on the left"
+            sep.length = btnHiddenLength
+            cBtn.title = Self.expandedGlyph
+            cBtn.toolTip = "Hide the menu bar icons on the left"
         } else {
-            // Inflate to push everything on the item's left off-screen. An
-            // inflated status item does not render its own button content (an
-            // AppKit limit at large widths), so there is no glyph here — the
-            // whole emptied strip is one big click target that expands again.
-            item.length = state.collapseWidth
-            button.title = ""
-            button.toolTip = "Show the hidden menu bar icons"
+            sep.length = state.collapseWidth
+            cBtn.title = Self.collapsedGlyph
+            cBtn.toolTip = "Show the hidden menu bar icons"
         }
     }
 
     @objc private func controlClicked(_ sender: NSStatusBarButton) {
         guard let event = NSApp.currentEvent else { toggle(); return }
         if event.type == .rightMouseUp {
-            showContextMenu()
+            showContextMenuFromChevron()
         } else {
             toggle()
         }
     }
 
-    private func showContextMenu() {
+    private func showContextMenuFromChevron() {
+        guard let btn = btnExpandCollapse?.button else { return }
+        let menu = getContextMenu()
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: btn.bounds.maxY + 5), in: btn)
+    }
+
+    private func getContextMenu() -> NSMenu {
         let menu = NSMenu()
 
         let autoHideItem = NSMenuItem(
@@ -192,9 +260,7 @@ final class MenuBarManager {
         disableItem.target = self
         menu.addItem(disableItem)
 
-        control?.menu = menu
-        control?.button?.performClick(nil)
-        control?.menu = nil
+        return menu
     }
 
     @objc private func setAutoHideDelay(_ sender: NSMenuItem) {
@@ -221,16 +287,15 @@ final class MenuBarManager {
         let alert = NSAlert()
         alert.messageText = "Menu Bar Manager"
         alert.informativeText = """
-        A small chevron ( ‹ ) was added to your menu bar. Everything to its \
-        LEFT is the "hidden" zone.
+        A separator ( | ) and a chevron ( ‹ ) were added to your menu bar.
 
-        • Click the ‹ chevron to collapse — every icon to its left disappears.
-        • To bring them back, click the empty strip where they were, or use \
-        the Show/Hide button in Pulse's menu bar popover.
+        Everything to the LEFT of the separator ( | ) is your "hidden" zone.
 
-        To keep an icon always visible, hold ⌘ and drag it to the RIGHT of the \
-        chevron. Anything left of the chevron hides; anything right of it \
-        (including the clock and Control Center) always stays.
+        • Click the chevron to collapse — every icon left of the separator disappears.
+        • To bring them back, click the chevron again.
+
+        To configure what hides, hold ⌘ and drag the separator ( | ). Anything \
+        left of it hides; anything right of it always stays visible.
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "Got it")
@@ -272,15 +337,13 @@ final class MenuBarManager {
     }
 
     private func isMouseInMenuBar() -> Bool {
-        let mouseLocation = NSEvent.mouseLocation
+        let mouse = NSEvent.mouseLocation
         for screen in NSScreen.screens {
-            let menuBarRect = CGRect(
-                x: screen.frame.origin.x,
-                y: screen.frame.maxY - 24,
-                width: screen.frame.width,
-                height: 24
-            )
-            if menuBarRect.contains(mouseLocation) { return true }
+            // Dynamic check accommodates notched displays instead of hardcoded 24pt
+            if mouse.x >= screen.frame.minX && mouse.x <= screen.frame.maxX &&
+               mouse.y >= screen.visibleFrame.maxY && mouse.y <= screen.frame.maxY {
+                return true
+            }
         }
         return false
     }
