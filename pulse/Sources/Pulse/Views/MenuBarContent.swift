@@ -258,7 +258,7 @@ struct MenuBarContent: View {
                 .labelsHidden()
             }
             if MenuBarManager.shared.isEnabled {
-                Text("⌘+drag icons left of the divider to hide them")
+                Text("Click the ‹ chevron to hide icons on its left")
                     .font(.system(size: 9))
                     .foregroundStyle(Halo.textDim)
             }
