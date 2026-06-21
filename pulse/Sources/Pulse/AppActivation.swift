@@ -77,6 +77,7 @@ final class AppActivation {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppActivation.shared.applyInitialPolicy()
+        MenuBarManager.shared.start()
     }
 
     /// Closing the Command Center must not quit Pulse — it returns to the menu
