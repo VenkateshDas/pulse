@@ -188,10 +188,13 @@ func parseLogContent(_ log: String) -> [Date: TimeInterval] {
             isOnBattery = true
         }
         
-        if lowerLine.contains("wake from") {
-            isAwake = true
-        } else if lowerLine.contains("entering sleep") || lowerLine.contains("darkwake from") || lowerLine.contains("entering darkwake") {
+        // Check sleep/darkwake FIRST: "DarkWake from …" also contains the
+        // substring "wake from", so matching wake first would wrongly count a
+        // dark wake (a brief maintenance wake) as awake-on-battery time.
+        if lowerLine.contains("entering sleep") || lowerLine.contains("darkwake from") || lowerLine.contains("entering darkwake") {
             isAwake = false
+        } else if lowerLine.contains("wake from") {
+            isAwake = true
         }
         
         if isAwake && isOnBattery {
@@ -228,19 +231,124 @@ func parseLogContent(_ log: String) -> [Date: TimeInterval] {
 func splitBatterySession(start: Date, end: Date) -> [(Date, TimeInterval)] {
     var result: [(Date, TimeInterval)] = []
     let calendar = Calendar.current
-    
+
     var currentStart = start
     while currentStart < end {
         let startOfDay = calendar.startOfDay(for: currentStart)
         guard let nextDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
             break
         }
-        
+
         let currentEnd = min(end, nextDay)
         let duration = currentEnd.timeIntervalSince(currentStart)
         result.append((startOfDay, duration))
-        
+
         currentStart = nextDay
     }
     return result
+}
+
+// MARK: - Session backfill (unplug→replug windows + charge drop from pmset)
+
+/// Reconstructs discrete on-battery sessions from the pmset log: each unplug
+/// (`Using Batt`) to the following replug (`Using AC`), with the battery charge
+/// read off the log at both ends. No per-app data — that history doesn't exist
+/// in the log — so these come back with empty `apps` and `source == .backfill`.
+func parseBatterySessions(_ log: String) -> [BatterySession] {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss Z"
+    dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+    let stampRegex = try? NSRegularExpression(
+        pattern: #"^\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4})"#)
+    // "Charge: 84", "Charge:84%", case-insensitive.
+    let chargeRegex = try? NSRegularExpression(pattern: #"(?i)charge:?\s*(\d{1,3})"#)
+
+    // A session longer than this is almost certainly a missed `Using AC` line,
+    // not a real unplug — drop it rather than chart a bogus span. 48h covers a
+    // lid-closed laptop sipping power over a weekend.
+    let maxSessionSeconds: TimeInterval = 48 * 3600
+    let minSessionSeconds: TimeInterval = 60
+    // A multi-hour stretch with zero charge change isn't a real discharge (the
+    // battery was likely off/hibernated, or the replug line was lost) — skip it.
+    let flatChargeGraceSeconds: TimeInterval = 2 * 3600
+
+    var sessionStart: Date?
+    var sessionStartCharge: Int?
+    var lastCharge: Int?
+    var lastBatteryDate: Date?
+    var lastBatteryCharge: Int?
+    var sessions: [BatterySession] = []
+
+    func close(at end: Date, endCharge: Int?) {
+        guard let start = sessionStart else { return }
+        defer { sessionStart = nil; sessionStartCharge = nil }
+        let duration = end.timeIntervalSince(start)
+        guard duration >= minSessionSeconds, duration <= maxSessionSeconds else { return }
+        let startC = sessionStartCharge ?? lastCharge ?? 0
+        let endC = endCharge ?? startC
+        // Drop implausible flat-charge spans (battery off/hibernated or a lost
+        // replug line) — a real unplug of this length always drains something.
+        if startC - endC <= 0 && duration > flatChargeGraceSeconds { return }
+        sessions.append(
+            BatterySession(
+                startedAt: start, endedAt: end,
+                startCharge: startC, endCharge: endC, source: .backfill))
+    }
+
+    for line in log.components(separatedBy: .newlines) {
+        guard let regex = stampRegex,
+            let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+            let stampRange = Range(match.range(at: 1), in: line),
+            let date = dateFormatter.date(from: String(line[stampRange]))
+        else { continue }
+
+        if let cRegex = chargeRegex,
+            let cMatch = cRegex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+            let cRange = Range(cMatch.range(at: 1), in: line),
+            let value = Int(line[cRange])
+        {
+            lastCharge = min(max(value, 0), 100)
+        }
+
+        let lower = line.lowercased()
+        if lower.contains("using batt") {
+            if sessionStart == nil {
+                sessionStart = date
+                sessionStartCharge = lastCharge
+            }
+            lastBatteryDate = date
+            lastBatteryCharge = lastCharge
+        } else if lower.contains("using ac") {
+            close(at: date, endCharge: lastCharge)
+        }
+    }
+
+    // Log ends mid-battery (currently unplugged): close at the last battery
+    // sample. A live session, if any, will supersede this on merge.
+    if sessionStart != nil {
+        close(at: lastBatteryDate ?? Date(), endCharge: lastBatteryCharge)
+    }
+    return sessions
+}
+
+/// Background read of `pmset -g log`, parsed into backfilled sessions.
+public func backfillBatterySessionsFromSystemLog() async -> [BatterySession] {
+    await Task.detached(priority: .background) { () -> [BatterySession] in
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["-g", "log"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            let data = try pipe.fileHandleForReading.readToEnd()
+            process.waitUntilExit()
+            if let data, let logContent = String(data: data, encoding: .utf8) {
+                return parseBatterySessions(logContent)
+            }
+        } catch {}
+        return []
+    }.value
 }

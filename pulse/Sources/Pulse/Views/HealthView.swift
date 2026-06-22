@@ -6,42 +6,66 @@ struct HealthView: View {
     @Environment(DashboardModel.self) private var dashboardModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            header
-            HealthScoreCard()
-                .frame(height: 150)
-            BatteryCard()
-                .frame(height: 185)
-            if !model.bluetoothDevices.isEmpty {
-                BluetoothCard()
-                    .frame(height: 90)
-            }
-            if !model.batteryUnavailable {
-                let readings = dashboardModel.batteryTrend.compactMap { $0.capacityPercent }
-                if readings.count >= 2 {
-                    CapacityTrendCard()
-                        .frame(height: 130)
-                } else {
-                    BatteryStatsCard()
-                        .frame(height: 100)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Halo.Space.lg) {
+                header
+
+                // Summary row: overall score beside live battery state.
+                HStack(alignment: .top, spacing: Halo.Space.lg) {
+                    HealthScoreCard()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if !model.batteryUnavailable {
+                        BatteryCard()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
-            }
-            HStack(alignment: .top, spacing: 16) {
-                StartupItemsCard()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(height: 200)
+
                 if !model.batteryUnavailable {
-                    BatteryConsumptionCard()
-                        .frame(maxWidth: 340, maxHeight: .infinity)
+                    // Battery over time: 60-day capacity trend beside daily use.
+                    HStack(alignment: .top, spacing: Halo.Space.lg) {
+                        batteryTrendCard
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        BatteryConsumptionCard()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(height: 175)
+
+                    // Per-session detail (unplug window, charge drop, app energy).
+                    BatterySessionsCard()
                 }
+
+                // Bluetooth peripherals: a slim full-width strip.
+                if !model.bluetoothDevices.isEmpty {
+                    BluetoothCard()
+                        .frame(height: 90)
+                }
+
+                // Startup agents: full width so the ITEM/KIND/STATUS columns breathe.
+                // Grows with its content; the page scrolls, the card doesn't.
+                StartupItemsCard()
+
+                BenchmarkCard()
+                    .frame(height: 180)
             }
-            BenchmarkCard()
-                .frame(height: 180)
+            .padding(Halo.Space.xxl)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { ZStack { Halo.void; Halo.meshBackground } }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
+    }
+
+    /// 60-day capacity trend once there are ≥2 daily readings; otherwise the
+    /// collecting-state stat card.
+    @ViewBuilder
+    private var batteryTrendCard: some View {
+        let readings = dashboardModel.batteryTrend.compactMap { $0.capacityPercent }
+        if readings.count >= 2 {
+            CapacityTrendCard()
+        } else {
+            BatteryStatsCard()
+        }
     }
 
     private var header: some View {
@@ -264,6 +288,10 @@ private struct BatteryCard: View {
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
+                // Half-width card → narrow columns; keep long values like
+                // "Service Recommended" on one line by scaling down a touch.
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
     }
 }
@@ -419,23 +447,29 @@ private struct CapacityTrendCard: View {
                 }
             }
 
+            // Adaptive window: pad ±2% around the observed range (capped at
+            // 100%) so a near-flat trend uses the plot area instead of hugging
+            // the floor. Honest — both axis labels reflect the real bounds.
             let minReading = readings.min() ?? 0
-            let floorValue = Double(max(0, minReading - 3))
-            let scale = 100.0 - floorValue
+            let maxReading = readings.max() ?? 100
+            let floorValue = Double(max(0, minReading - 2))
+            let ceilValue = Double(min(100, maxReading + 2))
+            let scale = max(ceilValue - floorValue, 1)
             let series: [Double?] = dashboardModel.batteryTrend.map { entry in
                 entry.capacityPercent.map { Double($0) - floorValue }
             }
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .trailing) {
-                    Text("100%")
+                    Text("\(Int(ceilValue))%")
                     Spacer()
                     Text("\(Int(floorValue))%")
                 }
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
-                .frame(width: 44, alignment: .trailing)
+                .frame(width: 40, alignment: .trailing)
                 HistoryChart(values: series, color: Halo.volt, maxValue: scale)
             }
+            .padding(.vertical, 2)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -447,28 +481,42 @@ private struct CapacityTrendCard: View {
 
 private struct BatteryConsumptionCard: View {
     @Environment(DashboardModel.self) private var dashboardModel
+    /// Days of daily-use bars shown at a glance. A compact bar chart instead
+    /// of a scrolling list keeps this card to a single (page-level) scroll.
+    private static let dayWindow = 14
+
+    private var recent: [BatteryHistoryStore.Entry] {
+        Array(dashboardModel.batteryTrend.suffix(Self.dayWindow))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("BATTERY USE · DAILY")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
-                .foregroundStyle(Halo.textDim)
+        // Scale to the busiest day in view, with an 8h floor so a light week
+        // doesn't exaggerate tiny bars.
+        let maxHours = recent.map { $0.timeOnBattery / 3600 }.max() ?? 0
+        let scaleMax = Swift.max(maxHours.rounded(.up), 8)
 
-            if dashboardModel.batteryTrend.isEmpty {
-                Text("No data yet. Using on battery will populate this list.")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("BATTERY USE · DAILY")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Halo.textDim)
+                Spacer()
+                if let today = recent.last, Calendar.current.isDateInToday(today.date) {
+                    Text(String(format: "%.1f h today", today.timeOnBattery / 3600))
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(hoursColor(today.timeOnBattery / 3600))
+                }
+            }
+
+            if recent.isEmpty {
+                Text("No data yet. Using on battery will populate this.")
                     .font(.system(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(dashboardModel.batteryTrend.reversed()) { entry in
-                            row(for: entry)
-                        }
-                    }
-                }
-                .scrollIndicators(.never)
+                chart(scaleMax: scaleMax)
+                axis
             }
         }
         .padding(16)
@@ -476,56 +524,71 @@ private struct BatteryConsumptionCard: View {
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
-    private func row(for entry: BatteryHistoryStore.Entry) -> some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(formatDate(entry.date))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Halo.textPrimary)
-                    .frame(width: 70, alignment: .leading)
-
-                Spacer()
-
-                // Time-of-day window (e.g. "9:00 AM – 11:30 PM")
-                if let first = entry.firstActiveAt, let last = entry.lastActiveAt {
-                    Text("\(formatTime(first)) – \(formatTime(last))")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Halo.textDim)
-                }
-
-                let hours = entry.timeOnBattery / 3600.0
-                Text(String(format: "%.1f h", hours))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(hoursColor(hours))
-                    .frame(width: 40, alignment: .trailing)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-
-            // Thin usage bar proportional to 12h max
-            GeometryReader { geo in
-                let fraction = min(entry.timeOnBattery / (12 * 3600), 1.0)
-                HStack(spacing: 0) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Halo.ion.opacity(0.4))
-                        .frame(width: geo.size.width * fraction, height: 2)
-                    Spacer(minLength: 0)
+    private func chart(scaleMax: Double) -> some View {
+        GeometryReader { geo in
+            // Reserve a row for the value label so bars never clip it.
+            let labelHeight: CGFloat = 13
+            let barMax = max(geo.size.height - labelHeight, 8)
+            HStack(alignment: .bottom, spacing: 5) {
+                ForEach(recent) { entry in
+                    let hours = entry.timeOnBattery / 3600
+                    let fraction = min(hours / scaleMax, 1)
+                    VStack(spacing: 2) {
+                        Text(hours >= 0.05 ? String(format: "%.1f", hours) : "")
+                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(hoursColor(hours))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            .fill(barGradient(hours))
+                            .frame(height: max(barMax * fraction, 3))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .bottom)
+                    .help(tooltip(for: entry, hours: hours))
+                    .accessibilityLabel(
+                        "\(formatDate(entry.date)): \(String(format: "%.1f", hours)) hours on battery")
                 }
             }
-            .frame(height: 2)
-            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
-        .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8))
+        .frame(maxHeight: .infinity)
+    }
+
+    /// Top-lit gradient so the bars read with depth rather than as flat blocks.
+    private func barGradient(_ hours: Double) -> LinearGradient {
+        let base = hoursColor(hours)
+        return LinearGradient(
+            colors: [base, base.opacity(0.55)],
+            startPoint: .top, endPoint: .bottom)
+    }
+
+    private var axis: some View {
+        HStack {
+            if let first = recent.first { Text(formatDate(first.date)) }
+            Spacer()
+            if recent.count > 1, let last = recent.last { Text(formatDate(last.date)) }
+        }
+        .font(.system(size: 9, design: .monospaced))
+        .foregroundStyle(Halo.textDim)
     }
 
     private func hoursColor(_ hours: Double) -> Color {
         hours >= 8 ? Halo.pulseGreen : hours >= 4 ? Halo.ion : Halo.textDim
     }
 
+    /// Hover detail: "Jun 14 · 5.2 h on battery · 9:00am–6:00pm".
+    private func tooltip(for entry: BatteryHistoryStore.Entry, hours: Double) -> String {
+        var parts = ["\(formatDate(entry.date)) · \(String(format: "%.1f", hours)) h on battery"]
+        if let first = entry.firstActiveAt, let last = entry.lastActiveAt {
+            parts.append("\(formatTime(first))–\(formatTime(last))")
+        }
+        return parts.joined(separator: " · ")
+    }
+
     private func formatDate(_ date: Date) -> String {
         let cal = Calendar.current
         if cal.isDateInToday(date) { return "Today" }
-        if cal.isDateInYesterday(date) { return "Yesterday" }
+        if cal.isDateInYesterday(date) { return "Yest" }
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
@@ -534,9 +597,218 @@ private struct BatteryConsumptionCard: View {
     private func formatTime(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
-        formatter.amSymbol = "am"
-        formatter.pmSymbol = "pm"
+        formatter.amSymbol = "am"; formatter.pmSymbol = "pm"
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Battery Sessions Card (per-session charge drop + per-app energy share)
+
+private struct BatterySessionsCard: View {
+    @Environment(DashboardModel.self) private var dashboardModel
+    @State private var expanded: Set<UUID> = []
+
+    /// Segment colors for the stacked share bar; "Other" always renders dim.
+    private static let palette: [Color] = [
+        Halo.ion, Halo.volt, Halo.tealLight, Halo.amber,
+        Halo.pulseGreen, Halo.flare, Halo.teal, Halo.tealDeep,
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("BATTERY SESSIONS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Halo.textDim)
+                Spacer()
+                Text("energy = share of active compute · approx")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim.opacity(0.7))
+            }
+
+            if dashboardModel.batterySessions.isEmpty {
+                Text("No unplugged sessions in the last 60 days. Run on battery and each unplug will appear here.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Halo.textDim)
+                    .padding(.vertical, 8)
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(dashboardModel.batterySessions.reversed()) { session in
+                        sessionRow(session)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+    }
+
+    @ViewBuilder
+    private func sessionRow(_ session: BatterySession) -> some View {
+        let shares = session.shares
+        let isExpanded = expanded.contains(session.id)
+        VStack(alignment: .leading, spacing: 9) {
+            // Header: when + how long + charge drop.
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(dayLabel(session.startedAt))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Halo.textPrimary)
+                        if session.isLive {
+                            Text("LIVE")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(Halo.pulseGreen)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(Halo.pulseGreen.opacity(0.15), in: Capsule())
+                        }
+                    }
+                    Text(windowText(session))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(Halo.textDim)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("−\(session.chargeDrop)%")
+                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                        .foregroundStyle(dropColor(session.chargeDrop))
+                    Text("\(session.startCharge)% → \(session.endCharge)%")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(Halo.textDim)
+                }
+            }
+
+            // Charge depletion: full bar = startCharge, filled portion = what
+            // remained at the end; the dim tail is what drained.
+            chargeBar(session)
+
+            if !shares.isEmpty {
+                shareBar(shares)
+                legend(shares, expanded: isExpanded)
+                if shares.count > 4 {
+                    Button(isExpanded ? "Show less" : "Show all \(shares.count) apps") {
+                        if isExpanded { expanded.remove(session.id) } else { expanded.insert(session.id) }
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Halo.ion)
+                    .buttonStyle(.plain)
+                }
+            } else if session.isLive {
+                Text("Measuring app activity…")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+            } else {
+                Text("Per-app energy needs Pulse running while unplugged — macOS keeps no per-app history.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim.opacity(0.85))
+            }
+        }
+        .padding(12)
+        .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// Horizontal charge gauge: solid up to the end charge, a dimmed segment for
+    /// the drop, over a faint track to 100%.
+    private func chargeBar(_ session: BatterySession) -> some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let endFrac = min(max(Double(session.endCharge) / 100, 0), 1)
+            let startFrac = min(max(Double(session.startCharge) / 100, 0), 1)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Halo.surface2)
+                Capsule()
+                    .fill(dropColor(session.chargeDrop).opacity(0.25))
+                    .frame(width: w * startFrac)
+                Capsule()
+                    .fill(Halo.ion)
+                    .frame(width: w * endFrac)
+            }
+        }
+        .frame(height: 4)
+    }
+
+    private func shareBar(_ shares: [(app: AppEnergyShare, fraction: Double)]) -> some View {
+        GeometryReader { geo in
+            HStack(spacing: 1) {
+                ForEach(Array(shares.enumerated()), id: \.element.app.id) { index, entry in
+                    Rectangle()
+                        .fill(color(for: entry.app.name, index: index))
+                        .frame(width: max(geo.size.width * entry.fraction - 1, 0))
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+        }
+        .frame(height: 8)
+    }
+
+    @ViewBuilder
+    private func legend(
+        _ shares: [(app: AppEnergyShare, fraction: Double)], expanded: Bool
+    ) -> some View {
+        let shown = expanded ? shares : Array(shares.prefix(4))
+        // Two-column grid keeps long app names readable at any window width.
+        let cols = [GridItem(.flexible(), alignment: .leading),
+                    GridItem(.flexible(), alignment: .leading)]
+        LazyVGrid(columns: cols, alignment: .leading, spacing: 4) {
+            ForEach(Array(shown.enumerated()), id: \.element.app.id) { index, entry in
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(color(for: entry.app.name, index: index))
+                        .frame(width: 7, height: 7)
+                    Text(entry.app.name)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Halo.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    Text("\(Int((entry.fraction * 100).rounded()))%")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Halo.textDim)
+                }
+            }
+        }
+    }
+
+    private func color(for name: String, index: Int) -> Color {
+        name == "Other" ? Halo.textDim.opacity(0.5) : Self.palette[index % Self.palette.count]
+    }
+
+    private func dropColor(_ drop: Int) -> Color {
+        drop >= 40 ? Halo.flare : drop >= 20 ? Halo.amber : Halo.textPrimary
+    }
+
+    private func dayLabel(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Today" }
+        if cal.isDateInYesterday(date) { return "Yesterday" }
+        let f = DateFormatter()
+        f.dateFormat = "EEE, MMM d"
+        return f.string(from: date)
+    }
+
+    private func windowText(_ session: BatterySession) -> String {
+        let time = DateFormatter()
+        time.dateFormat = "h:mm a"
+        time.amSymbol = "am"; time.pmSymbol = "pm"
+        let start = time.string(from: session.startedAt)
+        let mins = Int(session.duration() / 60)
+        let dur = mins >= 60 ? "\(mins / 60)h \(mins % 60)m" : "\(mins)m"
+
+        guard !session.isLive, let endedAt = session.endedAt else {
+            return "\(start) – now · \(dur)"
+        }
+        // Prefix the end with its date when the session crossed midnight, so an
+        // overnight unplug doesn't read like it ended earlier the same day.
+        let sameDay = Calendar.current.isDate(session.startedAt, inSameDayAs: endedAt)
+        var end = time.string(from: endedAt)
+        if !sameDay {
+            let day = DateFormatter()
+            day.dateFormat = "MMM d"
+            end = "\(day.string(from: endedAt)) \(end)"
+        }
+        return "\(start) – \(end) · \(dur)"
     }
 }
 
@@ -569,20 +841,20 @@ private struct StartupItemsCard: View {
                 Text("No launch agents installed")
                     .font(.system(size: 12))
                     .foregroundStyle(Halo.textDim)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(model.startupItems) { item in
-                            StartupItemRow(item: item) { model.toggle(item) }
-                        }
+                // No inner ScrollView — the card grows with its rows and the
+                // page is the single scroll surface (avoids nested scrolling).
+                LazyVStack(spacing: 2) {
+                    ForEach(model.startupItems) { item in
+                        StartupItemRow(item: item) { model.toggle(item) }
                     }
                 }
-                .scrollIndicators(.never)
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 

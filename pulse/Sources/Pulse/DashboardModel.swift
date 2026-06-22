@@ -72,6 +72,9 @@ final class DashboardModel {
     private(set) var networkOutHistory: [Double] = []
     private(set) var powerHistory: [Double] = []
     private(set) var batteryTrend: [BatteryHistoryStore.Entry] = []
+    /// On-battery sessions (newest last): time on battery, charge drop, and
+    /// per-app energy share. Published for the Health page.
+    private(set) var batterySessions: [BatterySession] = []
     /// Rounded CPU for the menu bar label. Separate property so the status
     /// item only re-renders when the displayed integer actually changes —
     /// re-rendering it every sample costs measurable CPU.
@@ -91,6 +94,9 @@ final class DashboardModel {
 
     static let historyLength = 900 // 900 samples * 2s = 30 minutes
     static let interval: Duration = .seconds(2)
+    /// Uptime gap above which an on-battery break is treated as real sleep
+    /// (ends the session), not a transient sampling stall.
+    static let sleepGapSeconds: TimeInterval = 90
 
     private let engine = PulseEngine()
     private var loop: Task<Void, Never>?
@@ -124,7 +130,11 @@ final class DashboardModel {
     @ObservationIgnored private var processWatcher = ProcessWatcher()
     @ObservationIgnored private let anomalyStore = AnomalyStore()
     @ObservationIgnored private let batteryHistory = BatteryHistoryStore()
+    @ObservationIgnored private let batterySessionStore = BatterySessionStore()
     @ObservationIgnored private var lastIngestUptime: TimeInterval?
+    /// Timestamp of the last valid on-battery sample, used to end a session at
+    /// the right moment when a sleep gap (not a replug) interrupts it.
+    @ObservationIgnored private var lastBatterySampleAt: Date?
     /// Per-alert-id last fire time — enforces the 30-min notification cooldown
     /// so a sustained condition notifies once, not every 2s.
     @ObservationIgnored private var lastNotified: [String: Date] = [:]
@@ -155,11 +165,15 @@ final class DashboardModel {
         observeScreenLock()
         requestNotificationAuthorization()
         
-        // Trigger background backfill on launch
+        // Trigger background backfill on launch: daily totals + reconstructed
+        // unplug sessions (times + charge drop) from the pmset log.
         Task { [weak self] in
             guard let self else { return }
             await self.batteryHistory.backfillFromSystemLog()
             self.batteryTrend = self.batteryHistory.entries
+            let sessions = await backfillBatterySessionsFromSystemLog()
+            self.batterySessionStore.mergeBackfilled(sessions)
+            self.batterySessions = self.batterySessionStore.allSessions
         }
 
         loop = Task { [weak self, engine] in
@@ -236,13 +250,43 @@ final class DashboardModel {
         }
 
         if let battery = snapshot.battery {
-            if !battery.isOnAC, let lastUptime = lastIngestUptime {
-                let duration = snapshot.uptime - lastUptime
-                // Filter out sleep gaps (>10s between 2s samples)
-                if duration > 0 && duration < 10 {
-                    batteryHistory.addTimeOnBattery(duration, at: snapshot.timestamp)
+            let charge = battery.currentChargePercent
+            let elapsed = lastIngestUptime.map { snapshot.uptime - $0 } ?? 0
+            // A gap >10s between 2s samples means the Mac slept — not live use.
+            let validDelta = elapsed > 0 && elapsed < 10
+
+            if !battery.isOnAC {
+                // Time-on-battery crediting is unchanged: only count gaps that
+                // look like live use (≤10s between 2s samples).
+                if validDelta {
+                    batteryHistory.addTimeOnBattery(elapsed, at: snapshot.timestamp)
                 }
+                if batterySessionStore.liveSession == nil {
+                    batterySessionStore.beginSession(charge: charge, at: snapshot.timestamp)
+                    lastBatterySampleAt = snapshot.timestamp
+                } else if validDelta {
+                    let procs = snapshot.topProcesses.map {
+                        (name: $0.name, cpuPercent: $0.cpuPercent)
+                    }
+                    batterySessionStore.accumulate(
+                        processes: procs, elapsed: elapsed, charge: charge,
+                        at: snapshot.timestamp)
+                    lastBatterySampleAt = snapshot.timestamp
+                } else if elapsed >= Self.sleepGapSeconds {
+                    // Genuinely slept while unplugged: close the pre-sleep
+                    // session at its last active sample, then open a fresh one.
+                    // Smaller (10–90s) gaps are transient stalls — keep the
+                    // session open rather than fragmenting it.
+                    batterySessionStore.endSession(
+                        charge: charge, at: lastBatterySampleAt ?? snapshot.timestamp)
+                    batterySessionStore.beginSession(charge: charge, at: snapshot.timestamp)
+                    lastBatterySampleAt = snapshot.timestamp
+                }
+            } else if batterySessionStore.liveSession != nil {
+                // Plugged back in — close the session.
+                batterySessionStore.endSession(charge: charge, at: snapshot.timestamp)
             }
+
             // One capacity reading per day feeds the 60-day degradation chart.
             batteryHistory.recordCapacity(battery.capacityPercent, at: snapshot.timestamp)
         }
@@ -331,6 +375,7 @@ final class DashboardModel {
         networkOutHistory = networkOutBuffer
         powerHistory = powerBuffer
         batteryTrend = batteryHistory.entries
+        batterySessions = batterySessionStore.allSessions
     }
 
     /// Builds the windowed CPU-hog alert card from a sustained anomaly.
