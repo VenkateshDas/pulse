@@ -65,8 +65,10 @@ struct OnboardingView: View {
         isPresented = false
     }
 
-    static let completeKey = "PulseOnboardingComplete"
-    static var isComplete: Bool { UserDefaults.standard.bool(forKey: completeKey) }
+    nonisolated static let completeKey = "PulseOnboardingComplete"
+    // nonisolated: only reads thread-safe UserDefaults, so the launch-time
+    // gate (PermissionsGate.shouldPromptOnLaunch) can call it off the main actor.
+    nonisolated static var isComplete: Bool { UserDefaults.standard.bool(forKey: completeKey) }
 }
 
 /// Detects Full Disk Access by attempting to read a TCC-protected path that
