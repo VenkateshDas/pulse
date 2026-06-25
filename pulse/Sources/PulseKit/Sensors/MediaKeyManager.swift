@@ -21,6 +21,7 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
 
     private var tap: MediaKeyTap?
     private var globalMonitor: Any?
+    private var accessibilityPollTimer: Timer?
 
     private init() {}
 
@@ -39,10 +40,27 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
             startMediaKeyTap()
         } else {
             print("[MediaKeys] No Accessibility — MediaKeyTap skipped, fallback only.")
+            startAccessibilityPoll()
         }
 
         // Tier 2: NSEvent global monitor (always works, no permissions)
         startGlobalMonitor()
+    }
+
+    /// Polls every 2s until Accessibility is granted, then starts Tier 1.
+    @MainActor
+    private func startAccessibilityPoll() {
+        guard accessibilityPollTimer == nil else { return }
+        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                guard self.isTrusted(prompt: false) else { return }
+                self.accessibilityPollTimer?.invalidate()
+                self.accessibilityPollTimer = nil
+                self.startMediaKeyTap()
+                print("[MediaKeys] Accessibility granted — MediaKeyTap started.")
+            }
+        }
     }
 
     public func stop() {
@@ -52,6 +70,8 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
             NSEvent.removeMonitor(mon)
             globalMonitor = nil
         }
+        accessibilityPollTimer?.invalidate()
+        accessibilityPollTimer = nil
     }
 
     // MARK: - Tier 1: MediaKeyTap

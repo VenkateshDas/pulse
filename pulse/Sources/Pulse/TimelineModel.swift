@@ -49,11 +49,12 @@ final class TimelineModel {
     static let spikeThreshold: Int64 = 2_000_000_000
 
     private nonisolated static func diskUsedBytes() -> UInt64 {
-        let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityKey]
+        let keys: Set<URLResourceKey> = [.volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey]
         guard let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys),
-            let total = values.volumeTotalCapacity, let free = values.volumeAvailableCapacity,
-            total > free
+            let total = values.volumeTotalCapacity,
+            let free = values.volumeAvailableCapacityForImportantUsage,
+            Int64(total) > free
         else { return 0 }
-        return UInt64(total - free)
+        return UInt64(Int64(total) - free)
     }
 }

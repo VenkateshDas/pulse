@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import Observation
@@ -135,6 +136,7 @@ final class DashboardModel {
     /// Timestamp of the last valid on-battery sample, used to end a session at
     /// the right moment when a sleep gap (not a replug) interrupts it.
     @ObservationIgnored private var lastBatterySampleAt: Date?
+    @ObservationIgnored private var displayAsleep = false
     /// Per-alert-id last fire time — enforces the 30-min notification cooldown
     /// so a sustained condition notifies once, not every 2s.
     @ObservationIgnored private var lastNotified: [String: Date] = [:]
@@ -163,6 +165,7 @@ final class DashboardModel {
     func start() {
         guard loop == nil else { return }
         observeScreenLock()
+        observeDisplaySleep()
         requestNotificationAuthorization()
         
         // Trigger background backfill on launch: daily totals + reconstructed
@@ -270,7 +273,7 @@ final class DashboardModel {
                     }
                     batterySessionStore.accumulate(
                         processes: procs, elapsed: elapsed, charge: charge,
-                        at: snapshot.timestamp)
+                        at: snapshot.timestamp, displayAsleep: displayAsleep)
                     lastBatterySampleAt = snapshot.timestamp
                 } else if elapsed >= Self.sleepGapSeconds {
                     // Genuinely slept while unplugged: close the pre-sleep
@@ -338,6 +341,25 @@ final class DashboardModel {
                 UNNotificationRequest(
                     identifier: "alert-\(alert.id)", content: content, trigger: nil))
         }
+    }
+
+    @ObservationIgnored private var displaySleepObservers: [Any] = []
+
+    private func observeDisplaySleep() {
+        let ws = NSWorkspace.shared.notificationCenter
+        let sleepObs = ws.addObserver(
+            forName: NSWorkspace.screensDidSleepNotification,
+            object: nil, queue: OperationQueue.main
+        ) { [weak self] (_: Notification) in
+            Task { @MainActor in self?.displayAsleep = true }
+        }
+        let wakeObs = ws.addObserver(
+            forName: NSWorkspace.screensDidWakeNotification,
+            object: nil, queue: OperationQueue.main
+        ) { [weak self] (_: Notification) in
+            Task { @MainActor in self?.displayAsleep = false }
+        }
+        displaySleepObservers = [sleepObs, wakeObs]
     }
 
     private func observeScreenLock() {

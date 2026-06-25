@@ -111,12 +111,12 @@ final class MenuBarManager {
     func toggle() {
         if isToggle { return }
         isToggle = true
-        
-        if state.isExpanded { collapse() } else { expand() }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.isToggle = false
+        defer {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.isToggle = false
+            }
         }
+        if state.isExpanded { collapse() } else { expand() }
     }
 
     func collapse() {

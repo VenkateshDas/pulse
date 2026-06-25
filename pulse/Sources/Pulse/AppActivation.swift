@@ -81,13 +81,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MenuBarManager.shared.start()
         
         // Brightness media-key interception.
-        // Prompt for Accessibility if not yet trusted (system dialog, once).
-        // Always call start() — the manager installs a global-monitor fallback
-        // that works without Accessibility; the CGEvent tap adds full control
-        // (blocking the macOS OSD) when the permission IS granted.
-        if !MediaKeyManager.shared.isTrusted(prompt: false) {
-            let _ = MediaKeyManager.shared.isTrusted(prompt: true)
-        }
+        // Never prompt here — the Permissions onboarding handles that.
+        // start() installs a global-monitor fallback that works without
+        // Accessibility; a poll upgrades to the CGEvent tap once granted.
         MediaKeyManager.shared.start()
     }
 

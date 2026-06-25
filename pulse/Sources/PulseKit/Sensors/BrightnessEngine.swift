@@ -62,12 +62,21 @@ public class BrightnessEngine: ObservableObject {
             return
         }
         
-        monitors = activeDisplays.prefix(Int(displayCount)).map { id in
+        let orderedIDs = Array(activeDisplays.prefix(Int(displayCount)))
+        let activeIDs = Set(orderedIDs)
+        monitors = orderedIDs.map { id in
             let isBuiltIn = CGDisplayIsBuiltin(id) != 0
             let name = isBuiltIn ? "Built-in Display" : "External Display"
             return Monitor(id: id, name: name, isBuiltIn: isBuiltIn)
         }
-        
+
+        // Prune stale entries for disconnected displays.
+        for id in brightnessMap.keys where !activeIDs.contains(id) {
+            brightnessMap.removeValue(forKey: id)
+            ddcFailures.removeValue(forKey: id)
+            SoftwareDimmer.shared.setBrightness(for: id, brightness: 1.0)
+        }
+
         for monitor in monitors {
             let hwBrightness = getBrightness(for: monitor)
             let canReadHardware = DisplayServicesCanChangeBrightness(monitor.id) != 0
@@ -104,8 +113,9 @@ public class BrightnessEngine: ObservableObject {
     }
 
     public func setBrightness(for monitor: Monitor, to value: Double) {
+        guard monitors.contains(where: { $0.id == monitor.id }) else { return }
         let clampedValue = max(-1.0, min(1.0, value))
-        
+
         let hardwareBrightness = clampedValue >= 0.0 ? clampedValue : 0.0
         let softwareBrightness = clampedValue >= 0.0 ? 1.0 : (1.0 + clampedValue)
         
