@@ -16,6 +16,7 @@ struct MenuBarContent: View {
     @Environment(Updater.self) private var updater
     @Environment(\.openWindow) private var openWindow
 
+    @Environment(\.dismiss) private var dismiss
     @State private var isOptimizing = false
     @State private var optimizeReport: String?
     @State private var menuBarCollapsed = false
@@ -85,6 +86,7 @@ struct MenuBarContent: View {
             }
             Spacer()
             Button {
+                dismiss()
                 openWindow(id: "dashboard")
                 NSApp.activate(ignoringOtherApps: true)
             } label: {

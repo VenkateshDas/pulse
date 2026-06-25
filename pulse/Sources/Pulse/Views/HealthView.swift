@@ -680,6 +680,11 @@ private struct BatterySessionsCard: View {
                 }
             }
 
+            // Screen on/off breakdown (live sessions only).
+            if (session.screenOnSeconds ?? 0) > 0 || (session.screenOffSeconds ?? 0) > 0 {
+                screenTimeRow(on: session.screenOnSeconds ?? 0, off: session.screenOffSeconds ?? 0)
+            }
+
             // Charge depletion: full bar = startCharge, filled portion = what
             // remained at the end; the dim tail is what drained.
             chargeBar(session)
@@ -773,6 +778,35 @@ private struct BatterySessionsCard: View {
 
     private func color(for name: String, index: Int) -> Color {
         name == "Other" ? Halo.textDim.opacity(0.5) : Self.palette[index % Self.palette.count]
+    }
+
+    private func screenTimeRow(on: TimeInterval, off: TimeInterval) -> some View {
+        let total = on + off
+        let onFrac = total > 0 ? on / total : 1
+        return HStack(spacing: 12) {
+            HStack(spacing: 4) {
+                Image(systemName: "display")
+                    .font(.system(size: 9))
+                Text("Screen on \(Self.shortDuration(on))")
+            }
+            .foregroundStyle(Halo.ion)
+            HStack(spacing: 4) {
+                Image(systemName: "moon.fill")
+                    .font(.system(size: 8))
+                Text("Off \(Self.shortDuration(off))")
+            }
+            .foregroundStyle(Halo.textDim)
+            Spacer()
+            Text("\(Int((onFrac * 100).rounded()))%")
+                .foregroundStyle(Halo.textDim)
+        }
+        .font(.system(size: 10, weight: .medium, design: .monospaced))
+    }
+
+    private static func shortDuration(_ s: TimeInterval) -> String {
+        let mins = Int(s) / 60
+        if mins >= 60 { return "\(mins / 60)h \(mins % 60)m" }
+        return "\(mins)m"
     }
 
     private func dropColor(_ drop: Int) -> Color {

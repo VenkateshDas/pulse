@@ -371,12 +371,72 @@ struct DashboardView: View {
                 )
             }
 
+            thermalChartRow
             cpuDayChartRow
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .premiumCard()
     }
     
+    private var thermalChartRow: some View {
+        let maxTemp = max(
+            model.tempHistory.max() ?? 60,
+            model.gpuTempHistory.max() ?? 60,
+            60
+        )
+        let scale = maxTemp + 10
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 4) {
+                Text("THERMAL · 30M")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                Image(systemName: "info.circle")
+                    .font(.system(size: 9))
+                    .help("CPU and GPU temperature over the last 30 minutes (Orange = CPU, Purple = GPU)")
+            }
+            .foregroundStyle(Halo.textDim)
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .trailing) {
+                    Text(String(format: "%.0f°", scale))
+                    Spacer()
+                    Text("0°")
+                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 50, alignment: .trailing)
+
+                ZStack {
+                    HistoryChart(values: paddedHistory(model.tempHistory), color: Halo.amber, maxValue: scale)
+                    HistoryChart(values: paddedHistory(model.gpuTempHistory), color: .purple, maxValue: scale)
+                }
+            }
+            .frame(height: 70)
+
+            HStack {
+                HStack(spacing: 4) {
+                    Circle().fill(Halo.amber).frame(width: 5, height: 5)
+                    Text("CPU")
+                }
+                HStack(spacing: 4) {
+                    Circle().fill(.purple).frame(width: 5, height: 5)
+                    Text("GPU")
+                }
+                Spacer()
+                Text("-30m")
+                Spacer()
+                Text("-15m")
+                Spacer()
+                HStack(spacing: 5) {
+                    Circle().fill(Halo.pulseGreen).frame(width: 5, height: 5)
+                    Text("LIVE").foregroundStyle(Halo.pulseGreen)
+                }
+            }
+            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .foregroundStyle(Halo.textDim)
+        }
+    }
+
     /// 24-hour CPU history — gap-honest (nil minutes render as gaps, never
     /// interpolated), persisted across launches via MinuteHistoryStore.
     private var cpuDayChartRow: some View {

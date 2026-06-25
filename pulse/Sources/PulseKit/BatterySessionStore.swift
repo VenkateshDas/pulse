@@ -37,11 +37,22 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
     /// the session closes so the stored file stays bounded.
     public var apps: [AppEnergyShare]
     public var source: Source?
+    /// Seconds the display was awake during this session (live-captured only).
+    public var screenOnSeconds: TimeInterval?
+    /// Total tracked seconds (screen-on + screen-off). Derives screenOffSeconds.
+    public var screenTrackedSeconds: TimeInterval?
+
+    /// Seconds the display was asleep — derived from tracked total minus on-time.
+    public var screenOffSeconds: TimeInterval? {
+        guard let tracked = screenTrackedSeconds else { return nil }
+        return max(0, tracked - (screenOnSeconds ?? 0))
+    }
 
     public init(
         id: UUID = UUID(), startedAt: Date, endedAt: Date? = nil,
         startCharge: Int, endCharge: Int, apps: [AppEnergyShare] = [],
-        source: Source = .live
+        source: Source = .live,
+        screenOnSeconds: TimeInterval? = nil, screenTrackedSeconds: TimeInterval? = nil
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -50,6 +61,8 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
         self.endCharge = endCharge
         self.apps = apps
         self.source = source
+        self.screenOnSeconds = screenOnSeconds
+        self.screenTrackedSeconds = screenTrackedSeconds
     }
 
     public var isLive: Bool { endedAt == nil }
@@ -149,12 +162,18 @@ public final class BatterySessionStore {
     /// No-op when no session is live (e.g. on AC).
     public func accumulate(
         processes: [(name: String, cpuPercent: Double)],
-        elapsed: TimeInterval, charge: Int, at date: Date = .now
+        elapsed: TimeInterval, charge: Int, at date: Date = .now,
+        displayAsleep: Bool = false
     ) {
         guard let index = liveIndex, elapsed > 0 else { return }
         var session = sessions[index]
         session.endCharge = charge
         session.endedAt = nil
+
+        session.screenTrackedSeconds = (session.screenTrackedSeconds ?? 0) + elapsed
+        if !displayAsleep {
+            session.screenOnSeconds = (session.screenOnSeconds ?? 0) + elapsed
+        }
 
         // uniquingKeysWith (not uniqueKeysWithValues) so a stray duplicate name
         // can never trap — live sessions hold unique names by construction, but
