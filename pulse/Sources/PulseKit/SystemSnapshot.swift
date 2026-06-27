@@ -99,6 +99,22 @@ public struct SystemSnapshot: Sendable, Equatable {
         memoryTotalBytes == 0 ? 0 : Double(memoryUsedBytes) / Double(memoryTotalBytes)
     }
 
+    public func withProcesses(_ processes: [ProcessSample]) -> SystemSnapshot {
+        SystemSnapshot(
+            timestamp: timestamp, cpuTotalPercent: cpuTotalPercent,
+            cpuPerCore: cpuPerCore, cpuEfficiencyPercent: cpuEfficiencyPercent,
+            cpuPerformancePercent: cpuPerformancePercent, loadAverage1m: loadAverage1m,
+            memoryUsedBytes: memoryUsedBytes, memoryTotalBytes: memoryTotalBytes,
+            memoryAppBytes: memoryAppBytes, memoryWiredBytes: memoryWiredBytes,
+            memoryCompressedBytes: memoryCompressedBytes, swapUsedBytes: swapUsedBytes,
+            memoryPressure: memoryPressure, diskFreeBytes: diskFreeBytes,
+            diskTotalBytes: diskTotalBytes, diskWeeklyGrowthBytes: diskWeeklyGrowthBytes,
+            networkBytesInPerSecond: networkBytesInPerSecond,
+            networkBytesOutPerSecond: networkBytesOutPerSecond,
+            thermal: thermal, sensors: sensors, sleepAssertions: sleepAssertions,
+            topProcesses: processes, uptime: uptime, battery: battery, gpuUsage: gpuUsage)
+    }
+
     public var diskUsedFraction: Double {
         diskTotalBytes == 0 ? 0 : Double(diskTotalBytes - diskFreeBytes) / Double(diskTotalBytes)
     }

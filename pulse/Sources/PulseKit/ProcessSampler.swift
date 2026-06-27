@@ -13,6 +13,7 @@ final class ProcessSampler {
     // same factor). Compare the raw deltas directly.
     private var previousTaskTime: [pid_t: UInt64] = [:]
     private var previousSampleAt: UInt64 = 0
+    private var nameCache: [pid_t: String] = [:]
 
     func sample(limit: Int) -> [ProcessSample] {
         let now = mach_absolute_time()
@@ -46,9 +47,16 @@ final class ProcessSampler {
                 cpuPercent = Double(taskTime - prev) / Double(wallDelta) * 100
             }
 
-            var nameBuffer = [CChar](repeating: 0, count: 128)
-            let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
-            let name = nameLength > 0 ? String(nullTerminated: nameBuffer) : "pid \(pid)"
+            let name: String
+            if let cached = nameCache[pid] {
+                name = cached
+            } else {
+                var nameBuffer = [CChar](repeating: 0, count: 128)
+                let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
+                let resolved = nameLength > 0 ? String(nullTerminated: nameBuffer) : "pid \(pid)"
+                nameCache[pid] = resolved
+                name = resolved
+            }
 
             samples.append(
                 ProcessSample(
@@ -61,6 +69,10 @@ final class ProcessSampler {
         }
 
         previousTaskTime = nextTaskTime
+        let livePIDs = Set(nextTaskTime.keys)
+        if nameCache.count > livePIDs.count * 2 {
+            nameCache = nameCache.filter { livePIDs.contains($0.key) }
+        }
         return Array(
             samples
                 .sorted { ($0.cpuPercent, $0.residentBytes) > ($1.cpuPercent, $1.residentBytes) }

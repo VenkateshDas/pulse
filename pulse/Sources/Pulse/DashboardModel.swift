@@ -93,14 +93,18 @@ final class DashboardModel {
     /// Feedback from the last alert action ("Sent Quit to Chrome Helper").
     var actionFeedback: String?
 
-    static let historyLength = 900 // 900 samples * 2s = 30 minutes
-    static let interval: Duration = .seconds(2)
+    static let historyLength = 900
+    static let activeInterval: Duration = .seconds(2)
+    static let idleInterval: Duration = .seconds(5)
+    static let processEveryNTicks = 3
     /// Uptime gap above which an on-battery break is treated as real sleep
     /// (ends the session), not a transient sampling stall.
     static let sleepGapSeconds: TimeInterval = 90
 
     private let engine = PulseEngine()
     private var loop: Task<Void, Never>?
+    @ObservationIgnored private var tickCount = 0
+    @ObservationIgnored private var lastProcesses: [ProcessSample] = []
 
     // Closed SwiftUI windows keep their NSHostingView alive, and every
     // observable mutation re-runs its layout (~4% CPU measured). So full
@@ -181,10 +185,24 @@ final class DashboardModel {
 
         loop = Task { [weak self, engine] in
             while !Task.isCancelled {
-                let snapshot = await engine.sample()
                 guard let self else { return }
+                let dashboardOpen = self.visibleViews > 0 && !self.screenLocked
+                self.tickCount += 1
+                let needsProcesses = dashboardOpen
+                    || self.tickCount % Self.processEveryNTicks == 0
+
+                let snapshot: SystemSnapshot
+                if needsProcesses {
+                    snapshot = await engine.sample()
+                    self.lastProcesses = snapshot.topProcesses
+                } else {
+                    let lite = await engine.sampleLite()
+                    snapshot = lite.withProcesses(self.lastProcesses)
+                }
+
                 self.ingest(snapshot)
-                try? await Task.sleep(for: Self.interval)
+                let interval = dashboardOpen ? Self.activeInterval : Self.idleInterval
+                try? await Task.sleep(for: interval)
             }
         }
     }
@@ -255,7 +273,7 @@ final class DashboardModel {
         if let battery = snapshot.battery {
             let charge = battery.currentChargePercent
             let elapsed = lastIngestUptime.map { snapshot.uptime - $0 } ?? 0
-            // A gap >10s between 2s samples means the Mac slept — not live use.
+            // A gap >10s between samples means the Mac slept — not live use.
             let validDelta = elapsed > 0 && elapsed < 10
 
             if !battery.isOnAC {

@@ -15,7 +15,7 @@ public actor GPUSampler {
     public init() {}
 
     public func sample(now: Date = .now) -> GPUUsage? {
-        if now.timeIntervalSince(lastScan) < 2 { return cached }
+        if now.timeIntervalSince(lastScan) < 5 { return cached }
         cached = Self.readAccelerator()
         lastScan = now
         return cached

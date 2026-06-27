@@ -20,13 +20,22 @@ public actor PulseEngine {
 
     public init() {}
 
-    public func sample(topProcessLimit: Int = 1024) async -> SystemSnapshot {
+    /// Lightweight sample: skips process enumeration entirely.
+    public func sampleLite() async -> SystemSnapshot {
+        await sample(includeProcesses: false)
+    }
+
+    public func sample(topProcessLimit: Int = 30) async -> SystemSnapshot {
+        await sample(includeProcesses: true, topProcessLimit: topProcessLimit)
+    }
+
+    private func sample(includeProcesses: Bool, topProcessLimit: Int = 30) async -> SystemSnapshot {
         let cpuSample = cpu.sample()
         let (app, wired, comp, swapUsed, pressure) = memory.sample()
         let memUsed = app + wired + comp
         let (diskFree, diskTotal) = disk.sample()
         let (netIn, netOut) = network.sample()
-        let top = processes.sample(limit: topProcessLimit)
+        let top = includeProcesses ? processes.sample(limit: topProcessLimit) : []
         let batteryHealth = await health.sampleBattery()
         let gpuUsage = await gpu.sample()
 
