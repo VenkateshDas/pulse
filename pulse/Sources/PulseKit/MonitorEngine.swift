@@ -200,6 +200,7 @@ public actor MonitorEngine {
     private var rows: [ProcessExtendedSample] = []
     private var parentByPID: [pid_t: pid_t] = [:]
     private var nameByPID: [pid_t: String] = [:]
+    private var nameCachePID: [pid_t: String] = [:]
     private var collectedAt: UInt64 = 0  // DispatchTime ns; 0 = never
 
     // CPU/pagein deltas need previous per-pid readings, like ProcessSampler.
@@ -250,18 +251,22 @@ public actor MonitorEngine {
         samples.reserveCapacity(Int(pidCount))
 
         for pid in pids[0..<Int(pidCount)] where pid > 0 {
-            // Name first, with a path fallback: proc_name is denied for
-            // other users' processes (launchd included) but proc_pidpath
-            // isn't — keeps parent lookups real in the detail card.
-            var nameBuffer = [CChar](repeating: 0, count: 128)
-            let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
-            var name = nameLength > 0 ? String(nullTerminated: nameBuffer) : "pid \(pid)"
-            if nameLength <= 0 {
-                var pathBuffer = [CChar](repeating: 0, count: 4096)
-                if proc_pidpath(pid, &pathBuffer, 4096) > 0 {
-                    let path = String(nullTerminated: pathBuffer)
-                    if let base = path.split(separator: "/").last { name = String(base) }
+            let name: String
+            if let cached = nameCachePID[pid] {
+                name = cached
+            } else {
+                var nameBuffer = [CChar](repeating: 0, count: 128)
+                let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
+                var resolved = nameLength > 0 ? String(nullTerminated: nameBuffer) : "pid \(pid)"
+                if nameLength <= 0 {
+                    var pathBuffer = [CChar](repeating: 0, count: 4096)
+                    if proc_pidpath(pid, &pathBuffer, 4096) > 0 {
+                        let path = String(nullTerminated: pathBuffer)
+                        if let base = path.split(separator: "/").last { resolved = String(base) }
+                    }
                 }
+                nameCachePID[pid] = resolved
+                name = resolved
             }
             if name != "pid \(pid)" { nextNames[pid] = name }
 
@@ -309,5 +314,9 @@ public actor MonitorEngine {
         rows = samples
         parentByPID = nextParents
         nameByPID = nextNames
+        let livePIDs = Set(nextTaskTime.keys)
+        if nameCachePID.count > livePIDs.count * 2 {
+            nameCachePID = nameCachePID.filter { livePIDs.contains($0.key) }
+        }
     }
 }

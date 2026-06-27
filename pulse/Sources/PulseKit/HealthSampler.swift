@@ -159,8 +159,20 @@ public actor HealthSampler {
 
     // MARK: - Battery
 
+    private var cachedBattery: BatteryHealth?
+    private var batteryCachedAt: Date = .distantPast
+
     /// nil on desktop Macs (no AppleSmartBattery service).
     public func sampleBattery() -> BatteryHealth? {
+        let now = Date()
+        if now.timeIntervalSince(batteryCachedAt) < 5 { return cachedBattery }
+        batteryCachedAt = now
+        let result = readBatteryFromIOKit()
+        cachedBattery = result
+        return result
+    }
+
+    private func readBatteryFromIOKit() -> BatteryHealth? {
         let service = IOServiceGetMatchingService(
             kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         guard service != 0 else { return nil }
