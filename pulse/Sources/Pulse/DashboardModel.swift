@@ -94,7 +94,7 @@ final class DashboardModel {
     var actionFeedback: String?
 
     static let historyLength = 900
-    static let activeInterval: Duration = .seconds(2)
+    static let activeInterval: Duration = .seconds(3)
     static let idleInterval: Duration = .seconds(5)
     static let processEveryNTicks = 3
     /// Uptime gap above which an on-battery break is treated as real sleep
@@ -188,8 +188,7 @@ final class DashboardModel {
                 guard let self else { return }
                 let dashboardOpen = self.visibleViews > 0 && !self.screenLocked
                 self.tickCount += 1
-                let needsProcesses = dashboardOpen
-                    || self.tickCount % Self.processEveryNTicks == 0
+                let needsProcesses = self.tickCount % Self.processEveryNTicks == 0
 
                 let snapshot: SystemSnapshot
                 if needsProcesses {
