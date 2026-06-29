@@ -22,8 +22,6 @@ final class MenuBarManager {
     private var btnSeparate: NSStatusItem?
     private var autoHideTimer: Timer?
     private var screenObserver: Any?
-    
-    private var isToggle = false
 
     private static let enabledKey = "PulseMenuBarManagementEnabled"
     private static let autoHideKey = "PulseMenuBarAutoHideDelay"
@@ -109,13 +107,6 @@ final class MenuBarManager {
     // MARK: - Toggle
 
     func toggle() {
-        if isToggle { return }
-        isToggle = true
-        defer {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.isToggle = false
-            }
-        }
         if state.isExpanded { collapse() } else { expand() }
     }
 

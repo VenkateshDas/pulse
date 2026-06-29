@@ -157,7 +157,6 @@ struct VitalCard: View {
                         style: StrokeStyle(lineWidth: 4, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
-                    .animation(Halo.Motion.ring, value: clamped)
                     .shadow(color: color.opacity(0.3), radius: 6)
             }
             Text(value)
