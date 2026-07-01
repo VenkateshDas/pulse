@@ -31,10 +31,11 @@ struct RootView: View {
                 default: DashboardView()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Halo.void)
             .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
         .frame(minWidth: 1080, minHeight: 720)
-        .background(Halo.void)
         .background {
             // Hidden ⌘K hotkey for the command palette (no visible chrome).
             Button("") { showPalette = true }

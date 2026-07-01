@@ -79,7 +79,7 @@ struct SidebarView: View {
         }
         .padding(Halo.Space.lg)
         .frame(width: 216)
-        .background(Halo.void)
+        .background { GlassLayer(material: .ultraThinMaterial, tint: Halo.void.opacity(0.7)) }
         .overlay(alignment: .trailing) {
             Rectangle().fill(Halo.borderSubtle).frame(width: 1)
         }

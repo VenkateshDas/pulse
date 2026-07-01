@@ -22,7 +22,7 @@ final class MenuBarManager {
     private var btnSeparate: NSStatusItem?
     private var autoHideTimer: Timer?
     private var screenObserver: Any?
-    
+
     private var isToggle = false
 
     private static let enabledKey = "PulseMenuBarManagementEnabled"
@@ -119,11 +119,17 @@ final class MenuBarManager {
         if state.isExpanded { collapse() } else { expand() }
     }
 
-    func collapse() {
+    func collapse(userInitiated: Bool = true) {
         guard state.isExpanded else { return }
         guard isBtnSeparateValidPosition else {
-            // If the user dragged them into an invalid order, auto-hide is 
+            // If the user dragged them into an invalid order, auto-hide is
             // still allowed to fire but we refuse to collapse to prevent trapping.
+            // Only warn on an explicit user click — the passive auto-hide timer
+            // must not pop a focus-stealing modal with no user action.
+            if userInitiated {
+                NSSound.beep()
+                showOrderWarningAlert()
+            }
             return
         }
         state.collapse()
@@ -312,6 +318,24 @@ final class MenuBarManager {
         }
     }
 
+    private func showOrderWarningAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Menu Bar Order Error"
+        alert.informativeText = """
+        The chevron ( ‹ ) must be to the RIGHT of the separator ( | ).
+
+        If it is to the left, collapsing the menu bar would hide the chevron itself and trap you!
+
+        Please hold ⌘ (Command) and drag the chevron to the right of the separator in your menu bar.
+        """
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Got it")
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
     // MARK: - Auto-hide Timer
 
     private func resetAutoHideTimer() {
@@ -337,7 +361,7 @@ final class MenuBarManager {
         if isMouseInMenuBar() {
             resetAutoHideTimer()
         } else {
-            collapse()
+            collapse(userInitiated: false)
         }
     }
 

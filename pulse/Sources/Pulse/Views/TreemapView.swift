@@ -55,7 +55,6 @@ struct TreemapView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .animation(.easeInOut(duration: 0.25), value: cells)
         }
     }
 

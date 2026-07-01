@@ -47,7 +47,6 @@ struct HealthScoreRing: View {
                 .stroke(score.band.color,
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(Halo.Motion.ring, value: score.value)
                 .shadow(color: score.band.color.opacity(0.4), radius: 12)
             label
         }
