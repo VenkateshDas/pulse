@@ -97,7 +97,7 @@ struct VitalCard: View {
                     ForEach(Array(stats.enumerated()), id: \.offset) { _, stat in
                         HStack(spacing: 4) {
                             Text(stat.label)
-                                .font(.system(size: 8, weight: .semibold))
+                                .font(.system(size: 9, weight: .semibold))
                                 .tracking(1)
                                 .foregroundStyle(Halo.textDim.opacity(0.7))
                             Text(stat.value)

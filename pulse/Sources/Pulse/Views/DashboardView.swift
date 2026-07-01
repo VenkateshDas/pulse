@@ -1,8 +1,8 @@
 import PulseKit
 import SwiftUI
 
-/// Main command-center content: greeting, vitals row, Cause→Fix alerts,
-/// CPU chart and top processes.
+/// Main command-center content: greeting, guided-focus attention cards,
+/// vitals row, CPU chart and top processes.
 struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
 
@@ -11,25 +11,30 @@ struct DashboardView: View {
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Halo.Space.lg) {
-            hero
-            vitals
-            AlertsSection()
-            HStack(alignment: .top, spacing: Halo.Space.lg) {
-                VStack(spacing: Halo.Space.lg) {
-                    chartsPanel
-                    CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+        ScrollView {
+            VStack(alignment: .leading, spacing: Halo.Space.lg) {
+                hero
+                AttentionSection()
+                if let feedback = model.actionFeedback {
+                    FeedbackBadge(message: feedback)
                 }
-                .frame(maxHeight: .infinity)
+                vitals
+                HStack(alignment: .top, spacing: Halo.Space.lg) {
+                    VStack(spacing: Halo.Space.lg) {
+                        chartsPanel
+                        CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                    }
+                    .frame(maxHeight: .infinity)
 
-                TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                    .frame(width: 400)
-                    .frame(maxHeight: .infinity, alignment: .top)
+                    TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                        .frame(width: 400)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
+                .frame(minHeight: 480)
             }
-            .frame(maxHeight: .infinity)
+            .padding(Halo.Space.xxl)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(Halo.Space.xxl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background { ZStack { Halo.void; Halo.meshBackground } }
     }
 
@@ -52,8 +57,10 @@ struct DashboardView: View {
                 diagnosis: model.diagnosis,
                 culpritName: culpritName,
                 onCulpritTap: {
+                    // Carry the PID so Monitor opens with the culprit selected.
                     NotificationCenter.default.post(
-                        name: Self.navigateToMonitor, object: nil)
+                        name: Self.navigateToMonitor,
+                        object: model.diagnosis.culpritPID)
                 })
             Text(statusLine)
                 .font(.system(size: 13, weight: .medium, design: .default))
@@ -89,7 +96,7 @@ struct DashboardView: View {
             issues == 0
             ? "nothing needs attention"
             : "\(issues) thing\(issues == 1 ? "" : "s") worth a glance"
-        return "\(health) · \(attention) · sampling live every 2s"
+        return "\(health) · \(attention) · sampling live"
     }
 
     // MARK: Vitals
@@ -506,7 +513,7 @@ struct DashboardView: View {
                     .tracking(2)
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
-                    .help("Network throughput over the last 30 minutes (Blue = In, Orange = Out)")
+                    .help("Network throughput over the last 30 minutes (Blue = Download, Purple = Upload)")
             }
             .foregroundStyle(Halo.textDim)
             HStack(alignment: .top, spacing: 8) {
@@ -520,8 +527,9 @@ struct DashboardView: View {
                 .frame(width: 50, alignment: .trailing)
                 
                 ZStack {
+                    // Download = ion, upload = volt — same semantics as Monitor.
                     HistoryChart(values: paddedHistory(model.networkInHistory), color: Halo.ion, maxValue: maxValue)
-                    HistoryChart(values: paddedHistory(model.networkOutHistory), color: Halo.flare, maxValue: maxValue)
+                    HistoryChart(values: paddedHistory(model.networkOutHistory), color: Halo.volt, maxValue: maxValue)
                 }
             }
             .frame(maxHeight: .infinity)

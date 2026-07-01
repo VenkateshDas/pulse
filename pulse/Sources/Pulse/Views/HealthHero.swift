@@ -51,6 +51,8 @@ struct HealthScoreRing: View {
             label
         }
         .frame(width: diameter, height: diameter)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Health score \(score.value) of 100, \(score.band.rawValue)")
     }
 
     @ViewBuilder

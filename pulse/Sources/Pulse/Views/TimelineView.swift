@@ -59,14 +59,10 @@ struct TimelineView: View {
     // MARK: - Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Timeline")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text("Your Mac's daily health record — disk growth, battery sessions, and notable events.")
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textDim)
-        }
+        PageHeader(
+            "Timeline",
+            subtitle: "Your Mac's daily health record — disk growth, battery sessions, and notable events."
+        )
         .padding(.bottom, 4)
     }
 
@@ -363,7 +359,7 @@ struct TimelineView: View {
 
                 if isSpike {
                     Text("SPIKE")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .tracking(0.8)
                         .foregroundStyle(Halo.flare)
                         .padding(.horizontal, 5).padding(.vertical, 2)

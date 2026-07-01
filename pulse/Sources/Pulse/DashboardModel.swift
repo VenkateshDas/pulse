@@ -5,43 +5,22 @@ import Observation
 import PulseKit
 import UserNotifications
 
-/// Configurable menu-bar label metrics. Order here is display order.
-enum MenuBarMetric: String, CaseIterable, Identifiable {
-    case cpu, memory, diskFree, temperature, battery
-    var id: String { rawValue }
+/// Which system notifications Pulse is allowed to post, independent of the OS
+/// notification permission itself (that's the Permissions page's job — this
+/// is per-notification-type opt-out for a user who granted permission but
+/// wants fewer pings).
+enum NotificationPreferences {
+    private static let criticalKey = "PulseNotifyCriticalAlerts"
+    private static let weeklyKey = "PulseNotifyWeeklyReport"
 
-    var label: String {
-        switch self {
-        case .cpu: "CPU"
-        case .memory: "Memory"
-        case .diskFree: "Disk free"
-        case .temperature: "Temperature"
-        case .battery: "Battery"
-        }
+    static var notifyCriticalAlerts: Bool {
+        get { UserDefaults.standard.object(forKey: criticalKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: criticalKey) }
     }
 
-    var symbol: String {
-        switch self {
-        case .cpu: "cpu"
-        case .memory: "memorychip"
-        case .diskFree: "internaldrive"
-        case .temperature: "thermometer.medium"
-        case .battery: "battery.100"
-        }
-    }
-
-    private static let key = "PulseMenuBarMetrics"
-
-    static func loadVisible() -> Set<MenuBarMetric> {
-        guard let raw = UserDefaults.standard.array(forKey: key) as? [String] else {
-            return [.cpu]  // default: CPU only, matching prior behavior
-        }
-        let metrics = raw.compactMap(MenuBarMetric.init(rawValue:))
-        return metrics.isEmpty ? [.cpu] : Set(metrics)
-    }
-
-    static func saveVisible(_ metrics: Set<MenuBarMetric>) {
-        UserDefaults.standard.set(metrics.map(\.rawValue), forKey: key)
+    static var notifyWeeklyReport: Bool {
+        get { UserDefaults.standard.object(forKey: weeklyKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: weeklyKey) }
     }
 }
 
@@ -60,6 +39,8 @@ final class DashboardModel {
     private(set) var healthScore = HealthScore(value: 100, band: .excellent, breakdown: [:])
     /// Sustained-CPU anomaly history, newest first (F5).
     private(set) var recentAnomalies: [AnomalyRecord] = []
+    /// Guided-focus items: up to 3 ranked, actionable things worth a look.
+    private(set) var attentionItems: [AttentionItem] = []
     private(set) var cpuHistory: [Double] = []
     /// Minute-averaged CPU over the trailing 24h (nil = no data for that
     /// minute); persisted across launches by MinuteHistoryStore.
@@ -80,16 +61,6 @@ final class DashboardModel {
     /// item only re-renders when the displayed integer actually changes —
     /// re-rendering it every sample costs measurable CPU.
     private(set) var menuBarCPUPercent: Int = 0
-    /// Companion gated integers for the other configurable menu-bar metrics.
-    /// Each updates only when its displayed value changes (no jitter).
-    private(set) var menuBarMemPercent: Int = 0
-    private(set) var menuBarDiskFreeGB: Int = 0
-    private(set) var menuBarTempC: Int = 0
-    private(set) var menuBarBatteryPercent: Int = 0
-    /// Which metrics the menu-bar label shows, in display order. Persisted.
-    var menuBarMetrics: Set<MenuBarMetric> = MenuBarMetric.loadVisible() {
-        didSet { MenuBarMetric.saveVisible(menuBarMetrics) }
-    }
     /// Feedback from the last alert action ("Sent Quit to Chrome Helper").
     var actionFeedback: String?
 
@@ -134,12 +105,17 @@ final class DashboardModel {
     /// Windowed CPU-anomaly detector (replaces the instant cpu-hog alert).
     @ObservationIgnored private var processWatcher = ProcessWatcher()
     @ObservationIgnored private let anomalyStore = AnomalyStore()
+    @ObservationIgnored private let attentionEngine = AttentionEngine()
+    @ObservationIgnored private var latestAttentionItems: [AttentionItem] = []
     @ObservationIgnored private let batteryHistory = BatteryHistoryStore()
     @ObservationIgnored private let batterySessionStore = BatterySessionStore()
     @ObservationIgnored private var lastIngestUptime: TimeInterval?
     /// Timestamp of the last valid on-battery sample, used to end a session at
     /// the right moment when a sleep gap (not a replug) interrupts it.
     @ObservationIgnored private var lastBatterySampleAt: Date?
+    /// Wall-clock time of the last ingested sample — sleep detection pairs
+    /// this with the (sleep-pausing) uptime delta.
+    @ObservationIgnored private var lastIngestDate: Date?
     @ObservationIgnored private var displayAsleep = false
     /// Per-alert-id last fire time — enforces the 30-min notification cooldown
     /// so a sustained condition notifies once, not every 2s.
@@ -150,7 +126,9 @@ final class DashboardModel {
     @ObservationIgnored private var dismissedAlerts: Set<String> =
         Set(UserDefaults.standard.stringArray(forKey: "PulseDismissedAlerts") ?? [])
 
-    /// Hides an alert card and silences its notifications until it recurs.
+    /// Hides an alert (from `alerts` and the sidebar/status severity) and
+    /// silences its notifications until the condition clears and recurs.
+    /// Called directly, and via `snoozeAttentionItem` when the id matches.
     func dismissAlert(id: String) {
         dismissedAlerts.insert(id)
         UserDefaults.standard.set(Array(dismissedAlerts), forKey: "PulseDismissedAlerts")
@@ -199,7 +177,7 @@ final class DashboardModel {
                     snapshot = lite.withProcesses(self.lastProcesses)
                 }
 
-                self.ingest(snapshot)
+                await self.ingest(snapshot)
                 let interval = dashboardOpen ? Self.activeInterval : Self.idleInterval
                 try? await Task.sleep(for: interval)
             }
@@ -219,7 +197,19 @@ final class DashboardModel {
             : "Couldn't quit \(name) — it may be a system process"
     }
 
-    private func ingest(_ snapshot: SystemSnapshot) {
+    /// Hides an attention item until `until`. Removed from the published list
+    /// immediately for instant feedback; persisted via `AttentionEngine`.
+    func snoozeAttentionItem(_ id: String, until: Date) {
+        attentionItems.removeAll { $0.id == id }
+        // AttentionEngine ids are alert ids 1:1 (diagnosis-only ids are
+        // synthetic and never match, so this is a harmless no-op for those).
+        // Reuses the existing dismiss path so a snoozed item also stops
+        // repeating its critical notification, not just the card.
+        dismissAlert(id: id)
+        Task { await attentionEngine.snooze(id, until: until) }
+    }
+
+    private func ingest(_ snapshot: SystemSnapshot) async {
         latest = snapshot
         // Replace AlertsEngine's instantaneous cpu-hog with a windowed one:
         // a process must stay hot for the full window before it alerts.
@@ -238,6 +228,8 @@ final class DashboardModel {
         latestAlerts = evaluated
         latestDiagnosis = DiagnosisEngine.evaluate(snapshot)
         latestHealth = HealthScore.evaluate(snapshot)
+        latestAttentionItems = await attentionEngine.currentItems(
+            diagnosis: latestDiagnosis, alerts: latestAlerts)
         // A dismissed alert resets once its condition clears, so a fresh
         // occurrence shows (and notifies) again.
         let activeIDs = Set(latestAlerts.map(\.id))
@@ -272,8 +264,14 @@ final class DashboardModel {
         if let battery = snapshot.battery {
             let charge = battery.currentChargePercent
             let elapsed = lastIngestUptime.map { snapshot.uptime - $0 } ?? 0
-            // A gap >10s between samples means the Mac slept — not live use.
-            let validDelta = elapsed > 0 && elapsed < 10
+            // `uptime` (systemUptime) pauses while the Mac sleeps, so a sleep
+            // is invisible in `elapsed` — the wall clock keeps running. A wall
+            // gap far beyond the awake gap means the Mac slept between samples.
+            let wallElapsed =
+                lastIngestDate.map { snapshot.timestamp.timeIntervalSince($0) } ?? 0
+            let slept = wallElapsed - elapsed >= Self.sleepGapSeconds
+            // A gap >10s between samples (or a sleep) means not live use.
+            let validDelta = elapsed > 0 && elapsed < 10 && !slept
 
             if !battery.isOnAC {
                 // Time-on-battery crediting is unchanged: only count gaps that
@@ -292,7 +290,7 @@ final class DashboardModel {
                         processes: procs, elapsed: elapsed, charge: charge,
                         at: snapshot.timestamp, displayAsleep: displayAsleep)
                     lastBatterySampleAt = snapshot.timestamp
-                } else if elapsed >= Self.sleepGapSeconds {
+                } else if slept || elapsed >= Self.sleepGapSeconds {
                     // Genuinely slept while unplugged: close the pre-sleep
                     // session at its last active sample, then open a fresh one.
                     // Smaller (10–90s) gaps are transient stalls — keep the
@@ -311,20 +309,12 @@ final class DashboardModel {
             batteryHistory.recordCapacity(battery.capacityPercent, at: snapshot.timestamp)
         }
         lastIngestUptime = snapshot.uptime
+        lastIngestDate = snapshot.timestamp
 
         let rounded = Int(snapshot.cpuTotalPercent.rounded())
         if rounded != menuBarCPUPercent {
             menuBarCPUPercent = rounded
         }
-        let mem = Int((snapshot.memoryUsedFraction * 100).rounded())
-        if mem != menuBarMemPercent { menuBarMemPercent = mem }
-        let diskGB = Int(snapshot.diskFreeBytes / 1_000_000_000)
-        if diskGB != menuBarDiskFreeGB { menuBarDiskFreeGB = diskGB }
-        let temp = Int(([snapshot.sensors.cpuTempC, snapshot.sensors.gpuTempC]
-            .compactMap { $0 }.max() ?? 0).rounded())
-        if temp != menuBarTempC { menuBarTempC = temp }
-        let batt = snapshot.battery?.currentChargePercent ?? 0
-        if batt != menuBarBatteryPercent { menuBarBatteryPercent = batt }
         if visibleViews > 0 && !screenLocked {
             publishLatest()
         }
@@ -343,7 +333,7 @@ final class DashboardModel {
     /// Posts a system notification for each critical alert, rate-limited to
     /// once per 30 min per alert id so a sustained condition doesn't spam.
     private func fireCriticalNotifications(_ alerts: [PulseAlert]) {
-        guard notificationsAvailable else { return }
+        guard notificationsAvailable, NotificationPreferences.notifyCriticalAlerts else { return }
         let now = Date.now
         for alert in alerts where alert.severity == .critical && !dismissedAlerts.contains(alert.id) {
             if let last = lastNotified[alert.id], now.timeIntervalSince(last) < Self.notificationCooldown {
@@ -403,6 +393,7 @@ final class DashboardModel {
         diagnosis = latestDiagnosis
         healthScore = latestHealth
         recentAnomalies = anomalyStore.records
+        attentionItems = latestAttentionItems
         cpuHistory = cpuBuffer
         cpuDayHistory = cpuDayStore.series()
         memoryHistory = memoryBuffer

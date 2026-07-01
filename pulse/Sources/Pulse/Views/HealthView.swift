@@ -69,14 +69,10 @@ struct HealthView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Health")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text("Battery, startup agents, and repeatable performance benchmarks.")
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textDim)
-        }
+        PageHeader(
+            "Health",
+            subtitle: "Battery, startup agents, and repeatable performance benchmarks."
+        )
         .padding(.bottom, 4)
     }
 }
@@ -535,7 +531,7 @@ private struct BatteryConsumptionCard: View {
                     let fraction = min(hours / scaleMax, 1)
                     VStack(spacing: 2) {
                         Text(hours >= 0.05 ? String(format: "%.1f", hours) : "")
-                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundStyle(hoursColor(hours))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -659,7 +655,7 @@ private struct BatterySessionsCard: View {
                             .foregroundStyle(Halo.textPrimary)
                         if session.isLive {
                             Text("LIVE")
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(Halo.pulseGreen)
                                 .padding(.horizontal, 5).padding(.vertical, 1)
                                 .background(Halo.pulseGreen.opacity(0.15), in: Capsule())
@@ -792,7 +788,7 @@ private struct BatterySessionsCard: View {
             .foregroundStyle(Halo.ion)
             HStack(spacing: 4) {
                 Image(systemName: "moon.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 9))
                 Text("Off \(Self.shortDuration(off))")
             }
             .foregroundStyle(Halo.textDim)
@@ -863,9 +859,7 @@ private struct StartupItemsCard: View {
                     .foregroundStyle(Halo.ion)
                 Spacer()
                 if let feedback = model.actionFeedback {
-                    Text(feedback)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Halo.pulseGreen)
+                    FeedbackBadge(message: feedback)
                 }
             }
 

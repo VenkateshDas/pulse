@@ -246,37 +246,24 @@ struct PermissionRow: View {
     }
 }
 
-// MARK: - Center (sidebar destination)
+// MARK: - Section (embedded in SettingsView)
 
-struct PermissionsView: View {
+/// The Permissions section body, embedded in `SettingsView`. Lives here
+/// alongside `PulsePermission`/`PermissionStore`/`PermissionRow` so the three
+/// never drift apart.
+struct PermissionsSection: View {
     @State private var store = PermissionStore()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Permissions")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(Halo.textPrimary)
-                    Text("Everything Pulse can ask macOS for, in one place. Grant only what you use — nothing here is required to launch.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Halo.textDim)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                ForEach(PulsePermission.allCases) { permission in
-                    PermissionRow(
-                        permission: permission,
-                        status: store.status(permission),
-                        onChanged: { Task { await store.refresh() } }
-                    )
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(PulsePermission.allCases) { permission in
+                PermissionRow(
+                    permission: permission,
+                    status: store.status(permission),
+                    onChanged: { Task { await store.refresh() } }
+                )
             }
-            .padding(28)
-            .frame(maxWidth: 720, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Halo.void)
         .task { await store.refresh() }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification)) { _ in

@@ -41,6 +41,9 @@ struct TopProcessesPanel: View {
     private func row(_ process: ProcessSample, maxCPU: Double) -> some View {
         let isHover = hoveredPID == process.pid
         return HStack(spacing: 10) {
+            Image(nsImage: ProcessIconCache.icon(for: process.pid))
+                .resizable()
+                .frame(width: 14, height: 14)
             Text(process.name)
                 .font(.system(size: 12))
                 .foregroundStyle(Halo.textPrimary)

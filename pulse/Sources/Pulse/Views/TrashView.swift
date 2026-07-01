@@ -13,30 +13,49 @@ struct TrashView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            
-            Picker("", selection: $selectedTab) {
-                Text("Raw Trash").tag(Tab.raw)
-                Text("Pulse History").tag(Tab.history)
+            VStack(alignment: .leading, spacing: Halo.Space.lg) {
+                PageHeader(
+                    "Trash",
+                    subtitle: "\(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))) — plus every Pulse operation you can still undo."
+                ) {
+                    if selectedTab == .raw {
+                        Button(role: .destructive) {
+                            storage.emptyTrash()
+                        } label: {
+                            Text("Empty Trash")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.red)
+                        .controlSize(.small)
+                        .disabled(storage.trashItemCount == 0 || storage.isCleaning)
+                    }
+                }
+                SegmentPicker(
+                    options: [(Tab.raw, "Raw Trash"), (Tab.history, "Pulse History")],
+                    selection: $selectedTab)
             }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Halo.surface2)
-            
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, Halo.Space.lg)
+
             Divider().background(Halo.borderSubtle)
-            
+
             if selectedTab == .raw {
                 if storage.trashAccessError {
-                    fdaWarningState
+                    EmptyState(
+                        icon: "lock.shield",
+                        title: "Full Disk Access Required",
+                        hint: "Pulse needs Full Disk Access to view your Trash.\nGo to System Settings > Privacy & Security to grant access.",
+                        tint: Halo.amber)
                 } else if storage.trashItemCount == 0 {
-                    emptyState(text: "Trash is Empty", icon: "trash")
+                    EmptyState(icon: "trash", title: "Trash is Empty")
                 } else {
                     contentList
                 }
             } else {
                 if storage.undoEntries.isEmpty {
-                    emptyState(text: "No Recent Operations", icon: "clock.arrow.circlepath")
+                    EmptyState(icon: "clock.arrow.circlepath", title: "No Recent Operations")
                 } else {
                     historyList
                 }
@@ -48,36 +67,6 @@ struct TrashView: View {
             storage.refreshTrashInfo()
             storage.refreshUndoHistory()
         }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Trash")
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(Halo.textDim)
-                Text("\(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes)))")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(Halo.textDim)
-            }
-            Spacer()
-            if selectedTab == .raw {
-                Button(role: .destructive) {
-                    storage.emptyTrash()
-                } label: {
-                    Text("Empty Trash")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.red)
-                .controlSize(.small)
-                .disabled(storage.trashItemCount == 0 || storage.isCleaning)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Halo.surface2)
     }
 
     private var contentList: some View {
@@ -102,33 +91,6 @@ struct TrashView: View {
         }
     }
 
-    private func emptyState(text: String, icon: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 32))
-                .foregroundStyle(Halo.surface2)
-            Text(text)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Halo.textDim)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var fdaWarningState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 32))
-                .foregroundStyle(Halo.amber)
-            Text("Full Disk Access Required")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Halo.textPrimary)
-            Text("Pulse needs Full Disk Access to view your Trash.\nGo to System Settings > Privacy & Security to grant access.")
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textDim)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
 }
 
 private struct TrashItemRow: View {

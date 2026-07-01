@@ -103,6 +103,7 @@ struct StorageView: View {
                         .foregroundStyle(Halo.textPrimary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Back")
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -134,20 +135,10 @@ struct StorageView: View {
     }
 
     private var lensSwitcher: some View {
-        HStack(spacing: 2) {
-            ForEach(StorageLens.allCases) { option in
-                let on = lens == option
-                Button { lens = option } label: {
-                    Text(option.rawValue)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(on ? Halo.void : Halo.textDim)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(on ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .help("\(option.rawValue) lens")
-            }
-        }
+        SegmentPicker(
+            options: StorageLens.allCases.map { ($0, $0.rawValue) },
+            selection: $lens,
+            help: { "\($0.rawValue) lens" })
     }
 
     // MARK: Map
@@ -161,12 +152,10 @@ struct StorageView: View {
                         .font(.system(size: 12)).foregroundStyle(Halo.textDim)
                 }
             } else if currentCells.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "folder.badge.questionmark")
-                        .font(.system(size: 32)).foregroundStyle(Halo.surface2)
-                    Text("Folder is empty or restricted.")
-                        .font(.system(size: 13)).foregroundStyle(Halo.textDim)
-                }
+                EmptyState(
+                    icon: "folder.badge.questionmark",
+                    title: "Nothing to map",
+                    hint: "Folder is empty or restricted.")
             } else {
                 TreemapView(cells: currentCells, lens: lens, selectedID: $selectedID) { node in
                     storage.pushDirectory(node)
@@ -248,6 +237,7 @@ struct StorageView: View {
                 .foregroundStyle(Halo.textDim)
                 .padding(.leading, 4)
                 .help("Rescan storage map and free space")
+                .accessibilityLabel("Rescan")
                 
                 if storage.isStreamingSizes || storage.scanState == .scanning {
                     ProgressView()

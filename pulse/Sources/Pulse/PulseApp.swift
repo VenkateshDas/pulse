@@ -66,7 +66,7 @@ struct PulseApp: App {
     /// Schedules a recurring Monday-morning Weekly Pulse notification. Guarded
     /// behind a bundle id — UNUserNotificationCenter traps in bare SwiftPM runs.
     private static func scheduleWeeklyReport() {
-        guard Bundle.main.bundleIdentifier != nil else { return }
+        guard Bundle.main.bundleIdentifier != nil, NotificationPreferences.notifyWeeklyReport else { return }
         let center = UNUserNotificationCenter.current()
         let id = "com.pulse.weekly-report"
         let content = UNMutableNotificationContent()
@@ -81,30 +81,12 @@ struct PulseApp: App {
 
     private var menuBarLabel: some View {
         // Static-width label: menu bar items must not jiggle as values change.
-        // Reads only the gated integer properties, so it re-renders only when
-        // a displayed value actually changes, not on every sample.
-        let metrics = MenuBarMetric.allCases.filter { model.menuBarMetrics.contains($0) }
-        return HStack(spacing: 6) {
+        // Reads only the gated integer property, so it re-renders only when
+        // the displayed value actually changes, not on every sample.
+        HStack(spacing: 6) {
             Image(systemName: "waveform.path.ecg")
-            if metrics.isEmpty {
-                Text(String(format: "%3d%%", model.menuBarCPUPercent))
-                    .font(.system(size: 12, design: .monospaced))
-            } else {
-                ForEach(metrics) { metric in
-                    Text(menuBarText(for: metric))
-                        .font(.system(size: 12, design: .monospaced))
-                }
-            }
-        }
-    }
-
-    private func menuBarText(for metric: MenuBarMetric) -> String {
-        switch metric {
-        case .cpu: String(format: "%3d%%", model.menuBarCPUPercent)
-        case .memory: String(format: "M%2d%%", model.menuBarMemPercent)
-        case .diskFree: "\(model.menuBarDiskFreeGB)G"
-        case .temperature: model.menuBarTempC > 0 ? "\(model.menuBarTempC)°" : "—°"
-        case .battery: "\(model.menuBarBatteryPercent)%🔋"
+            Text(String(format: "%3d%%", model.menuBarCPUPercent))
+                .font(.system(size: 12, design: .monospaced))
         }
     }
 }
