@@ -114,15 +114,19 @@ struct VitalCard: View {
         .padding(Halo.Space.md)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background {
-            RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
-                .fill(Halo.surface1)
-                .shadow(
-                    color: isHovered
-                        ? color.opacity(0.15)
-                        : Halo.Shadow.cardColor,
-                    radius: isHovered ? Halo.Shadow.elevatedRadius : Halo.Shadow.cardRadius,
-                    y: isHovered ? Halo.Shadow.elevatedY : Halo.Shadow.cardY
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
+                    .fill(Halo.surface1.opacity(0.6))
+            }
+            .shadow(
+                color: isHovered
+                    ? color.opacity(0.15)
+                    : Halo.Shadow.cardColor,
+                radius: isHovered ? Halo.Shadow.elevatedRadius : Halo.Shadow.cardRadius,
+                y: isHovered ? Halo.Shadow.elevatedY : Halo.Shadow.cardY
+            )
         }
         .overlay {
             RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)

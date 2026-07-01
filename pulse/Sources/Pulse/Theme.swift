@@ -109,6 +109,23 @@ enum Halo {
     )
 }
 
+// MARK: - Glass Backgrounds
+
+/// Two-layer material + tint backdrop, shared by every full-bleed glass panel
+/// (popover body, sidebars). Card-shaped surfaces with padding/shadow/border
+/// use `premiumCard()` instead.
+struct GlassLayer<S: ShapeStyle>: View {
+    var material: Material = .regularMaterial
+    var tint: S
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(material)
+            Rectangle().fill(tint)
+        }
+    }
+}
+
 // MARK: - View Modifiers
 
 extension View {
@@ -116,13 +133,17 @@ extension View {
         self
             .padding(padding)
             .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Halo.surface1)
-                    .shadow(
-                        color: Halo.Shadow.cardColor,
-                        radius: Halo.Shadow.cardRadius,
-                        y: Halo.Shadow.cardY
-                    )
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.regularMaterial)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Halo.surface1.opacity(0.6))
+                }
+                .shadow(
+                    color: Halo.Shadow.cardColor,
+                    radius: Halo.Shadow.cardRadius,
+                    y: Halo.Shadow.cardY
+                )
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

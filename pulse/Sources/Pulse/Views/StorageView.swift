@@ -17,7 +17,7 @@ struct StorageView: View {
         HStack(spacing: 0) {
             sidebar
                 .frame(width: 220)
-                .background(Halo.surface1)
+                .background { GlassLayer(tint: Halo.surface1.opacity(0.6)) }
             Rectangle().fill(Halo.surface2).frame(width: 1)
 
             VStack(spacing: 0) {

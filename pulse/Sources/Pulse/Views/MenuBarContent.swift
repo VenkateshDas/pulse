@@ -26,47 +26,68 @@ struct MenuBarContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            hud
-            if let snapshot = model.snapshot {
-                let cpuLabel = snapshot.gpuUsage.map { String(format: "%.0f%% · GPU %.0f%%", snapshot.cpuTotalPercent, $0.deviceUtilization) }
-                    ?? String(format: "%.0f%%", snapshot.cpuTotalPercent)
-                metricRow(
-                    "CPU", cpuLabel,
-                    fraction: snapshot.cpuTotalPercent / 100,
-                    spark: model.cpuHistory)
-                metricRow(
-                    "Memory", ByteFormat.string(snapshot.memoryUsedBytes),
-                    fraction: snapshot.memoryUsedFraction,
-                    spark: model.memoryHistory)
-                diskRow(snapshot)
-                thermalRow(snapshot)
-                if let battery = snapshot.battery {
-                    batteryRow(battery)
-                }
-                Divider().overlay(Halo.borderSubtle)
-                DisplaysPopoverSection()
-                Divider().overlay(Halo.borderSubtle)
-                topProcesses(snapshot)
-            } else {
-                Text("Sampling…")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
-            }
+            // HUD Card
+                hud
+                    .padding(12)
+                    .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
 
-            Divider().overlay(Halo.borderSubtle)
-            menuBarManagerRow
-            Divider().overlay(Halo.borderSubtle)
-            actions
+                // Vitals Card
+                VStack(spacing: 8) {
+                    if let snapshot = model.snapshot {
+                        let cpuLabel = snapshot.gpuUsage.map { String(format: "%.0f%% · GPU %.0f%%", snapshot.cpuTotalPercent, $0.deviceUtilization) }
+                            ?? String(format: "%.0f%%", snapshot.cpuTotalPercent)
+                        metricRow(
+                            "CPU", cpuLabel,
+                            fraction: snapshot.cpuTotalPercent / 100,
+                            spark: model.cpuHistory)
+                        metricRow(
+                            "Memory", ByteFormat.string(snapshot.memoryUsedBytes),
+                            fraction: snapshot.memoryUsedFraction,
+                            spark: model.memoryHistory)
+                        diskRow(snapshot)
+                        thermalRow(snapshot)
+                        if let battery = snapshot.battery {
+                            batteryRow(battery)
+                        }
+                    } else {
+                        Text("Sampling…")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(12)
+                .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
+
+                // Hardware Card
+                if let snapshot = model.snapshot {
+                    VStack(alignment: .leading, spacing: 10) {
+                        DisplaysPopoverSection()
+                        Divider().overlay(Halo.borderSubtle)
+                        topProcesses(snapshot)
+                    }
+                    .padding(12)
+                    .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
+                }
+
+                // Controls Card
+                VStack(spacing: 10) {
+                    menuBarManagerRow
+                    Divider().overlay(Halo.borderSubtle)
+                    actions
+                }
+                .padding(12)
+                .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
         }
+        .padding(14)
         .onAppear {
             model.viewAppeared()
             storage.refreshTrashInfo()
             updater.checkForUpdates()  // throttled background check
         }
         .onDisappear { model.viewDisappeared() }
-        .padding(14)
-        .frame(width: 280)
-        .background(Halo.void)
+        .frame(width: 300)
+        .background { GlassLayer(tint: Halo.void.opacity(0.4)) }
     }
 
     // MARK: HUD (live verdict + score)
@@ -306,6 +327,7 @@ struct MenuBarContent: View {
                 .controlSize(.regular)
                 .buttonStyle(.bordered)
                 .tint(Halo.pulseGreen)
+                .clipShape(Capsule())
                 .disabled(isOptimizing)
 
                 Button {
@@ -317,6 +339,7 @@ struct MenuBarContent: View {
                 .controlSize(.regular)
                 .buttonStyle(.bordered)
                 .tint(Halo.amber)
+                .clipShape(Capsule())
                 .disabled(storage.trashItemCount == 0 || storage.isCleaning)
             }
 
@@ -368,6 +391,7 @@ struct MenuBarContent: View {
             .controlSize(.small)
             .buttonStyle(.borderedProminent)
             .tint(Halo.ion)
+            .clipShape(Capsule())
         case .checking:
             Text("Checking for updates…")
                 .font(.system(size: 11))

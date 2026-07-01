@@ -112,9 +112,6 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
         Task { @MainActor in
             let engine = BrightnessEngine.shared
             guard let monitor = engine.monitors.first(where: { $0.id == displayID }) else { return }
-            if engine.isAdaptiveModeEnabled && !monitor.isBuiltIn {
-                engine.isAdaptiveModeEnabled = false
-            }
             engine.adjustBrightness(for: monitor, delta: delta)
         }
 
@@ -161,9 +158,6 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
             engine.brightnessMap[monitor.id] = hw
             engine.saveBrightnessMap()
         } else {
-            if engine.isAdaptiveModeEnabled {
-                engine.isAdaptiveModeEnabled = false
-            }
             let delta = isUp ? kBrightnessStep : -kBrightnessStep
             engine.adjustBrightness(for: monitor, delta: delta)
         }

@@ -27,7 +27,11 @@ final class NetworkSampler {
             let isUp = (flags & IFF_UP) != 0
             let isLoopback = (flags & IFF_LOOPBACK) != 0
             
-            if isUp && !isLoopback, let dataPtr = current.pointee.ifa_data {
+            if isUp && !isLoopback, 
+               let addr = current.pointee.ifa_addr,
+               addr.pointee.sa_family == UInt8(AF_LINK),
+               let dataPtr = current.pointee.ifa_data {
+                
                 let name = String(cString: current.pointee.ifa_name)
                 // Filter specifically for "en" (ethernet/wifi) to exclude bridge/awdl/ipsec
                 if name.starts(with: "en") {
