@@ -1,8 +1,8 @@
 import PulseKit
 import SwiftUI
 
-/// Main command-center content: greeting, vitals row, Cause→Fix alerts,
-/// CPU chart and top processes.
+/// Main command-center content: greeting, guided-focus attention cards,
+/// vitals row, CPU chart and top processes.
 struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
 
@@ -11,25 +11,32 @@ struct DashboardView: View {
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Halo.Space.lg) {
-            hero
-            vitals
-            AlertsSection()
-            HStack(alignment: .top, spacing: Halo.Space.lg) {
-                VStack(spacing: Halo.Space.lg) {
-                    chartsPanel
-                    CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+        ScrollView {
+            VStack(alignment: .leading, spacing: Halo.Space.lg) {
+                hero
+                AttentionSection()
+                if let feedback = model.actionFeedback {
+                    Text(feedback)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Halo.ion)
                 }
-                .frame(maxHeight: .infinity)
+                vitals
+                HStack(alignment: .top, spacing: Halo.Space.lg) {
+                    VStack(spacing: Halo.Space.lg) {
+                        chartsPanel
+                        CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                    }
+                    .frame(maxHeight: .infinity)
 
-                TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                    .frame(width: 400)
-                    .frame(maxHeight: .infinity, alignment: .top)
+                    TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                        .frame(width: 400)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
+                .frame(minHeight: 480)
             }
-            .frame(maxHeight: .infinity)
+            .padding(Halo.Space.xxl)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(Halo.Space.xxl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background { ZStack { Halo.void; Halo.meshBackground } }
     }
 

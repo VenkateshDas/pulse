@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 import SwiftUI
 import PulseKit
 
@@ -23,6 +24,25 @@ final class AppActivation {
             guard showDockIcon != oldValue else { return }
             UserDefaults.standard.set(showDockIcon, forKey: Self.dockKey)
             apply()
+        }
+    }
+
+    /// Whether Pulse registers itself as a login item via `SMAppService`.
+    /// Read/write hits the launchd registry directly — there's nothing to
+    /// cache, `.status` is already a fast local check.
+    var launchAtLogin: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set {
+            do {
+                if newValue {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                // Best-effort: SMAppService has no user-facing recovery path
+                // here beyond retrying, so the toggle simply won't have moved.
+            }
         }
     }
 

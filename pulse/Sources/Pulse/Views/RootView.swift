@@ -26,7 +26,7 @@ struct RootView: View {
                 case .monitor: MonitorView()
                 case .displays: DisplaysView()
                 case .health: HealthView()
-                case .permissions: PermissionsView()
+                case .settings: SettingsView(selection: $selection)
                 case .diagnostics: DevModeView()
                 default: DashboardView()
                 }

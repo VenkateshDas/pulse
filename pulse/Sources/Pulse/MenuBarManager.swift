@@ -22,6 +22,8 @@ final class MenuBarManager {
     private var btnSeparate: NSStatusItem?
     private var autoHideTimer: Timer?
     private var screenObserver: Any?
+    private var wakeObservers: [Any] = []
+    private var pendingReconcile: DispatchWorkItem?
 
     private var isToggle = false
 
@@ -185,6 +187,21 @@ final class MenuBarManager {
             Task { @MainActor in self?.handleScreenChange() }
         }
 
+        // Status-item button windows go transiently nil across App Nap and
+        // sleep/wake — reconcile the visible chevron with `state` on wake so
+        // a click that landed during the gap isn't stranded. Both notifications
+        // are needed: screensDidWake covers display power-saving (idle dims/
+        // blanks the screen without the Mac actually sleeping), didWake covers
+        // full system sleep (lid closed, or idle sleep) — the more common
+        // "left it backgrounded for a while" case.
+        let wakeCenter = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.screensDidWakeNotification, NSWorkspace.didWakeNotification] {
+            let obs = wakeCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.reconcile() }
+            }
+            wakeObservers.append(obs)
+        }
+
         // Start expanded so the user can arrange icons before collapsing.
         state.expand()
         applyControl()
@@ -205,14 +222,29 @@ final class MenuBarManager {
             NotificationCenter.default.removeObserver(obs)
             screenObserver = nil
         }
+        let wakeCenter = NSWorkspace.shared.notificationCenter
+        wakeObservers.forEach { wakeCenter.removeObserver($0) }
+        wakeObservers.removeAll()
+        pendingReconcile?.cancel()
+        pendingReconcile = nil
     }
 
     // MARK: - Rendering
 
     private func applyControl() {
-        guard let chevron = btnExpandCollapse, let cBtn = chevron.button else { return }
-        guard let sep = btnSeparate else { return }
-        
+        guard let chevron = btnExpandCollapse, let sep = btnSeparate else { return }
+        guard let cBtn = chevron.button else {
+            // Button window is transiently nil (App Nap / display sleep /
+            // monitor hot-plug). Silently giving up here used to leave
+            // `state` and the on-screen chevron permanently desynced — the
+            // next click would flip `state` again with no visible effect,
+            // looking completely dead. Retry until the button is back.
+            scheduleReconcile()
+            return
+        }
+        pendingReconcile?.cancel()
+        pendingReconcile = nil
+
         if state.isExpanded {
             sep.length = btnHiddenLength
             cBtn.title = Self.expandedGlyph
@@ -381,7 +413,28 @@ final class MenuBarManager {
 
     private func handleScreenChange() {
         updateScreenWidth()
-        if state.isCollapsed { applyControl() }
+        reconcile()
+    }
+
+    /// Re-asserts visibility and re-applies `state` to the actual status
+    /// items. Called after events known to transiently break the chevron —
+    /// display/monitor reconfiguration and screen wake — so a stale visual
+    /// (or a system-demoted, overflow-hidden item) doesn't strand the user.
+    private func reconcile() {
+        guard btnExpandCollapse != nil else { return }
+        btnExpandCollapse?.isVisible = true
+        btnSeparate?.isVisible = true
+        applyControl()
+    }
+
+    private func scheduleReconcile() {
+        guard pendingReconcile == nil else { return }
+        let work = DispatchWorkItem { [weak self] in
+            self?.pendingReconcile = nil
+            self?.reconcile()
+        }
+        pendingReconcile = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     private func updateScreenWidth() {

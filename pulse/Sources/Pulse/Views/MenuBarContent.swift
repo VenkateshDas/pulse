@@ -20,6 +20,7 @@ struct MenuBarContent: View {
     @State private var isOptimizing = false
     @State private var optimizeReport: String?
     @State private var menuBarCollapsed = false
+    @State private var confirmAttentionQuit: (pid: Int32, name: String)?
 
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
     private static let sparkSamples = 15
@@ -88,37 +89,102 @@ struct MenuBarContent: View {
         .onDisappear { model.viewDisappeared() }
         .frame(width: 300)
         .background { GlassLayer(tint: Halo.void.opacity(0.4)) }
+        .confirmationDialog(
+            "Quit \(confirmAttentionQuit?.name ?? "")?",
+            isPresented: Binding(
+                get: { confirmAttentionQuit != nil },
+                set: { if !$0 { confirmAttentionQuit = nil } }
+            )
+        ) {
+            Button("Quit \(confirmAttentionQuit?.name ?? "")", role: .destructive) {
+                if let target = confirmAttentionQuit {
+                    model.quitProcess(pid: target.pid, name: target.name)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Sends a normal Quit signal. Unsaved work in that app may be lost.")
+        }
     }
 
-    // MARK: HUD (live verdict + score)
+    // MARK: HUD (top attention item + score)
+
+    private var topAttentionItem: AttentionItem? { model.attentionItems.first }
 
     private var hud: some View {
-        HStack(spacing: 10) {
-            HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, labelMode: .scoreOnly)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(model.diagnosis.line)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text("Health \(model.healthScore.value) · \(model.healthScore.band.rawValue)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, labelMode: .scoreOnly)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(topAttentionItem?.title ?? model.diagnosis.line)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Halo.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text("Health \(model.healthScore.value) · \(model.healthScore.band.rawValue)")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.textDim)
+                }
+                Spacer()
+                Button {
+                    dismiss()
+                    openWindow(id: "dashboard")
+                    NSApp.activate(ignoringOtherApps: true)
+                } label: {
+                    Image(systemName: "rectangle.grid.2x2")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textSecondary)
+                        .frame(width: 26, height: 26)
+                        .background(Halo.surface2, in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Open Command Center")
             }
-            Spacer()
-            Button {
-                dismiss()
-                openWindow(id: "dashboard")
-                NSApp.activate(ignoringOtherApps: true)
-            } label: {
-                Image(systemName: "rectangle.grid.2x2")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textSecondary)
-                    .frame(width: 26, height: 26)
-                    .background(Halo.surface2, in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous))
+            if let item = topAttentionItem {
+                attentionRow(item)
             }
-            .buttonStyle(.plain)
-            .help("Open Command Center")
+        }
+    }
+
+    @ViewBuilder
+    private func attentionRow(_ item: AttentionItem) -> some View {
+        HStack(spacing: 8) {
+            Text(item.detail)
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 8)
+            switch item.action {
+            case .quitProcess(let pid, let name):
+                Button("Quit") { confirmAttentionQuit = (pid, name) }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Halo.ion.opacity(0.85))
+                    .controlSize(.mini)
+            case .cleanJunk:
+                Button("Clean") { clean.runNow() }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Halo.amber.opacity(0.85))
+                    .controlSize(.mini)
+            case .openPane(let target):
+                Button("Review") { navigateAttention(to: target) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+            case nil:
+                EmptyView()
+            }
+        }
+    }
+
+    private func navigateAttention(to target: AttentionTarget) {
+        dismiss()
+        openWindow(id: "dashboard")
+        NSApp.activate(ignoringOtherApps: true)
+        switch target {
+        case .monitor:
+            NotificationCenter.default.post(name: DashboardView.navigateToMonitor, object: nil)
+        case .storage:
+            NotificationCenter.default.post(name: .navigateToOptimize, object: nil)
         }
     }
 

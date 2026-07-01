@@ -11,7 +11,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case monitor = "Monitor"
     case displays = "Displays"
     case health = "Health"
-    case permissions = "Permissions"
+    case settings = "Settings"
     case diagnostics = "Diagnostics"
 
     var id: String { rawValue }
@@ -25,7 +25,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: "waveform.path.ecg"
         case .displays: "display"
         case .health: "stethoscope"
-        case .permissions: "lock.shield.fill"
+        case .settings: "gearshape.fill"
         case .diagnostics: "wrench.and.screwdriver.fill"
         }
     }
@@ -44,7 +44,7 @@ enum SidebarSection: String, CaseIterable {
         case .overview: [.dashboard]
         case .insights: [.storage, .timeline]
         case .system: [.monitor, .displays, .health]
-        case .tools: [.uninstall, .permissions, .diagnostics]
+        case .tools: [.uninstall, .settings, .diagnostics]
         }
     }
 }

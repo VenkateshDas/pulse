@@ -89,7 +89,7 @@ public class BrightnessEngine: ObservableObject {
                     brightnessMap[monitor.id] = hwBrightness
                 } else if saved < 0.0 {
                     // Restore sub-zero overlay state
-                    setBrightness(for: monitor, to: saved)
+                    setBrightness(for: monitor, to: saved, showOSD: false)
                 } else {
                     // For external monitors, we trust our saved map over the fake 1.0 hardware value
                     // For internal monitors, if the change was negligible, we just keep the saved map to prevent rounding jitter
@@ -112,7 +112,7 @@ public class BrightnessEngine: ObservableObject {
         return CoreDisplay_Display_GetUserBrightness(monitor.id)
     }
 
-    public func setBrightness(for monitor: Monitor, to value: Double) {
+    public func setBrightness(for monitor: Monitor, to value: Double, showOSD: Bool = true) {
         guard monitors.contains(where: { $0.id == monitor.id }) else { return }
         let clampedValue = max(-1.0, min(1.0, value))
 
@@ -127,43 +127,97 @@ public class BrightnessEngine: ObservableObject {
         }
         
         brightnessMap[monitor.id] = clampedValue
-        
-        var ddcSuccess = true // Assume true for built-in or if we don't need DDC
+
         if !monitor.isBuiltIn {
-            ddcSuccess = false
-            var command = DDCWriteCommand(control_id: 0x10, new_value: UInt16(hardwareBrightness * 100))
-            #if arch(arm64)
-            ddcSuccess = writeDDC_M1(monitor: monitor, control_id: 0x10, new_value: UInt16(hardwareBrightness * 100))
-            #else
-            let fb = IOFramebufferPortFromCGDisplayID(monitor.id, nil)
-            if fb != 0 {
-                ddcSuccess = DDCWriteIntel(fb, &command, 0x51)
-            }
-            #endif
+            // DDC/CI over I2C takes tens of ms per round trip. Calling it
+            // synchronously here — on every drag pixel, unthrottled — blocked
+            // the main thread long enough that queued drag events landed out
+            // of order, which looked like brightness jumping up then back
+            // down mid-drag on external monitors (built-in uses the fast
+            // DisplayServices/CoreDisplay calls above, so it never showed
+            // this). Serialize and coalesce writes off the main thread
+            // instead; only the latest value survives if several pile up
+            // before the in-flight write finishes.
+            scheduleDDCWrite(for: monitor, controlValue: UInt16((hardwareBrightness * 100).rounded()))
         }
-        
-        if !monitor.isBuiltIn {
-            if !ddcSuccess {
-                ddcFailures[monitor.id, default: 0] += 1
-            } else {
-                ddcFailures[monitor.id] = 0
-            }
-        }
-        
-        let isDDCDead = (ddcFailures[monitor.id] ?? 0) >= 3
-        
-        // Apply Software Dimming if Sub-zero is engaged, OR if Hardware DDC completely fails multiple times
-        if softwareBrightness < 1.0 {
+
+        let isDDCDead = !monitor.isBuiltIn && (ddcFailures[monitor.id] ?? 0) >= 3
+
+        if isDDCDead {
+            // DDC can't be trusted at all here, not even to have reliably
+            // reached its floor at the 0-crossing — so the overlay must
+            // cover the *entire* -1...1 range itself, as one continuous
+            // function of clampedValue. Splicing this with the sub-zero-only
+            // `softwareBrightness` formula below created a real jump right
+            // at the 50% mark: that formula assumes hardware DDC already
+            // sits at its minimum by the time clampedValue reaches 0, which
+            // isn't true once DDC is dead, so software dimming was resetting
+            // to "off" the instant the slider crossed 0.
+            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: (clampedValue + 1.0) / 2.0)
+        } else if softwareBrightness < 1.0 {
+            // Sub-zero range with working DDC — hardware is already pinned
+            // at its floor, overlay does the rest.
             SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: softwareBrightness)
-        } else if isDDCDead {
-            // Hardware DDC failed on external monitor consistently, use software dimming for the full range
-            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: hardwareBrightness)
         } else {
             // Hardware dimming works and we're not in sub-zero range, ensure software dimming is off
             SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: 1.0)
         }
+
+        if showOSD {
+            // Same 0...1 mapping the UI slider uses, sub-zero range folded in.
+            BrightnessOSD.shared.show(fraction: (clampedValue + 1.0) / 2.0, on: monitor.id)
+        }
     }
-    
+
+    // MARK: - Async DDC writes
+
+    private var pendingDDCValue: [CGDirectDisplayID: UInt16] = [:]
+    private var ddcWriteInFlight: Set<CGDirectDisplayID> = []
+
+    /// Queues `controlValue` as the latest write for this monitor and, if no
+    /// write loop is already running for it, starts one. The loop drains to
+    /// whatever is newest each time it's free, so a fast drag collapses to a
+    /// single trailing write instead of one per pixel, and writes to the
+    /// same monitor never overlap on the I2C bus.
+    private func scheduleDDCWrite(for monitor: Monitor, controlValue: UInt16) {
+        let id = monitor.id
+        pendingDDCValue[id] = controlValue
+        guard !ddcWriteInFlight.contains(id) else { return }
+        ddcWriteInFlight.insert(id)
+
+        Task.detached(priority: .userInitiated) { [weak self] in
+            while let self {
+                guard let value = await MainActor.run(body: { self.pendingDDCValue.removeValue(forKey: id) })
+                else { break }
+                let success = Self.performDDCWrite(monitor: monitor, controlID: 0x10, newValue: value)
+                await MainActor.run {
+                    self.ddcFailures[id] = success ? 0 : (self.ddcFailures[id] ?? 0) + 1
+                }
+                // Most external monitors' I2C controllers can't keep up with
+                // back-to-back commands — hammering them without a gap was
+                // producing real write failures (NAK/timeout), which tripped
+                // the isDDCDead fallback mid-drag. This is the same order of
+                // throttle DDC control apps (Lunar, MonitorControl) use.
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+            _ = await MainActor.run { [weak self] in self?.ddcWriteInFlight.remove(id) }
+        }
+    }
+
+    /// The actual blocking I2C round trip — must never run on the main
+    /// thread. `nonisolated` so it executes directly on the background task
+    /// that calls it instead of hopping back to MainActor.
+    nonisolated private static func performDDCWrite(monitor: Monitor, controlID: UInt8, newValue: UInt16) -> Bool {
+        #if arch(arm64)
+        return writeDDC_M1(monitor: monitor, control_id: controlID, new_value: newValue)
+        #else
+        var command = DDCWriteCommand(control_id: controlID, new_value: newValue)
+        let fb = IOFramebufferPortFromCGDisplayID(monitor.id, nil)
+        guard fb != 0 else { return false }
+        return DDCWriteIntel(fb, &command, 0x51)
+        #endif
+    }
+
     public func adjustBrightness(for monitor: Monitor, delta: Double) {
         if isAdaptiveModeEnabled && !monitor.isBuiltIn {
             isAdaptiveModeEnabled = false
@@ -208,7 +262,7 @@ public class BrightnessEngine: ObservableObject {
                         let currentExt = currentMap[ext.id] ?? self.getBrightness(for: ext)
                         if abs(currentExt - sourceBrightness) > 0.02 {
                             await MainActor.run {
-                                self.setBrightness(for: ext, to: sourceBrightness)
+                                self.setBrightness(for: ext, to: sourceBrightness, showOSD: false)
                             }
                         }
                     }
@@ -241,7 +295,7 @@ public class BrightnessEngine: ObservableObject {
     }
 
     #if arch(arm64)
-    private func writeDDC_M1(monitor: Monitor, control_id: UInt8, new_value: UInt16) -> Bool {
+    nonisolated private static func writeDDC_M1(monitor: Monitor, control_id: UInt8, new_value: UInt16) -> Bool {
         var iter: io_iterator_t = 0
         guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("DCPAVServiceProxy"), &iter) == KERN_SUCCESS else { return false }
         
