@@ -19,9 +19,7 @@ struct UninstallView: View {
                     case .orphans: OrphanScanCard()
                     }
                     if let report = model.report {
-                        Text(report)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Halo.pulseGreen)
+                        FeedbackBadge(message: report)
                     }
                 }
                 .padding(.bottom, 8)

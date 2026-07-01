@@ -16,9 +16,7 @@ struct DashboardView: View {
                 hero
                 AttentionSection()
                 if let feedback = model.actionFeedback {
-                    Text(feedback)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Halo.ion)
+                    FeedbackBadge(message: feedback)
                 }
                 vitals
                 HStack(alignment: .top, spacing: Halo.Space.lg) {

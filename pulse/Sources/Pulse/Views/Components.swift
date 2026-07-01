@@ -1,4 +1,52 @@
+import AppKit
 import SwiftUI
+
+// MARK: - Feedback badge
+
+/// Operation feedback ("Sent Quit to X", "Freed 1.2 GB") in a soft green
+/// capsule — one look for every action result instead of scattered plain text.
+struct FeedbackBadge: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 11))
+            Text(message)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(2)
+        }
+        .foregroundStyle(Halo.pulseGreen)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Halo.pulseGreen.opacity(0.10), in: Capsule())
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+}
+
+// MARK: - Process icon cache
+
+/// App icons for process rows, cached by PID. GUI apps resolve via
+/// NSRunningApplication; daemons fall back to the generic executable icon.
+@MainActor
+enum ProcessIconCache {
+    private static var cache: [Int32: NSImage] = [:]
+    private static let fallback: NSImage = {
+        let icon = NSWorkspace.shared.icon(for: .unixExecutable)
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
+    }()
+
+    static func icon(for pid: Int32) -> NSImage {
+        if let hit = cache[pid] { return hit }
+        // ponytail: unbounded PID churn — reset wholesale past 512 entries.
+        if cache.count > 512 { cache.removeAll(keepingCapacity: true) }
+        let icon = NSRunningApplication(processIdentifier: pid)?.icon ?? fallback
+        icon.size = NSSize(width: 16, height: 16)
+        cache[pid] = icon
+        return icon
+    }
+}
 
 // MARK: - Page header
 

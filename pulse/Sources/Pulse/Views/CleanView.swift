@@ -204,9 +204,7 @@ struct AutoCleanCard: View {
             }
 
             if let report = model.report {
-                Text(report)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.pulseGreen)
+                FeedbackBadge(message: report)
             }
         }
         .padding(16)

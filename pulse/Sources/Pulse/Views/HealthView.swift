@@ -859,9 +859,7 @@ private struct StartupItemsCard: View {
                     .foregroundStyle(Halo.ion)
                 Spacer()
                 if let feedback = model.actionFeedback {
-                    Text(feedback)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Halo.pulseGreen)
+                    FeedbackBadge(message: feedback)
                 }
             }
 

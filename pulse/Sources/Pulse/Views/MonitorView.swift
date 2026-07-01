@@ -293,6 +293,9 @@ private struct ProcessRow: View {
                     Circle()
                         .fill(activityColor)
                         .frame(width: 5, height: 5)
+                    Image(nsImage: ProcessIconCache.icon(for: process.pid))
+                        .resizable()
+                        .frame(width: 14, height: 14)
                     Text(process.name)
                         .font(.system(size: 12))
                         .foregroundStyle(Halo.textPrimary)
@@ -414,9 +417,7 @@ private struct ProcessDetailCard: View {
         Spacer()
 
         if let feedback = model.actionFeedback {
-            Text(feedback)
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.pulseGreen)
+            FeedbackBadge(message: feedback)
         }
 
         Button {
