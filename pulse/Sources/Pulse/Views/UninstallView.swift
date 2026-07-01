@@ -35,38 +35,18 @@ struct UninstallView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Uninstall")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text(
+        PageHeader(
+            "Uninstall",
+            subtitle:
                 "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app goes to the Trash and every leftover is staged in the Vault — nothing is ever destroyed."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(Halo.textDim)
-        }
+        )
     }
 
     private var tabBar: some View {
-        HStack(spacing: 4) {
-            ForEach(UninstallModel.Tab.allCases) { tab in
-                let selected = model.tab == tab
-                Button {
-                    model.tab = tab
-                } label: {
-                    Text(tab.rawValue.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(selected ? Halo.void : Halo.textDim)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(
-                            selected ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2),
-                            in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
+        @Bindable var model = model
+        return SegmentPicker(
+            options: UninstallModel.Tab.allCases.map { ($0, $0.rawValue) },
+            selection: $model.tab)
     }
 
     @ViewBuilder
@@ -127,6 +107,7 @@ struct DropZoneCard: View {
 struct InstalledAppsCard: View {
     @Environment(UninstallModel.self) private var model
     @State private var query = ""
+    @State private var hoveredPath: String?
 
     private var filtered: [InstalledApp] {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -217,10 +198,13 @@ struct InstalledAppsCard: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(Halo.surface2.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            .background(
+                Halo.surface2.opacity(hoveredPath == app.path ? 0.75 : 0.4),
+                in: RoundedRectangle(cornerRadius: 8))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { hoveredPath = $0 ? app.path : nil }
     }
 
     private func subtitle(_ app: InstalledApp) -> String {

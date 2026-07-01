@@ -3,7 +3,6 @@ import SwiftUI
 struct DiskView: View {
     @Environment(StorageModel.self) private var storage
     @State private var selectedTab = 0
-    @State private var hoveredTab: Int?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,12 +42,14 @@ struct DiskView: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: Halo.Space.sm) {
-            tabBtn("Map", index: 0)
-            tabBtn("Hidden Space", index: 1)
-            tabBtn("Reclaim", index: 2)
-            tabBtn("Trash", index: 3)
-            tabBtn("Optimize", index: 4)
+        HStack {
+            SegmentPicker(
+                options: [
+                    (0, "Map"), (1, "Hidden Space"), (2, "Reclaim"),
+                    (3, "Trash"), (4, "Optimize"),
+                ],
+                selection: $selectedTab,
+                style: .tab)
             Spacer()
         }
         .padding(.horizontal, Halo.Space.xxl + 8)
@@ -58,27 +59,5 @@ struct DiskView: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(Halo.borderSubtle).frame(height: 1)
         }
-    }
-
-    private func tabBtn(_ title: String, index: Int) -> some View {
-        let isSelected = selectedTab == index
-        let isHover = hoveredTab == index && !isSelected
-        return Button {
-            withAnimation(Halo.Motion.snappy) { selectedTab = index }
-        } label: {
-            Text(title)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? Halo.interactive : Halo.textDim)
-                .padding(.horizontal, Halo.Space.md)
-                .padding(.vertical, Halo.Space.sm)
-                .background(
-                    isSelected
-                        ? Halo.interactive.opacity(0.10)
-                        : (isHover ? Halo.surface2.opacity(0.6) : .clear),
-                    in: Capsule()
-                )
-        }
-        .buttonStyle(.plain)
-        .onHover { hoveredTab = $0 ? index : nil }
     }
 }

@@ -26,16 +26,10 @@ struct OptimizeView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Optimize")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text("Safe maintenance tasks. Removals go to the Trash — reversible.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-            }
-            Spacer()
+        PageHeader(
+            "Optimize",
+            subtitle: "Safe maintenance tasks. Removals go to the Trash — reversible."
+        ) {
             if model.totalBytesFreed > 0 {
                 Text("Freed \(ByteFormat.string(UInt64(max(0, model.totalBytesFreed))))")
                     .font(.system(size: 12, weight: .semibold))

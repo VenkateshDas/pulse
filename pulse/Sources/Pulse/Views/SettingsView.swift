@@ -40,15 +40,10 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Settings")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text("Customize how Pulse runs, what it shows, and what it's allowed to do.")
-                .font(.system(size: 13))
-                .foregroundStyle(Halo.textDim)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        PageHeader(
+            "Settings",
+            subtitle: "Customize how Pulse runs, what it shows, and what it's allowed to do."
+        )
     }
 
     // MARK: - General

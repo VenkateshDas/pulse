@@ -5,6 +5,7 @@ import SwiftUI
 /// Reclaim tab: one flat list of safe + careful items across the disk, bulk action.
 struct CleanView: View {
     @Environment(StorageModel.self) private var storage
+    @State private var hoveredID: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -48,21 +49,16 @@ struct CleanView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("RECLAIM")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
-                .foregroundStyle(Halo.textDim)
-            Text("flat list of everything safe to remove")
-                .font(.system(size: 10))
-                .foregroundStyle(Halo.textDim)
-            Spacer()
+        PageHeader(
+            "Reclaim",
+            subtitle: "One flat list of everything safe to remove — safe items pre-selected, careful items opt-in."
+        ) {
             Button("Select All Safe") {
                 storage.selectAllSafe()
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(Halo.ion)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .tint(Halo.ion)
             .disabled(storage.scanState == .scanning)
         }
     }
@@ -126,7 +122,10 @@ struct CleanView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Halo.surface2.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            Halo.surface2.opacity(hoveredID == item.id ? 0.75 : 0.4),
+            in: RoundedRectangle(cornerRadius: 8))
+        .onHover { hoveredID = $0 ? item.id : nil }
     }
 
     private func detailLine(_ item: CleanItem) -> String {
@@ -214,49 +213,21 @@ struct AutoCleanCard: View {
     }
 
     private var frequencyPicker: some View {
-        HStack(spacing: 4) {
-            ForEach(CleanSchedule.Frequency.allCases, id: \.self) { frequency in
-                let selected = model.schedule.frequency == frequency
-                Button {
-                    model.setFrequency(frequency)
-                } label: {
-                    Text("⚡ \(frequency.rawValue.uppercased())")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(selected ? Halo.void : Halo.textDim)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            selected ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2),
-                            in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .help("Run the scheduled clean \(frequency.rawValue)")
-            }
-        }
+        SegmentPicker(
+            options: CleanSchedule.Frequency.allCases.map { ($0, $0.rawValue) },
+            selection: Binding(
+                get: { model.schedule.frequency },
+                set: { model.setFrequency($0) }),
+            help: { "Run the scheduled clean \($0.rawValue)" })
     }
 
     private var timePreferencePicker: some View {
-        HStack(spacing: 4) {
-            ForEach(CleanSchedule.TimePreference.allCases, id: \.self) { preference in
-                let selected = model.schedule.timePreference == preference
-                Button {
-                    model.setTimePreference(preference)
-                } label: {
-                    Text(Self.timeLabel(preference))
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(selected ? Halo.void : Halo.textDim)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            selected ? AnyShapeStyle(Halo.volt) : AnyShapeStyle(Halo.surface2),
-                            in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .help(Self.timeHelp(preference))
-            }
-        }
+        SegmentPicker(
+            options: CleanSchedule.TimePreference.allCases.map { ($0, Self.timeLabel($0)) },
+            selection: Binding(
+                get: { model.schedule.timePreference },
+                set: { model.setTimePreference($0) }),
+            help: Self.timeHelp)
     }
 
     static func timeLabel(_ preference: CleanSchedule.TimePreference) -> String {
@@ -283,7 +254,11 @@ struct AutoCleanCard: View {
                 if model.isRunning {
                     ProgressView().controlSize(.small)
                 }
-                Text(model.isRunning ? "Cleaning…" : "⚡ Run Now")
+                if !model.isRunning {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                Text(model.isRunning ? "Cleaning…" : "Run Now")
                     .font(.system(size: 13, weight: .bold))
             }
             .foregroundStyle(Halo.void)

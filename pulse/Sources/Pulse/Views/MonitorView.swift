@@ -26,16 +26,11 @@ struct MonitorView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Monitor")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text(
+        PageHeader(
+            "Monitor",
+            subtitle:
                 "Every process with CPU, memory, threads and page-fault rates, plus live per-interface network throughput. Per-process network needs private Apple entitlements — Pulse won't pretend otherwise."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(Halo.textDim)
-        }
+        )
     }
 }
 
@@ -107,29 +102,11 @@ private struct ProcessListCard: View {
     }
 
     private var modePicker: some View {
-        HStack(spacing: 4) {
-            modeButton("LIST", isTree: false)
-            modeButton("TREE", isTree: true)
-        }
-    }
-
-    private func modeButton(_ title: String, isTree: Bool) -> some View {
-        let selected = model.treeMode == isTree
-        return Button {
-            model.treeMode = isTree
-        } label: {
-            Text(title)
-                .font(.system(size: 10, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(selected ? Halo.void : Halo.textDim)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    selected ? AnyShapeStyle(Halo.ion) : AnyShapeStyle(Halo.surface2),
-                    in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .help(isTree ? "Group processes under their parent" : "Flat sortable list")
+        @Bindable var model = model
+        return SegmentPicker(
+            options: [(false, "List"), (true, "Tree")],
+            selection: $model.treeMode,
+            help: { $0 ? "Group processes under their parent" : "Flat sortable list" })
     }
 
     private var sortMenu: some View {
@@ -232,6 +209,7 @@ private struct ProcessRow: View {
     let depth: Int
     let selected: Bool
     let action: () -> Void
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -267,7 +245,7 @@ private struct ProcessRow: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(
-                selected ? Halo.surface2 : .clear,
+                selected ? Halo.surface2 : (isHovered ? Halo.surface2.opacity(0.5) : .clear),
                 in: RoundedRectangle(cornerRadius: 6))
             .overlay(alignment: .leading) {
                 if selected {
@@ -279,6 +257,7 @@ private struct ProcessRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 
     private var activityColor: Color {
@@ -315,17 +294,10 @@ private struct ProcessDetailCard: View {
     }
 
     private var placeholder: some View {
-        VStack(spacing: 10) {
-            Spacer()
-            Image(systemName: "waveform.path.ecg.rectangle")
-                .font(.system(size: 28))
-                .foregroundStyle(Halo.textDim.opacity(0.5))
-            Text("Select a process to inspect it")
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textDim)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
+        EmptyState(
+            icon: "waveform.path.ecg.rectangle",
+            title: "No process selected",
+            hint: "Select a process to inspect it")
     }
 
     @ViewBuilder

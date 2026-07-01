@@ -16,7 +16,7 @@ struct InsightsView: View {
                 } else if model.hasScanned && model.insights.isEmpty {
                     empty
                 } else {
-                    section(.hiddenSpace, "👀 Hidden space — review before removing")
+                    section(.hiddenSpace, "Hidden space — review before removing")
                     section(.cleanable, "Cleanable — rebuilt or re-downloaded")
                 }
             }
@@ -28,16 +28,10 @@ struct InsightsView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Hidden Space")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text("Big, easy-to-forget locations. Not all safe to delete — read each hint.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-            }
-            Spacer()
+        PageHeader(
+            "Hidden Space",
+            subtitle: "Big, easy-to-forget locations. Not all safe to delete — read each hint."
+        ) {
             if model.totalBytes > 0 {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(ByteFormat.string(UInt64(max(0, model.totalBytes))))
@@ -108,9 +102,11 @@ struct InsightsView: View {
     }
 
     private var empty: some View {
-        Text("Nothing notable — no large hidden caches or backups found.")
-            .font(.system(size: 12))
-            .foregroundStyle(Halo.textDim)
-            .padding(.top, 40)
+        EmptyState(
+            icon: "checkmark.seal",
+            title: "Nothing notable",
+            hint: "No large hidden caches or backups found.",
+            tint: Halo.pulseGreen)
+        .padding(.top, 24)
     }
 }

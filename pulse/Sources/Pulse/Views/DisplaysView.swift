@@ -53,15 +53,9 @@ struct DisplaysView: View {
     }
     
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Displays")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text(
-                "Intelligent adaptive brightness for built-in and external displays."
-            )
-            .font(.system(size: 12))
-            .foregroundStyle(Halo.textDim)
-        }
+        PageHeader(
+            "Displays",
+            subtitle: "Intelligent adaptive brightness for built-in and external displays."
+        )
     }
 }

@@ -69,14 +69,10 @@ struct HealthView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Health")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(Halo.textPrimary)
-            Text("Battery, startup agents, and repeatable performance benchmarks.")
-                .font(.system(size: 12))
-                .foregroundStyle(Halo.textDim)
-        }
+        PageHeader(
+            "Health",
+            subtitle: "Battery, startup agents, and repeatable performance benchmarks."
+        )
         .padding(.bottom, 4)
     }
 }
