@@ -89,6 +89,8 @@ struct CommandPaletteView: View {
                     .foregroundStyle(Halo.textPrimary)
                     .focused($searchFocused)
                     .onSubmit { runHighlighted() }
+                    .onKeyPress(.downArrow) { move(1) }
+                    .onKeyPress(.upArrow) { move(-1) }
                 Text("esc")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
@@ -97,16 +99,22 @@ struct CommandPaletteView: View {
             }
             .padding(14)
             Divider().overlay(Halo.surface2)
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(Array(filtered.enumerated()), id: \.element.id) { index, command in
-                        row(command, active: index == highlighted)
-                            .onTapGesture { run(command) }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(filtered.enumerated()), id: \.element.id) { index, command in
+                            row(command, active: index == highlighted)
+                                .onTapGesture { run(command) }
+                                .id(index)
+                        }
                     }
+                    .padding(8)
                 }
-                .padding(8)
+                .frame(maxHeight: 340)
+                .onChange(of: highlighted) { _, index in
+                    proxy.scrollTo(index, anchor: .center)
+                }
             }
-            .frame(maxHeight: 340)
         }
         .frame(width: 500)
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous))
@@ -140,6 +148,13 @@ struct CommandPaletteView: View {
         .padding(.vertical, 8)
         .background(active ? Halo.surface2 : .clear, in: RoundedRectangle(cornerRadius: 8))
         .contentShape(Rectangle())
+    }
+
+    /// Moves the keyboard highlight, wrapping at both ends.
+    private func move(_ delta: Int) -> KeyPress.Result {
+        guard !filtered.isEmpty else { return .ignored }
+        highlighted = (highlighted + delta + filtered.count) % filtered.count
+        return .handled
     }
 
     private func runHighlighted() {

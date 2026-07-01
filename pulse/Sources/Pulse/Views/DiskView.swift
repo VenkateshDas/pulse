@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct DiskView: View {
+    @Environment(StorageModel.self) private var storage
     @State private var selectedTab = 0
     @State private var hoveredTab: Int?
 
@@ -23,9 +24,22 @@ struct DiskView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // Already-visible case: the notification arrives while this view lives.
         .onReceive(NotificationCenter.default.publisher(for: .navigateToOptimize)) { _ in
-            withAnimation(Halo.Motion.snappy) { selectedTab = 4 }
+            open(tab: 4)
         }
+        .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
+            open(tab: 2)
+        }
+        // Cross-pane case: RootView stashed the target tab before this view existed.
+        .onAppear {
+            if let tab = storage.pendingDiskTab { open(tab: tab) }
+        }
+    }
+
+    private func open(tab: Int) {
+        storage.pendingDiskTab = nil
+        withAnimation(Halo.Motion.snappy) { selectedTab = tab }
     }
 
     private var tabBar: some View {

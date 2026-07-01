@@ -59,8 +59,10 @@ struct DashboardView: View {
                 diagnosis: model.diagnosis,
                 culpritName: culpritName,
                 onCulpritTap: {
+                    // Carry the PID so Monitor opens with the culprit selected.
                     NotificationCenter.default.post(
-                        name: Self.navigateToMonitor, object: nil)
+                        name: Self.navigateToMonitor,
+                        object: model.diagnosis.culpritPID)
                 })
             Text(statusLine)
                 .font(.system(size: 13, weight: .medium, design: .default))
@@ -96,7 +98,7 @@ struct DashboardView: View {
             issues == 0
             ? "nothing needs attention"
             : "\(issues) thing\(issues == 1 ? "" : "s") worth a glance"
-        return "\(health) · \(attention) · sampling live every 2s"
+        return "\(health) · \(attention) · sampling live"
     }
 
     // MARK: Vitals
@@ -513,7 +515,7 @@ struct DashboardView: View {
                     .tracking(2)
                 Image(systemName: "info.circle")
                     .font(.system(size: 9))
-                    .help("Network throughput over the last 30 minutes (Blue = In, Orange = Out)")
+                    .help("Network throughput over the last 30 minutes (Blue = Download, Purple = Upload)")
             }
             .foregroundStyle(Halo.textDim)
             HStack(alignment: .top, spacing: 8) {
@@ -527,8 +529,9 @@ struct DashboardView: View {
                 .frame(width: 50, alignment: .trailing)
                 
                 ZStack {
+                    // Download = ion, upload = volt — same semantics as Monitor.
                     HistoryChart(values: paddedHistory(model.networkInHistory), color: Halo.ion, maxValue: maxValue)
-                    HistoryChart(values: paddedHistory(model.networkOutHistory), color: Halo.flare, maxValue: maxValue)
+                    HistoryChart(values: paddedHistory(model.networkOutHistory), color: Halo.volt, maxValue: maxValue)
                 }
             }
             .frame(maxHeight: .infinity)

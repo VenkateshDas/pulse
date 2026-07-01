@@ -13,6 +13,10 @@ final class StorageModel {
 
     private(set) var scanState: ScanState = .idle
     private(set) var scan: StorageScan?
+    /// Deep-link handoff: which Disk tab to open on next appearance. Set by
+    /// RootView's navigation handlers because DiskView may not exist yet when
+    /// the notification fires (it subscribes too late to receive it).
+    var pendingDiskTab: Int?
     private(set) var rootNode: StorageNode?
     private(set) var navigationPath: [StorageNode] = []
     private(set) var selection: Set<String> = []

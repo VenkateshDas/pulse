@@ -8,6 +8,7 @@ struct RootView: View {
     @Environment(HealthModel.self) private var healthModel
     @Environment(UninstallModel.self) private var uninstall
     @Environment(CleanModel.self) private var clean
+    @Environment(StorageModel.self) private var storage
     @State private var selection: SidebarItem = .dashboard
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
@@ -37,10 +38,21 @@ struct RootView: View {
         }
         .frame(minWidth: 1080, minHeight: 720)
         .background {
-            // Hidden ⌘K hotkey for the command palette (no visible chrome).
-            Button("") { showPalette = true }
-                .keyboardShortcut("k", modifiers: .command)
-                .opacity(0)
+            // Hidden hotkeys (no visible chrome): ⌘K palette, ⌘1–9 sections,
+            // ⌘, Settings.
+            Group {
+                Button("") { showPalette = true }
+                    .keyboardShortcut("k", modifiers: .command)
+                ForEach(Array(SidebarItem.allCases.enumerated()), id: \.element) { index, item in
+                    if index < 9 {
+                        Button("") { withAnimation(Halo.Motion.snappy) { selection = item } }
+                            .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
+                    }
+                }
+                Button("") { withAnimation(Halo.Motion.snappy) { selection = .settings } }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+            .opacity(0)
         }
         .overlay { commandPaletteOverlay }
         .sheet(isPresented: $showOnboarding) {
@@ -52,12 +64,17 @@ struct RootView: View {
             PermissionsGate.markPrompted()
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
+            storage.pendingDiskTab = 2
             selection = .storage
         }
-        .onReceive(NotificationCenter.default.publisher(for: DashboardView.navigateToMonitor)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: DashboardView.navigateToMonitor)) { note in
+            // Carries the culprit PID when tapped from the diagnosis chip, so
+            // Monitor opens with that process already selected.
+            if let pid = note.object as? Int32 { monitorModel.select(pid) }
             selection = .monitor
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToOptimize)) { _ in
+            storage.pendingDiskTab = 4
             selection = .storage
         }
         .onReceive(
