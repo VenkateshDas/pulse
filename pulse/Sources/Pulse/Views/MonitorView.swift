@@ -38,6 +38,8 @@ struct MonitorView: View {
 
 private struct ProcessListCard: View {
     @Environment(MonitorModel.self) private var model
+    @State private var confirmQuit: (pid: Int32, name: String)?
+    @FocusState private var filterFocused: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -69,6 +71,7 @@ private struct ProcessListCard: View {
                         ) {
                             model.select(row.process.pid)
                         }
+                        .contextMenu { contextMenu(row.process) }
                     }
                 }
             }
@@ -77,6 +80,46 @@ private struct ProcessListCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+        .background {
+            // Hidden ⌘F hotkey — focuses the filter field while Monitor is open.
+            Button("") { filterFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .opacity(0)
+        }
+        .confirmationDialog(
+            "Send Quit to \(confirmQuit?.name ?? "")?",
+            isPresented: Binding(
+                get: { confirmQuit != nil },
+                set: { if !$0 { confirmQuit = nil } }
+            )
+        ) {
+            Button("Send Quit", role: .destructive) {
+                if let target = confirmQuit {
+                    model.quitProcess(pid: target.pid, name: target.name)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("SIGTERM asks the process to exit. Unsaved work in it may be lost.")
+        }
+    }
+
+    @ViewBuilder
+    private func contextMenu(_ process: ProcessExtendedSample) -> some View {
+        Button("Inspect") { model.select(process.pid) }
+        Divider()
+        Button("Copy Name") { copy(process.name) }
+        Button("Copy PID") { copy("\(process.pid)") }
+        Divider()
+        Button("Send Quit…", role: .destructive) {
+            model.select(process.pid)
+            confirmQuit = (process.pid, process.name)
+        }
+    }
+
+    private func copy(_ string: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
     }
 
     /// Tree rows flattened with depth; a non-empty filter always shows the
@@ -148,6 +191,7 @@ private struct ProcessListCard: View {
             }
             .buttonStyle(.plain)
             .help(model.sortAscending ? "Smallest first" : "Largest first")
+            .accessibilityLabel("Sort direction")
         }
     }
 
@@ -168,10 +212,11 @@ private struct ProcessListCard: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 10))
                 .foregroundStyle(Halo.textDim)
-            TextField("Filter by name", text: $model.filter)
+            TextField("Filter by name (⌘F)", text: $model.filter)
                 .textFieldStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(Halo.textPrimary)
+                .focused($filterFocused)
             if !model.filter.isEmpty {
                 Button {
                     model.filter = ""
@@ -190,17 +235,42 @@ private struct ProcessListCard: View {
 
     private var columnHeader: some View {
         HStack(spacing: 10) {
-            Text("NAME")
+            sortableColumn("NAME", key: .name)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text("CPU").frame(width: 52, alignment: .trailing)
-            Text("MEM").frame(width: 60, alignment: .trailing)
-            Text("THR").frame(width: 36, alignment: .trailing)
-            Text("FLT/S").frame(width: 44, alignment: .trailing)
+            sortableColumn("CPU", key: .cpu).frame(width: 52, alignment: .trailing)
+            sortableColumn("MEM", key: .memory).frame(width: 60, alignment: .trailing)
+            sortableColumn("THR", key: .threads).frame(width: 36, alignment: .trailing)
+            sortableColumn("FLT/S", key: .pageFaults).frame(width: 44, alignment: .trailing)
         }
         .font(.system(size: 9, weight: .semibold, design: .monospaced))
         .tracking(1)
         .foregroundStyle(Halo.textDim)
         .padding(.horizontal, 8)
+    }
+
+    /// Click a column to sort by it; click again to flip direction.
+    private func sortableColumn(_ title: String, key: MonitorEngine.SortKey) -> some View {
+        let isActive = model.sortKey == key
+        return Button {
+            if isActive {
+                model.sortAscending.toggle()
+            } else {
+                model.sortKey = key
+            }
+        } label: {
+            HStack(spacing: 2) {
+                Text(title)
+                    .foregroundStyle(isActive ? Halo.ion : Halo.textDim)
+                if isActive {
+                    Image(systemName: model.sortAscending ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(Halo.ion)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Sort by \(title)")
     }
 }
 

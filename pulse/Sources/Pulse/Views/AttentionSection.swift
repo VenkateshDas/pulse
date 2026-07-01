@@ -136,6 +136,7 @@ private struct AttentionCard: View {
         .menuIndicator(.hidden)
         .frame(width: 22)
         .help("Snooze — hides until it recurs or the snooze expires")
+        .accessibilityLabel("Snooze options")
     }
 
     private var defaultSnoozeLabel: String {

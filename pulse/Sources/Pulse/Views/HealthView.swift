@@ -531,7 +531,7 @@ private struct BatteryConsumptionCard: View {
                     let fraction = min(hours / scaleMax, 1)
                     VStack(spacing: 2) {
                         Text(hours >= 0.05 ? String(format: "%.1f", hours) : "")
-                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundStyle(hoursColor(hours))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -655,7 +655,7 @@ private struct BatterySessionsCard: View {
                             .foregroundStyle(Halo.textPrimary)
                         if session.isLive {
                             Text("LIVE")
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(Halo.pulseGreen)
                                 .padding(.horizontal, 5).padding(.vertical, 1)
                                 .background(Halo.pulseGreen.opacity(0.15), in: Capsule())
@@ -788,7 +788,7 @@ private struct BatterySessionsCard: View {
             .foregroundStyle(Halo.ion)
             HStack(spacing: 4) {
                 Image(systemName: "moon.fill")
-                    .font(.system(size: 8))
+                    .font(.system(size: 9))
                 Text("Off \(Self.shortDuration(off))")
             }
             .foregroundStyle(Halo.textDim)

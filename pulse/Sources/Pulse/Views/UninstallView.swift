@@ -373,6 +373,7 @@ struct UninstallPlanCard: View {
             }
             .buttonStyle(.plain)
             .help("Reveal in Finder — \(item.path)")
+            .accessibilityLabel("Reveal in Finder")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -789,6 +790,7 @@ struct OrphanScanCard: View {
             }
             .buttonStyle(.plain)
             .help("Reveal in Finder — \(item.path)")
+            .accessibilityLabel("Reveal in Finder")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)

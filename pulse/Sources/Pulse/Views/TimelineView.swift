@@ -359,7 +359,7 @@ struct TimelineView: View {
 
                 if isSpike {
                     Text("SPIKE")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .tracking(0.8)
                         .foregroundStyle(Halo.flare)
                         .padding(.horizontal, 5).padding(.vertical, 2)

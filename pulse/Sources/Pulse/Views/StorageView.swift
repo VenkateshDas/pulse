@@ -103,6 +103,7 @@ struct StorageView: View {
                         .foregroundStyle(Halo.textPrimary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Back")
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -236,6 +237,7 @@ struct StorageView: View {
                 .foregroundStyle(Halo.textDim)
                 .padding(.leading, 4)
                 .help("Rescan storage map and free space")
+                .accessibilityLabel("Rescan")
                 
                 if storage.isStreamingSizes || storage.scanState == .scanning {
                     ProgressView()
