@@ -249,6 +249,25 @@ struct ParseBatterySessionsTests {
         """
         #expect(parseBatterySessions(log).isEmpty)
     }
+
+    @Test func dropsMostlyAsleepLowDrainWindow() {
+        // 32h unplugged draining 2% (0.06%/h) — a lid-closed sleep, not a
+        // session worth charting.
+        let log = """
+        2026-06-16 10:00:00 +0000 Using Batt (Charge:100%)
+        2026-06-17 18:00:00 +0000 Using AC (Charge:98%)
+        """
+        #expect(parseBatterySessions(log).isEmpty)
+    }
+
+    @Test func keepsRealMultiHourDischarge() {
+        // 5h at ~8%/h is genuine in-use drain.
+        let log = """
+        2026-06-16 10:00:00 +0000 Using Batt (Charge:90%)
+        2026-06-16 15:00:00 +0000 Using AC (Charge:50%)
+        """
+        #expect(parseBatterySessions(log).count == 1)
+    }
 }
 
 @Suite("BatterySession backfill merge")

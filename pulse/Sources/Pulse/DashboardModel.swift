@@ -113,6 +113,9 @@ final class DashboardModel {
     /// Timestamp of the last valid on-battery sample, used to end a session at
     /// the right moment when a sleep gap (not a replug) interrupts it.
     @ObservationIgnored private var lastBatterySampleAt: Date?
+    /// Wall-clock time of the last ingested sample — sleep detection pairs
+    /// this with the (sleep-pausing) uptime delta.
+    @ObservationIgnored private var lastIngestDate: Date?
     @ObservationIgnored private var displayAsleep = false
     /// Per-alert-id last fire time — enforces the 30-min notification cooldown
     /// so a sustained condition notifies once, not every 2s.
@@ -261,8 +264,14 @@ final class DashboardModel {
         if let battery = snapshot.battery {
             let charge = battery.currentChargePercent
             let elapsed = lastIngestUptime.map { snapshot.uptime - $0 } ?? 0
-            // A gap >10s between samples means the Mac slept — not live use.
-            let validDelta = elapsed > 0 && elapsed < 10
+            // `uptime` (systemUptime) pauses while the Mac sleeps, so a sleep
+            // is invisible in `elapsed` — the wall clock keeps running. A wall
+            // gap far beyond the awake gap means the Mac slept between samples.
+            let wallElapsed =
+                lastIngestDate.map { snapshot.timestamp.timeIntervalSince($0) } ?? 0
+            let slept = wallElapsed - elapsed >= Self.sleepGapSeconds
+            // A gap >10s between samples (or a sleep) means not live use.
+            let validDelta = elapsed > 0 && elapsed < 10 && !slept
 
             if !battery.isOnAC {
                 // Time-on-battery crediting is unchanged: only count gaps that
@@ -281,7 +290,7 @@ final class DashboardModel {
                         processes: procs, elapsed: elapsed, charge: charge,
                         at: snapshot.timestamp, displayAsleep: displayAsleep)
                     lastBatterySampleAt = snapshot.timestamp
-                } else if elapsed >= Self.sleepGapSeconds {
+                } else if slept || elapsed >= Self.sleepGapSeconds {
                     // Genuinely slept while unplugged: close the pre-sleep
                     // session at its last active sample, then open a fresh one.
                     // Smaller (10–90s) gaps are transient stalls — keep the
@@ -300,6 +309,7 @@ final class DashboardModel {
             batteryHistory.recordCapacity(battery.capacityPercent, at: snapshot.timestamp)
         }
         lastIngestUptime = snapshot.uptime
+        lastIngestDate = snapshot.timestamp
 
         let rounded = Int(snapshot.cpuTotalPercent.rounded())
         if rounded != menuBarCPUPercent {

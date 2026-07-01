@@ -106,10 +106,34 @@ public final class BatterySessionStore {
             let data = try? Data(contentsOf: fileURL),
             let stored = try? JSONDecoder().decode([BatterySession].self, from: data)
         {
-            sessions = stored.filter { now.timeIntervalSince($0.startedAt) <= Self.maxAge }
+            sessions = stored
+                .filter { now.timeIntervalSince($0.startedAt) <= Self.maxAge }
+                .compactMap { Self.sanitized($0, now: now) }
         } else {
             sessions = []
         }
+    }
+
+    /// Repairs what a previous run left behind. A decoded session can't be
+    /// live — Pulse just launched — so one still open means Pulse quit or
+    /// crashed while unplugged. If it were kept open, the next on-AC tick
+    /// would close it at "now" and chart a phantom multi-day session
+    /// (observed: 95h, −0%). Close it at its last observed sample instead,
+    /// or drop it when it never observed one. Also drops already-closed
+    /// phantoms persisted by older builds: a live-captured session that
+    /// claims hours of duration but never accumulated a single app sample.
+    static func sanitized(_ session: BatterySession, now: Date = .now) -> BatterySession? {
+        var repaired = session
+        if repaired.isLive {
+            guard let lastSeen = repaired.apps.map(\.lastSeen).max() else { return nil }
+            repaired.endedAt = lastSeen
+            repaired.apps = capApps(repaired.apps)
+        }
+        guard repaired.duration(now: now) >= minDurationToKeep else { return nil }
+        if !repaired.isBackfilled, repaired.apps.isEmpty, repaired.duration(now: now) > 3600 {
+            return nil
+        }
+        return repaired
     }
 
     /// Index of the open (live) session, if one exists. Only the last entry can

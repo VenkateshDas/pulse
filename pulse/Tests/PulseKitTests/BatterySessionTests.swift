@@ -12,6 +12,42 @@ struct BatterySessionStoreTests {
 
     private let t0 = Date(timeIntervalSince1970: 1_700_000_000)
 
+    // MARK: Load-time sanitation (phantom sessions from previous runs)
+
+    @Test func staleLiveSessionClosesAtLastObservedSample() {
+        // Pulse quit while unplugged: the open session must close at its last
+        // accumulate sample, never at "now" (which charted 95h phantoms).
+        let lastSeen = t0.addingTimeInterval(1800)
+        let stale = BatterySession(
+            startedAt: t0, endedAt: nil, startCharge: 90, endCharge: 80,
+            apps: [AppEnergyShare(name: "Chrome", cpuTimeSeconds: 50, firstSeen: t0, lastSeen: lastSeen)])
+        let repaired = BatterySessionStore.sanitized(stale, now: t0.addingTimeInterval(95 * 3600))
+        #expect(repaired?.endedAt == lastSeen)
+        #expect(repaired?.isLive == false)
+    }
+
+    @Test func staleLiveSessionWithoutSamplesIsDropped() {
+        let stale = BatterySession(
+            startedAt: t0, endedAt: nil, startCharge: 100, endCharge: 100)
+        #expect(BatterySessionStore.sanitized(stale, now: t0.addingTimeInterval(95 * 3600)) == nil)
+    }
+
+    @Test func closedPhantomWithoutAppsIsDropped() {
+        // Persisted by older builds: live-source, hours long, zero app samples.
+        let phantom = BatterySession(
+            startedAt: t0, endedAt: t0.addingTimeInterval(95 * 3600),
+            startCharge: 100, endCharge: 100)
+        #expect(BatterySessionStore.sanitized(phantom) == nil)
+    }
+
+    @Test func backfilledSessionSurvivesSanitation() {
+        // Backfill legitimately has no apps — the pmset log has no such data.
+        let backfill = BatterySession(
+            startedAt: t0, endedAt: t0.addingTimeInterval(2 * 3600),
+            startCharge: 90, endCharge: 70, source: .backfill)
+        #expect(BatterySessionStore.sanitized(backfill) != nil)
+    }
+
     @Test func opensASingleLiveSession() {
         let s = store(now: t0)
         s.beginSession(charge: 90, at: t0)

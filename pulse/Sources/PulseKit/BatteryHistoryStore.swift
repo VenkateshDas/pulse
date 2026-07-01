@@ -290,6 +290,11 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
         // Drop implausible flat-charge spans (battery off/hibernated or a lost
         // replug line) — a real unplug of this length always drains something.
         if startC - endC <= 0 && duration > flatChargeGraceSeconds { return }
+        // Drop mostly-asleep windows: an in-use discharge loses well over
+        // 1%/h, while a lid-closed day sips a couple of %. A 31h window that
+        // drained 2% was sleep, not a session worth charting.
+        let hours = duration / 3600
+        if hours > 3, Double(startC - endC) / hours < 1 { return }
         sessions.append(
             BatterySession(
                 startedAt: start, endedAt: end,
