@@ -490,6 +490,21 @@ final class MenuBarManager {
         applyControl(force: force)
     }
 
+    /// NSApp.setActivationPolicy re-registers the app with the window
+    /// server; on the Control-Center-composited menu bar this leaves the
+    /// existing status items visible but click-dead (reproducible: open the
+    /// Command Center window, Cmd-Q it → chevron frozen). Rebuild shortly
+    /// after every actual policy flip — the delay lets AppKit finish the
+    /// transition before the items re-register.
+    func handleActivationPolicyChange() {
+        guard btnExpandCollapse != nil else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.btnExpandCollapse != nil else { return }
+            Self.log.info("activation policy changed — rebuilding status items")
+            self.rebuildStatusItems()
+        }
+    }
+
     /// Tears down and recreates the two status items, preserving `state`.
     private func rebuildStatusItems() {
         Self.log.error("rebuilding status items")

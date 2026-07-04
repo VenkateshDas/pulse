@@ -89,6 +89,10 @@ final class AppActivation {
             (showDockIcon || openWindowCount > 0) ? .regular : .accessory
         guard NSApp.activationPolicy() != policy else { return }
         NSApp.setActivationPolicy(policy)
+        // Policy flips strand existing status items click-dead in the
+        // menu bar compositor — let the Menu Bar Manager re-register its
+        // items (see handleActivationPolicyChange).
+        MenuBarManager.shared.handleActivationPolicyChange()
     }
 }
 
