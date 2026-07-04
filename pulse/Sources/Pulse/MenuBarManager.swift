@@ -1,5 +1,6 @@
 import AppKit
 import PulseKit
+import os.log
 
 /// Hides menu bar items using the NSStatusItem width-inflation trick, with
 /// two status items: a chevron (the click target) and a separator. When
@@ -21,8 +22,21 @@ final class MenuBarManager {
     private var pendingReconcile: DispatchWorkItem?
     /// Consecutive reconciles that found the chevron's button window missing.
     private var deadButtonStrikes = 0
+    /// Rebuilding is a last resort — churning items every few heartbeats on
+    /// a macOS that never reports a button window would itself wedge the bar.
+    private var lastRebuild = Date.distantPast
 
     private var isToggle = false
+
+    /// Ground truth for "collapsed": the separator's ACTUAL length, not our
+    /// cached `state`. The two can drift (macOS relayouts, missed writes) and
+    /// a drifted `state` makes clicks no-op — the "chevron frozen" symptom.
+    private var isActuallyCollapsed: Bool? {
+        btnSeparate.map { $0.length > btnHiddenLength }
+    }
+
+    /// Diagnostic trail: `log show --predicate 'subsystem == "com.pulse.app"' --last 1h`
+    private static let log = Logger(subsystem: "com.pulse.app", category: "MenuBar")
 
     private static let enabledKey = "PulseMenuBarManagementEnabled"
     private static let autoHideKey = "PulseMenuBarAutoHideDelay"
@@ -115,7 +129,17 @@ final class MenuBarManager {
                 self?.isToggle = false
             }
         }
+        syncStateToActual()
         if state.isExpanded { collapse() } else { expand() }
+    }
+
+    /// Re-derives `state` from the separator's real length before acting on
+    /// it. If they drifted apart, every toggle flipped `state` with no visible
+    /// effect — a permanently dead-looking chevron.
+    private func syncStateToActual() {
+        guard let actual = isActuallyCollapsed, actual != state.isCollapsed else { return }
+        Self.log.error("state desync: state=\(self.state.isCollapsed ? "collapsed" : "expanded", privacy: .public) actual=\(actual ? "collapsed" : "expanded", privacy: .public) — resyncing")
+        if actual { state.collapse() } else { state.expand() }
     }
 
     func collapse(userInitiated: Bool = true) {
@@ -131,15 +155,17 @@ final class MenuBarManager {
             }
             return
         }
+        Self.log.info("collapse (userInitiated=\(userInitiated, privacy: .public))")
         state.collapse()
-        applyControl()
+        applyControl(force: true)
         cancelAutoHideTimer()
     }
 
     func expand() {
         guard state.isCollapsed else { return }
+        Self.log.info("expand")
         state.expand()
-        applyControl()
+        applyControl(force: true)
         resetAutoHideTimer()
     }
 
@@ -167,14 +193,14 @@ final class MenuBarManager {
         let wakeCenter = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.screensDidWakeNotification, NSWorkspace.didWakeNotification] {
             let obs = wakeCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.reconcile() }
+                Task { @MainActor in self?.reconcile(force: true) }
             }
             wakeObservers.append(obs)
         }
 
         // Start expanded so the user can arrange icons before collapsing.
         state.expand()
-        applyControl()
+        applyControl(force: true)
         resetAutoHideTimer()
         startHeartbeat()
     }
@@ -232,9 +258,15 @@ final class MenuBarManager {
 
     // MARK: - Rendering
 
-    private func applyControl() {
+    /// `force` rewrites length/title even when they already read back as the
+    /// target values. User actions and screen/wake events force: the setter's
+    /// relayout side effect is exactly what un-wedges a menu bar whose visual
+    /// state stopped matching what the getter reports. The heartbeat doesn't
+    /// force, so idle polling never churns layout.
+    private func applyControl(force: Bool = false) {
         guard let chevron = btnExpandCollapse, let sep = btnSeparate else { return }
         guard let cBtn = chevron.button else {
+            Self.log.error("applyControl: chevron button is nil — scheduling retry")
             // Button window is transiently nil (App Nap / display sleep /
             // monitor hot-plug). Silently giving up here used to leave
             // `state` and the on-screen chevron permanently desynced — the
@@ -246,20 +278,21 @@ final class MenuBarManager {
         pendingReconcile?.cancel()
         pendingReconcile = nil
 
-        // Write-only-on-change: the heartbeat calls this every few seconds,
-        // and rewriting NSStatusItem.length/title unconditionally forces a
-        // menu bar relayout each time.
         let length = state.isExpanded ? btnHiddenLength : state.collapseWidth
         let glyph = state.isExpanded ? Self.expandedGlyph : Self.collapsedGlyph
         let tip = state.isExpanded
             ? "Hide the menu bar icons on the left"
             : "Show the hidden menu bar icons"
-        if sep.length != length { sep.length = length }
-        if cBtn.title != glyph { cBtn.title = glyph }
+        if force || sep.length != length {
+            Self.log.info("applyControl: sep.length \(sep.length, privacy: .public) -> \(length, privacy: .public) (force=\(force, privacy: .public))")
+            sep.length = length
+        }
+        if force || cBtn.title != glyph { cBtn.title = glyph }
         if cBtn.toolTip != tip { cBtn.toolTip = tip }
     }
 
     @objc private func controlClicked(_ sender: NSStatusBarButton) {
+        Self.log.info("chevron clicked (state=\(self.state.isCollapsed ? "collapsed" : "expanded", privacy: .public) actual=\(self.isActuallyCollapsed.map { $0 ? "collapsed" : "expanded" } ?? "unknown", privacy: .public))")
         guard let event = NSApp.currentEvent else { toggle(); return }
         if event.type == .rightMouseUp {
             showContextMenuFromChevron()
@@ -415,8 +448,9 @@ final class MenuBarManager {
     // MARK: - Screen Changes
 
     private func handleScreenChange() {
+        Self.log.info("screen change")
         updateScreenWidth()
-        reconcile()
+        reconcile(force: true)
     }
 
     /// Re-asserts visibility and re-applies `state` to the actual status
@@ -424,7 +458,7 @@ final class MenuBarManager {
     /// display/monitor reconfiguration and screen wake — and every few
     /// seconds by the heartbeat, so a stale visual (or a system-demoted,
     /// overflow-hidden item) doesn't strand the user.
-    private func reconcile() {
+    private func reconcile(force: Bool = false) {
         guard let chevron = btnExpandCollapse else { return }
         if chevron.isVisible == false { chevron.isVisible = true }
         if let sep = btnSeparate, sep.isVisible == false { sep.isVisible = true }
@@ -440,8 +474,11 @@ final class MenuBarManager {
             // would churn items every heartbeat for the whole nap.
             if CGDisplayIsAsleep(CGMainDisplayID()) == 0 {
                 deadButtonStrikes += 1
+                Self.log.error("reconcile: chevron button window nil (strike \(self.deadButtonStrikes, privacy: .public))")
             }
-            if deadButtonStrikes >= 3 {
+            // Throttled hard: if a rebuild didn't bring the window back,
+            // rebuilding again every few heartbeats just churns the bar.
+            if deadButtonStrikes >= 3, Date().timeIntervalSince(lastRebuild) > 120 {
                 deadButtonStrikes = 0
                 rebuildStatusItems()
                 return
@@ -450,17 +487,19 @@ final class MenuBarManager {
             deadButtonStrikes = 0
         }
 
-        applyControl()
+        applyControl(force: force)
     }
 
     /// Tears down and recreates the two status items, preserving `state`.
     private func rebuildStatusItems() {
+        Self.log.error("rebuilding status items")
+        lastRebuild = Date()
         if let item = btnExpandCollapse { NSStatusBar.system.removeStatusItem(item) }
         if let item = btnSeparate { NSStatusBar.system.removeStatusItem(item) }
         btnExpandCollapse = nil
         btnSeparate = nil
         createStatusItems()
-        applyControl()
+        applyControl(force: true)
     }
 
     // MARK: - Heartbeat
@@ -487,7 +526,7 @@ final class MenuBarManager {
         guard pendingReconcile == nil else { return }
         let work = DispatchWorkItem { [weak self] in
             self?.pendingReconcile = nil
-            self?.reconcile()
+            self?.reconcile(force: true)
         }
         pendingReconcile = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
