@@ -67,6 +67,11 @@ public class SoftwareDimmer: @unchecked Sendable {
                 defer: false
             )
             
+            // ARC owns this window via `overlayWindows`. The AppKit default
+            // (isReleasedWhenClosed = true) makes close() ALSO release it —
+            // pruneStaleOverlays' close() then over-released and crashed the
+            // app the moment an external display was unplugged.
+            window.isReleasedWhenClosed = false
             window.backgroundColor = .clear
             window.isOpaque = false
             window.hasShadow = false

@@ -49,7 +49,8 @@ public class BrightnessEngine: ObservableObject {
         if let savedMap = UserDefaults.standard.dictionary(forKey: "PulseBrightnessMap") as? [String: Double] {
             brightnessMap = Dictionary(uniqueKeysWithValues: savedMap.compactMap { key, value in
                 guard let id = CGDirectDisplayID(key) else { return nil }
-                return (id, value)
+                // Migrate values persisted by the old -1...1 sub-zero range.
+                return (id, max(0.0, min(1.0, value)))
             })
         }
     }
@@ -82,14 +83,9 @@ public class BrightnessEngine: ObservableObject {
             let canReadHardware = DisplayServicesCanChangeBrightness(monitor.id) != 0
             
             if let saved = brightnessMap[monitor.id] {
-                let expectedHw = max(0.0, saved)
-                
-                if canReadHardware && hwBrightness > 0.0 && abs(hwBrightness - expectedHw) > 0.05 {
+                if canReadHardware && hwBrightness > 0.0 && abs(hwBrightness - saved) > 0.05 {
                     // Hardware was changed externally (e.g., Apple Control Center)
                     brightnessMap[monitor.id] = hwBrightness
-                } else if saved < 0.0 {
-                    // Restore sub-zero overlay state
-                    setBrightness(for: monitor, to: saved, showOSD: false)
                 } else {
                     // For external monitors, we trust our saved map over the fake 1.0 hardware value
                     // For internal monitors, if the change was negligible, we just keep the saved map to prevent rounding jitter
@@ -114,18 +110,18 @@ public class BrightnessEngine: ObservableObject {
 
     public func setBrightness(for monitor: Monitor, to value: Double, showOSD: Bool = true) {
         guard monitors.contains(where: { $0.id == monitor.id }) else { return }
-        let clampedValue = max(-1.0, min(1.0, value))
+        // Plain 0...1 range. The old -1...0 "sub-zero" software-dimming zone
+        // is gone: it doubled every mapping in the app and made 50% on the
+        // slider mean 100% hardware.
+        let clampedValue = max(0.0, min(1.0, value))
 
-        let hardwareBrightness = clampedValue >= 0.0 ? clampedValue : 0.0
-        let softwareBrightness = clampedValue >= 0.0 ? 1.0 : (1.0 + clampedValue)
-        
         if DisplayServicesCanChangeBrightness(monitor.id) != 0 {
-            _ = DisplayServicesSetBrightness(monitor.id, Float(hardwareBrightness))
-            _ = DisplayServicesSetLinearBrightness(monitor.id, Float(hardwareBrightness))
+            _ = DisplayServicesSetBrightness(monitor.id, Float(clampedValue))
+            _ = DisplayServicesSetLinearBrightness(monitor.id, Float(clampedValue))
         } else {
-            CoreDisplay_Display_SetUserBrightness(monitor.id, hardwareBrightness)
+            CoreDisplay_Display_SetUserBrightness(monitor.id, clampedValue)
         }
-        
+
         brightnessMap[monitor.id] = clampedValue
 
         if !monitor.isBuiltIn {
@@ -138,34 +134,22 @@ public class BrightnessEngine: ObservableObject {
             // this). Serialize and coalesce writes off the main thread
             // instead; only the latest value survives if several pile up
             // before the in-flight write finishes.
-            scheduleDDCWrite(for: monitor, controlValue: UInt16((hardwareBrightness * 100).rounded()))
+            scheduleDDCWrite(for: monitor, controlValue: UInt16((clampedValue * 100).rounded()))
         }
 
         let isDDCDead = !monitor.isBuiltIn && (ddcFailures[monitor.id] ?? 0) >= 3
 
         if isDDCDead {
-            // DDC can't be trusted at all here, not even to have reliably
-            // reached its floor at the 0-crossing — so the overlay must
-            // cover the *entire* -1...1 range itself, as one continuous
-            // function of clampedValue. Splicing this with the sub-zero-only
-            // `softwareBrightness` formula below created a real jump right
-            // at the 50% mark: that formula assumes hardware DDC already
-            // sits at its minimum by the time clampedValue reaches 0, which
-            // isn't true once DDC is dead, so software dimming was resetting
-            // to "off" the instant the slider crossed 0.
-            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: (clampedValue + 1.0) / 2.0)
-        } else if softwareBrightness < 1.0 {
-            // Sub-zero range with working DDC — hardware is already pinned
-            // at its floor, overlay does the rest.
-            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: softwareBrightness)
+            // Hardware control is unreachable — the overlay stands in for the
+            // whole 0...1 range so the slider still does something.
+            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: clampedValue)
         } else {
-            // Hardware dimming works and we're not in sub-zero range, ensure software dimming is off
+            // Hardware dimming works — ensure software dimming is off.
             SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: 1.0)
         }
 
         if showOSD {
-            // Same 0...1 mapping the UI slider uses, sub-zero range folded in.
-            BrightnessOSD.shared.show(fraction: (clampedValue + 1.0) / 2.0, on: monitor.id)
+            BrightnessOSD.shared.show(fraction: clampedValue, on: monitor.id)
         }
     }
 
@@ -223,7 +207,7 @@ public class BrightnessEngine: ObservableObject {
             isAdaptiveModeEnabled = false
         }
         let current = brightnessMap[monitor.id] ?? getBrightness(for: monitor)
-        let newBrightness = max(-1.0, min(1.0, current + delta))
+        let newBrightness = max(0.0, min(1.0, current + delta))
         setBrightness(for: monitor, to: newBrightness)
         saveBrightnessMap()
     }

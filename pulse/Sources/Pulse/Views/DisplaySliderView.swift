@@ -24,29 +24,18 @@ struct DisplaySliderView: View {
             // Custom Premium Capsule Slider
             GeometryReader { geometry in
                 let trackWidth = geometry.size.width
-                
-                // Map currentBrightness (-1...1) to (0...1) fraction for width
-                let fraction = (currentBrightness + 1.0) / 2.0
-                let fillWidth = max(0, min(trackWidth, trackWidth * CGFloat(fraction)))
-                
+                let fillWidth = max(0, min(trackWidth, trackWidth * CGFloat(currentBrightness)))
+
                 ZStack(alignment: .leading) {
                     // Track Background
                     Capsule()
                         .fill(Halo.surface2)
                         .frame(height: 18)
-                        
+
                     // Track Fill
                     Capsule()
                         .fill(Halo.accentGradient(Halo.ion))
                         .frame(width: fillWidth, height: 18)
-                        
-                    // Zero Marker (Optional, shows where 0% / hardware boundary is)
-                    if currentBrightness < 0.0 {
-                        Capsule()
-                            .fill(Halo.textPrimary.opacity(0.8))
-                            .frame(width: 2, height: 18)
-                            .offset(x: trackWidth / 2)
-                    }
                 }
                 .clipShape(Capsule())
                 .contentShape(Capsule())
@@ -59,9 +48,8 @@ struct DisplaySliderView: View {
                                 }
                             }
                             
-                            let dragFraction = max(0, min(1, value.location.x / trackWidth))
-                            let newValue = (dragFraction * 2.0) - 1.0 // Map (0...1) back to (-1...1)
-                            
+                            let newValue = max(0, min(1, value.location.x / trackWidth))
+
                             if brightnessEngine.isAdaptiveModeEnabled && !monitor.isBuiltIn {
                                 brightnessEngine.isAdaptiveModeEnabled = false
                             }

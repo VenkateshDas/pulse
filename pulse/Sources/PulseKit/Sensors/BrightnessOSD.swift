@@ -27,8 +27,7 @@ public final class BrightnessOSD {
 
     private init() {}
 
-    /// `fraction` is 0...1 — same normalization the app's own slider uses
-    /// (including the sub-zero software-dimming range folded in).
+    /// `fraction` is 0...1 — same normalization the app's own slider uses.
     public func show(fraction: Double, on displayID: CGDirectDisplayID) {
         let screen = Self.screen(for: displayID)
         let panel = panelForScreen(screen, displayID: displayID)
@@ -79,6 +78,8 @@ public final class BrightnessOSD {
             backing: .buffered,
             defer: false
         )
+        // ARC owns this panel; never let close() double-release it.
+        newPanel.isReleasedWhenClosed = false
         newPanel.isOpaque = false
         newPanel.backgroundColor = .clear
         newPanel.hasShadow = true
