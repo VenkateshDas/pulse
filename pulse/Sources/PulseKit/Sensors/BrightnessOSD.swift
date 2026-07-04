@@ -44,10 +44,17 @@ public final class BrightnessOSD {
 
     private func hide() {
         guard let panel else { return }
-        NSAnimationContext.runAnimationGroup { context in
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.25
             panel.animator().alphaValue = 0
-        }
+        }, completionHandler: { [weak self] in
+            // Fully off screen once faded — an invisible shielding-level
+            // panel left ordered-in can swallow the AX click routing the
+            // macOS menu bar uses (see SoftwareDimmer).
+            if self?.panel?.alphaValue == 0 {
+                self?.panel?.orderOut(nil)
+            }
+        })
     }
 
     private static func screen(for displayID: CGDirectDisplayID) -> NSScreen? {
