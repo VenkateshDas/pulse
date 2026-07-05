@@ -16,7 +16,9 @@ struct DisplaySliderView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 Spacer()
-                Text("\(Int(currentBrightness * 100))%")
+                // .rounded() to match the OSD label and the DDC write — plain
+                // Int() truncates and reads 1% lower (93 vs 94 for 0.935).
+                Text("\(Int((currentBrightness * 100).rounded()))%")
                     .font(.system(size: 11, weight: .medium).monospacedDigit())
                     .foregroundStyle(Halo.textDim)
             }
