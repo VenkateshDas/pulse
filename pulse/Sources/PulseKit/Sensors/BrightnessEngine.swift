@@ -15,6 +15,17 @@ public struct Monitor: Equatable, Identifiable, Sendable {
     }
 }
 
+/// Must live at file scope: DisplayServices invokes it on its own dispatch
+/// queue, so a closure formed inside a @MainActor method would inherit main-
+/// actor isolation and trap the Swift 6 runtime isolation check on delivery.
+private let pulseBrightnessChangeCallback: CFNotificationCallback = { _, observer, _, _, userInfo in
+    let id = CGDirectDisplayID(UInt(bitPattern: observer))
+    guard let value = (userInfo as NSDictionary?)?["value"] as? Double else { return }
+    Task { @MainActor in
+        BrightnessEngine.shared.hardwareBrightnessDidChange(id: id, value: value)
+    }
+}
+
 @MainActor
 public class BrightnessEngine: ObservableObject {
     public static let shared = BrightnessEngine()
@@ -22,6 +33,8 @@ public class BrightnessEngine: ObservableObject {
     @Published public private(set) var monitors: [Monitor] = []
     @Published public var brightnessMap: [CGDirectDisplayID: Double] = [:]
     private var ddcFailures: [CGDirectDisplayID: Int] = [:]
+    private var observedDisplays: Set<CGDirectDisplayID> = []
+    private var lastAppSet: [CGDirectDisplayID: Date] = [:]
 
     private var screenObserver: Any?
 
@@ -77,6 +90,25 @@ public class BrightnessEngine: ObservableObject {
             ddcFailures.removeValue(forKey: id)
             SoftwareDimmer.shared.setBrightness(for: id, brightness: 1.0)
         }
+        for id in observedDisplays where !activeIDs.contains(id) {
+            _ = DisplayServicesUnregisterForBrightnessChangeNotifications(id, id)
+            observedDisplays.remove(id)
+        }
+
+        // Hardware brightness changes from outside Pulse (macOS media-key
+        // handler, Control Center, auto-brightness) never went through
+        // setBrightness, so brightnessMap silently drifted from reality and
+        // the sliders showed stale values. This notification fires for every
+        // change from any source, keeping the map — and thus every slider —
+        // in sync.
+        for monitor in monitors
+        where DisplayServicesCanChangeBrightness(monitor.id) != 0 && !observedDisplays.contains(monitor.id) {
+            let status = DisplayServicesRegisterForBrightnessChangeNotifications(monitor.id, monitor.id, pulseBrightnessChangeCallback)
+            print("[Brightness] observer register display \(monitor.id) status \(status)")
+            if status == 0 {
+                observedDisplays.insert(monitor.id)
+            }
+        }
 
         for monitor in monitors {
             let hwBrightness = getBrightness(for: monitor)
@@ -123,6 +155,7 @@ public class BrightnessEngine: ObservableObject {
         }
 
         brightnessMap[monitor.id] = clampedValue
+        lastAppSet[monitor.id] = Date()
 
         if !monitor.isBuiltIn {
             // DDC/CI over I2C takes tens of ms per round trip. Calling it
@@ -200,6 +233,18 @@ public class BrightnessEngine: ObservableObject {
         guard fb != 0 else { return false }
         return DDCWriteIntel(fb, &command, 0x51)
         #endif
+    }
+
+    /// Hardware brightness changed outside Pulse — sync the map so every
+    /// slider follows. Echoes of our own writes arrive here too (with ramp
+    /// intermediates); the time guard drops them so a slider drag doesn't
+    /// fight its own lagging notifications.
+    func hardwareBrightnessDidChange(id: CGDirectDisplayID, value: Double) {
+        if let t = lastAppSet[id], Date().timeIntervalSince(t) < 0.5 { return }
+        let clamped = max(0.0, min(1.0, value))
+        guard abs((brightnessMap[id] ?? -1) - clamped) > 0.005 else { return }
+        brightnessMap[id] = clamped
+        saveBrightnessMap()
     }
 
     public func adjustBrightness(for monitor: Monitor, delta: Double) {

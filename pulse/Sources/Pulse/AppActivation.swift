@@ -109,6 +109,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // start() installs a global-monitor fallback that works without
         // Accessibility; a poll upgrades to the CGEvent tap once granted.
         MediaKeyManager.shared.start()
+
+        // BrightnessEngine is otherwise lazily created by the first view that
+        // reads it, so its hardware brightness-change observer wouldn't exist
+        // until the popover first opens — media-key / Control Center changes
+        // made before that were never reflected in the sliders. Touch it now.
+        _ = BrightnessEngine.shared
     }
 
     /// Closing the Command Center must not quit Pulse — it returns to the menu
