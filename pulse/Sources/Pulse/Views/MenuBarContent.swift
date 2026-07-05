@@ -372,6 +372,10 @@ struct MenuBarContent: View {
                 Text("Mac won't sleep\(awake.expiresAt == nil ? " until turned off" : "").")
                     .font(.system(size: 9))
                     .foregroundStyle(Halo.textDim)
+            } else if awake.lastActivationFailed {
+                Text("Couldn't create the power assertion — try again.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.amber)
             }
         }
     }
