@@ -509,10 +509,23 @@ final class MenuBarManager {
     private func rebuildStatusItems() {
         Self.log.error("rebuilding status items")
         lastRebuild = Date()
+        // removeStatusItem also deletes the item's "NSStatusItem Preferred
+        // Position <autosaveName>" default — the recreated items would land
+        // at the system default position (far left of the bar), losing the
+        // user's arrangement on every rebuild. Capture the positions before
+        // removal and write them back before recreation; setting autosaveName
+        // in createStatusItems then re-reads them.
+        let defaults = UserDefaults.standard
+        let positionKeys = [Self.expandCollapseAutosaveName, Self.separateAutosaveName]
+            .map { "NSStatusItem Preferred Position \($0)" }
+        let savedPositions = positionKeys.map { defaults.object(forKey: $0) }
         if let item = btnExpandCollapse { NSStatusBar.system.removeStatusItem(item) }
         if let item = btnSeparate { NSStatusBar.system.removeStatusItem(item) }
         btnExpandCollapse = nil
         btnSeparate = nil
+        for (key, value) in zip(positionKeys, savedPositions) where value != nil {
+            defaults.set(value, forKey: key)
+        }
         createStatusItems()
         applyControl(force: true)
     }
