@@ -73,6 +73,8 @@ struct MenuBarContent: View {
 
                 // Controls Card
                 VStack(spacing: 10) {
+                    keepAwakeRow
+                    Divider().overlay(Halo.borderSubtle)
                     menuBarManagerRow
                     Divider().overlay(Halo.borderSubtle)
                     actions
@@ -325,6 +327,55 @@ struct MenuBarContent: View {
                             .frame(width: 56, alignment: .trailing)
                     }
                 }
+            }
+        }
+    }
+
+    // MARK: Keep Awake
+
+    private var keepAwakeRow: some View {
+        let awake = KeepAwakeController.shared
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: awake.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
+                    .font(.system(size: 11))
+                    .foregroundStyle(awake.isActive ? Halo.ion : Halo.textSecondary)
+                Text("Keep Awake")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Halo.textSecondary)
+                Spacer()
+                if awake.isActive {
+                    Menu {
+                        ForEach(KeepAwakeController.durations, id: \.label) { choice in
+                            Button(choice.label) { awake.activate(for: choice.seconds) }
+                        }
+                    } label: {
+                        SwiftUI.TimelineView(.periodic(from: .now, by: 30)) { _ in
+                            Text(awake.remainingText ?? "On")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Halo.ion)
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Change duration")
+                }
+                Toggle("", isOn: Binding(
+                    get: { awake.isActive },
+                    set: { $0 ? awake.activate() : awake.deactivate() }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+            }
+            if awake.isActive {
+                Text("Mac won't sleep\(awake.expiresAt == nil ? " until turned off" : "").")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.textDim)
+            } else if awake.lastActivationFailed {
+                Text("Couldn't create the power assertion — try again.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.amber)
             }
         }
     }
