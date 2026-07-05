@@ -158,6 +158,15 @@ final class StorageModel {
         }
     }
     
+    /// Miller-column drill: truncate to the clicked column, then open `node`
+    /// as the next column. No-op when that column is already open.
+    func openColumn(_ node: StorageNode, fromColumn index: Int) {
+        guard node.isDirectory else { return }
+        if navigationPath.indices.contains(index + 1), navigationPath[index + 1].path == node.path { return }
+        navigationPath = Array(navigationPath.prefix(index + 1))
+        pushDirectory(node)
+    }
+
     func popDirectory() {
         if navigationPath.count > 1 {
             navigationPath.removeLast()
@@ -203,8 +212,7 @@ final class StorageModel {
         let nodeName = node.name
         let nodeSizeBytes = node.sizeBytes
         Task {
-            let report = await Task.detached(priority: .userInitiated) {
-                var rep: String
+            let (report, trashed) = await Task.detached(priority: .userInitiated) {
                 do {
                     var trashedURL: NSURL?
                     try FileManager.default.trashItem(at: URL(fileURLWithPath: nodePath), resultingItemURL: &trashedURL)
@@ -212,19 +220,20 @@ final class StorageModel {
                         let item = TrashedItem(originalPath: nodePath, trashPath: trashPath)
                         await UndoJournal.shared.record(UndoEntry(op: "Storage Map Clean", items: [item], bytesFreed: Int64(nodeSizeBytes)))
                     }
-                    rep = "\(ByteFormat.string(nodeSizeBytes)) moved to Trash"
+                    return ("\(ByteFormat.string(nodeSizeBytes)) moved to Trash", true)
                 } catch {
-                    rep = "Failed to move \(nodeName) to Trash"
+                    return ("Failed to move \(nodeName) to Trash", false)
                 }
-                return rep
             }.value
             self.isCleaning = false
             self.cleanReport = report
-            self.refreshTrashInfo()
-            if let current = self.navigationPath.last {
-                self.navigationPath.removeLast()
-                self.pushDirectory(current)
+            if trashed {
+                // In-place sync: no rescan — remove the node and subtract its
+                // size from every ancestor column so all views agree instantly.
+                self.navigationPath = self.navigationPath.pruning(deletedPath: nodePath, bytes: nodeSizeBytes)
             }
+            self.refreshTrashInfo()
+            self.refreshPurgeable()
         }
     }
 

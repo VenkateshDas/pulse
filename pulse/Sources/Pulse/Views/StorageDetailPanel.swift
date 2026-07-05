@@ -2,12 +2,12 @@ import AppKit
 import PulseKit
 import SwiftUI
 
-/// Detail panel for the treemap cell the user tapped: size, contents, safety
-/// grade, age, owning category, and the actions (Clean → Vault, reveal in
-/// Finder, zoom in). Spec §3.3 "click any cell → detail panel".
+/// Detail panel for the column row the user selected: size, contents, safety
+/// grade, age, owning category, and the actions (move to Trash, reveal in
+/// Finder, open folder).
 struct StorageDetailPanel: View {
     @Environment(StorageModel.self) private var storage
-    let cell: TreemapCell
+    let cell: StorageItemInfo
     let onZoom: (StorageNode) -> Void
 
     var body: some View {
@@ -75,11 +75,11 @@ struct StorageDetailPanel: View {
 
     private var actions: some View {
         VStack(spacing: 8) {
-            if cell.node.isDirectory {
+            if cell.node.isDirectory && !cell.isPseudo {
                 Button {
                     onZoom(cell.node)
                 } label: {
-                    Label("Zoom in", systemImage: "arrow.down.right.and.arrow.up.left")
+                    Label("Open folder", systemImage: "folder")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -95,7 +95,9 @@ struct StorageDetailPanel: View {
             }
             .buttonStyle(.bordered)
             .tint(Halo.textDim)
-            if cell.isProtected {
+            if cell.isPseudo {
+                EmptyView()
+            } else if cell.isProtected {
                 Button {} label: {
                     Label("Protected", systemImage: "lock.fill")
                         .frame(maxWidth: .infinity)

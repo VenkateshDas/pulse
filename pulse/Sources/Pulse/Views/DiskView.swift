@@ -45,7 +45,7 @@ struct DiskView: View {
         HStack {
             SegmentPicker(
                 options: [
-                    (0, "Map"), (1, "Hidden Space"), (2, "Reclaim"),
+                    (0, "Browse"), (1, "Hidden Space"), (2, "Reclaim"),
                     (3, "Trash"), (4, "Optimize"),
                 ],
                 selection: $selectedTab,
