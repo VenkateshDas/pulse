@@ -27,8 +27,7 @@ public final class BrightnessOSD {
 
     private init() {}
 
-    /// `fraction` is 0...1 — same normalization the app's own slider uses
-    /// (including the sub-zero software-dimming range folded in).
+    /// `fraction` is 0...1 — same normalization the app's own slider uses.
     public func show(fraction: Double, on displayID: CGDirectDisplayID) {
         let screen = Self.screen(for: displayID)
         let panel = panelForScreen(screen, displayID: displayID)
@@ -45,10 +44,17 @@ public final class BrightnessOSD {
 
     private func hide() {
         guard let panel else { return }
-        NSAnimationContext.runAnimationGroup { context in
+        NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.25
             panel.animator().alphaValue = 0
-        }
+        }, completionHandler: { [weak self] in
+            // Fully off screen once faded — an invisible shielding-level
+            // panel left ordered-in can swallow the AX click routing the
+            // macOS menu bar uses (see SoftwareDimmer).
+            if self?.panel?.alphaValue == 0 {
+                self?.panel?.orderOut(nil)
+            }
+        })
     }
 
     private static func screen(for displayID: CGDirectDisplayID) -> NSScreen? {
@@ -79,6 +85,8 @@ public final class BrightnessOSD {
             backing: .buffered,
             defer: false
         )
+        // ARC owns this panel; never let close() double-release it.
+        newPanel.isReleasedWhenClosed = false
         newPanel.isOpaque = false
         newPanel.backgroundColor = .clear
         newPanel.hasShadow = true

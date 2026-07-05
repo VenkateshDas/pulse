@@ -1,17 +1,12 @@
 import AppKit
 import PulseKit
+import os.log
 
-/// Hides menu bar items using the NSStatusItem width-inflation trick, with a
-/// SINGLE status item that is both the visible chevron and the inflating
-/// element. When collapsed, the item's width balloons to ~2× the screen,
-/// pushing everything to its LEFT off-screen; the chevron glyph stays pinned
-/// to the item's right edge (right-aligned title) so it remains clickable.
-///
-/// A single item is deliberate: two independent status items proved unable to
-/// stay adjacent — macOS scattered them to opposite ends of the bar (separator
-/// at x=0, chevron at x=3879), so inflating the separator hid nothing. One
-/// item has no position to coordinate, so "everything left of the chevron
-/// hides" always holds.
+/// Hides menu bar items using the NSStatusItem width-inflation trick, with
+/// two status items: a chevron (the click target) and a separator. When
+/// collapsed, the separator's width balloons to ~2× the screen, pushing
+/// everything to its LEFT off-screen; the chevron stays right of it and
+/// remains clickable.
 @MainActor
 final class MenuBarManager {
     static let shared = MenuBarManager()
@@ -21,11 +16,27 @@ final class MenuBarManager {
     private var btnExpandCollapse: NSStatusItem?
     private var btnSeparate: NSStatusItem?
     private var autoHideTimer: Timer?
+    private var heartbeatTimer: Timer?
     private var screenObserver: Any?
     private var wakeObservers: [Any] = []
     private var pendingReconcile: DispatchWorkItem?
+    /// Consecutive reconciles that found the chevron's button window missing.
+    private var deadButtonStrikes = 0
+    /// Rebuilding is a last resort — churning items every few heartbeats on
+    /// a macOS that never reports a button window would itself wedge the bar.
+    private var lastRebuild = Date.distantPast
 
     private var isToggle = false
+
+    /// Ground truth for "collapsed": the separator's ACTUAL length, not our
+    /// cached `state`. The two can drift (macOS relayouts, missed writes) and
+    /// a drifted `state` makes clicks no-op — the "chevron frozen" symptom.
+    private var isActuallyCollapsed: Bool? {
+        btnSeparate.map { $0.length > btnHiddenLength }
+    }
+
+    /// Diagnostic trail: `log show --predicate 'subsystem == "com.pulse.app"' --last 1h`
+    private static let log = Logger(subsystem: "com.pulse.app", category: "MenuBar")
 
     private static let enabledKey = "PulseMenuBarManagementEnabled"
     private static let autoHideKey = "PulseMenuBarAutoHideDelay"
@@ -118,7 +129,17 @@ final class MenuBarManager {
                 self?.isToggle = false
             }
         }
+        syncStateToActual()
         if state.isExpanded { collapse() } else { expand() }
+    }
+
+    /// Re-derives `state` from the separator's real length before acting on
+    /// it. If they drifted apart, every toggle flipped `state` with no visible
+    /// effect — a permanently dead-looking chevron.
+    private func syncStateToActual() {
+        guard let actual = isActuallyCollapsed, actual != state.isCollapsed else { return }
+        Self.log.error("state desync: state=\(self.state.isCollapsed ? "collapsed" : "expanded", privacy: .public) actual=\(actual ? "collapsed" : "expanded", privacy: .public) — resyncing")
+        if actual { state.collapse() } else { state.expand() }
     }
 
     func collapse(userInitiated: Bool = true) {
@@ -134,15 +155,17 @@ final class MenuBarManager {
             }
             return
         }
+        Self.log.info("collapse (userInitiated=\(userInitiated, privacy: .public))")
         state.collapse()
-        applyControl()
+        applyControl(force: true)
         cancelAutoHideTimer()
     }
 
     func expand() {
         guard state.isCollapsed else { return }
+        Self.log.info("expand")
         state.expand()
-        applyControl()
+        applyControl(force: true)
         resetAutoHideTimer()
     }
 
@@ -151,34 +174,7 @@ final class MenuBarManager {
     private func setUp() {
         guard btnExpandCollapse == nil else { return }
 
-        // Expand/Collapse Chevron
-        let expandItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        expandItem.autosaveName = Self.expandCollapseAutosaveName
-        if let button = expandItem.button {
-            button.target = self
-            button.action = #selector(controlClicked(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.font = .systemFont(ofSize: 15, weight: .bold)
-            button.alignment = .right
-        }
-        btnExpandCollapse = expandItem
-
-        // Separator Line
-        let separateItem = NSStatusBar.system.statusItem(withLength: btnHiddenLength)
-        separateItem.autosaveName = Self.separateAutosaveName
-        if let button = separateItem.button {
-            button.title = "|"
-            // Optionally set image if we had ic_line, but title "|" works
-            // Right-click context menu
-            let menu = getContextMenu()
-            separateItem.menu = menu
-        }
-        btnSeparate = separateItem
-
-        // Self-Healing UI: Cmd-dragging a status item off the bar is persisted 
-        // by macOS. Force visibility so the user is never permanently locked out.
-        btnExpandCollapse?.isVisible = true
-        btnSeparate?.isVisible = true
+        createStatusItems()
 
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -197,19 +193,50 @@ final class MenuBarManager {
         let wakeCenter = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.screensDidWakeNotification, NSWorkspace.didWakeNotification] {
             let obs = wakeCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.reconcile() }
+                Task { @MainActor in self?.reconcile(force: true) }
             }
             wakeObservers.append(obs)
         }
 
         // Start expanded so the user can arrange icons before collapsing.
         state.expand()
-        applyControl()
+        applyControl(force: true)
         resetAutoHideTimer()
+        startHeartbeat()
+    }
+
+    private func createStatusItems() {
+        // Expand/Collapse Chevron
+        let expandItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        expandItem.autosaveName = Self.expandCollapseAutosaveName
+        if let button = expandItem.button {
+            button.target = self
+            button.action = #selector(controlClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.font = .systemFont(ofSize: 15, weight: .bold)
+            button.alignment = .right
+        }
+        btnExpandCollapse = expandItem
+
+        // Separator Line
+        let separateItem = NSStatusBar.system.statusItem(withLength: btnHiddenLength)
+        separateItem.autosaveName = Self.separateAutosaveName
+        if let button = separateItem.button {
+            button.title = "|"
+            // Right-click context menu
+            separateItem.menu = getContextMenu()
+        }
+        btnSeparate = separateItem
+
+        // Self-Healing UI: Cmd-dragging a status item off the bar is persisted
+        // by macOS. Force visibility so the user is never permanently locked out.
+        btnExpandCollapse?.isVisible = true
+        btnSeparate?.isVisible = true
     }
 
     private func tearDown() {
         cancelAutoHideTimer()
+        stopHeartbeat()
         if let item = btnExpandCollapse {
             NSStatusBar.system.removeStatusItem(item)
             btnExpandCollapse = nil
@@ -231,9 +258,15 @@ final class MenuBarManager {
 
     // MARK: - Rendering
 
-    private func applyControl() {
+    /// `force` rewrites length/title even when they already read back as the
+    /// target values. User actions and screen/wake events force: the setter's
+    /// relayout side effect is exactly what un-wedges a menu bar whose visual
+    /// state stopped matching what the getter reports. The heartbeat doesn't
+    /// force, so idle polling never churns layout.
+    private func applyControl(force: Bool = false) {
         guard let chevron = btnExpandCollapse, let sep = btnSeparate else { return }
         guard let cBtn = chevron.button else {
+            Self.log.error("applyControl: chevron button is nil — scheduling retry")
             // Button window is transiently nil (App Nap / display sleep /
             // monitor hot-plug). Silently giving up here used to leave
             // `state` and the on-screen chevron permanently desynced — the
@@ -245,18 +278,21 @@ final class MenuBarManager {
         pendingReconcile?.cancel()
         pendingReconcile = nil
 
-        if state.isExpanded {
-            sep.length = btnHiddenLength
-            cBtn.title = Self.expandedGlyph
-            cBtn.toolTip = "Hide the menu bar icons on the left"
-        } else {
-            sep.length = state.collapseWidth
-            cBtn.title = Self.collapsedGlyph
-            cBtn.toolTip = "Show the hidden menu bar icons"
+        let length = state.isExpanded ? btnHiddenLength : state.collapseWidth
+        let glyph = state.isExpanded ? Self.expandedGlyph : Self.collapsedGlyph
+        let tip = state.isExpanded
+            ? "Hide the menu bar icons on the left"
+            : "Show the hidden menu bar icons"
+        if force || sep.length != length {
+            Self.log.info("applyControl: sep.length \(sep.length, privacy: .public) -> \(length, privacy: .public) (force=\(force, privacy: .public))")
+            sep.length = length
         }
+        if force || cBtn.title != glyph { cBtn.title = glyph }
+        if cBtn.toolTip != tip { cBtn.toolTip = tip }
     }
 
     @objc private func controlClicked(_ sender: NSStatusBarButton) {
+        Self.log.info("chevron clicked (state=\(self.state.isCollapsed ? "collapsed" : "expanded", privacy: .public) actual=\(self.isActuallyCollapsed.map { $0 ? "collapsed" : "expanded" } ?? "unknown", privacy: .public))")
         guard let event = NSApp.currentEvent else { toggle(); return }
         if event.type == .rightMouseUp {
             showContextMenuFromChevron()
@@ -412,26 +448,113 @@ final class MenuBarManager {
     // MARK: - Screen Changes
 
     private func handleScreenChange() {
+        Self.log.info("screen change")
         updateScreenWidth()
-        reconcile()
+        reconcile(force: true)
     }
 
     /// Re-asserts visibility and re-applies `state` to the actual status
     /// items. Called after events known to transiently break the chevron —
-    /// display/monitor reconfiguration and screen wake — so a stale visual
-    /// (or a system-demoted, overflow-hidden item) doesn't strand the user.
-    private func reconcile() {
+    /// display/monitor reconfiguration and screen wake — and every few
+    /// seconds by the heartbeat, so a stale visual (or a system-demoted,
+    /// overflow-hidden item) doesn't strand the user.
+    private func reconcile(force: Bool = false) {
+        guard let chevron = btnExpandCollapse else { return }
+        if chevron.isVisible == false { chevron.isVisible = true }
+        if let sep = btnSeparate, sep.isVisible == false { sep.isVisible = true }
+
+        // A button whose backing window stays gone is a dead status item —
+        // clicks land nowhere and no amount of re-applying state revives it.
+        // Three consecutive strikes (heartbeat-spaced, so screens had time to
+        // wake) → rebuild both items from scratch. autosaveName preserves
+        // their menu bar positions.
+        if chevron.button?.window == nil {
+            // Don't count strikes while the display itself is asleep — the
+            // window is legitimately gone then, and rebuilding in that state
+            // would churn items every heartbeat for the whole nap.
+            if CGDisplayIsAsleep(CGMainDisplayID()) == 0 {
+                deadButtonStrikes += 1
+                Self.log.error("reconcile: chevron button window nil (strike \(self.deadButtonStrikes, privacy: .public))")
+            }
+            // Throttled hard: if a rebuild didn't bring the window back,
+            // rebuilding again every few heartbeats just churns the bar.
+            if deadButtonStrikes >= 3, Date().timeIntervalSince(lastRebuild) > 120 {
+                deadButtonStrikes = 0
+                rebuildStatusItems()
+                return
+            }
+        } else {
+            deadButtonStrikes = 0
+        }
+
+        applyControl(force: force)
+    }
+
+    /// NSApp.setActivationPolicy re-registers the app with the window
+    /// server; on the Control-Center-composited menu bar this leaves the
+    /// existing status items visible but click-dead (reproducible: open the
+    /// Command Center window, Cmd-Q it → chevron frozen). Rebuild shortly
+    /// after every actual policy flip — the delay lets AppKit finish the
+    /// transition before the items re-register.
+    func handleActivationPolicyChange() {
         guard btnExpandCollapse != nil else { return }
-        btnExpandCollapse?.isVisible = true
-        btnSeparate?.isVisible = true
-        applyControl()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.btnExpandCollapse != nil else { return }
+            Self.log.info("activation policy changed — rebuilding status items")
+            self.rebuildStatusItems()
+        }
+    }
+
+    /// Tears down and recreates the two status items, preserving `state`.
+    private func rebuildStatusItems() {
+        Self.log.error("rebuilding status items")
+        lastRebuild = Date()
+        // removeStatusItem also deletes the item's "NSStatusItem Preferred
+        // Position <autosaveName>" default — the recreated items would land
+        // at the system default position (far left of the bar), losing the
+        // user's arrangement on every rebuild. Capture the positions before
+        // removal and write them back before recreation; setting autosaveName
+        // in createStatusItems then re-reads them.
+        let defaults = UserDefaults.standard
+        let positionKeys = [Self.expandCollapseAutosaveName, Self.separateAutosaveName]
+            .map { "NSStatusItem Preferred Position \($0)" }
+        let savedPositions = positionKeys.map { defaults.object(forKey: $0) }
+        if let item = btnExpandCollapse { NSStatusBar.system.removeStatusItem(item) }
+        if let item = btnSeparate { NSStatusBar.system.removeStatusItem(item) }
+        btnExpandCollapse = nil
+        btnSeparate = nil
+        for (key, value) in zip(positionKeys, savedPositions) where value != nil {
+            defaults.set(value, forKey: key)
+        }
+        createStatusItems()
+        applyControl(force: true)
+    }
+
+    // MARK: - Heartbeat
+
+    /// Periodic self-heal. Wake/screen-change notifications miss some of the
+    /// ways macOS breaks status items (App Nap, spaces, overflow demotion) —
+    /// the reported symptom was a chevron that randomly stops responding.
+    /// The reconcile is cheap and write-only-on-change, so polling is safe.
+    private func startHeartbeat() {
+        stopHeartbeat()
+        let timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            Task { @MainActor in MenuBarManager.shared.reconcile() }
+        }
+        timer.tolerance = 2
+        heartbeatTimer = timer
+    }
+
+    private func stopHeartbeat() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
     }
 
     private func scheduleReconcile() {
         guard pendingReconcile == nil else { return }
         let work = DispatchWorkItem { [weak self] in
             self?.pendingReconcile = nil
-            self?.reconcile()
+            self?.reconcile(force: true)
         }
         pendingReconcile = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)

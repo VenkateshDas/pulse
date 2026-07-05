@@ -49,6 +49,20 @@ public class SoftwareDimmer: @unchecked Sendable {
     
     @MainActor
     private func applyOverlayDimming(for displayID: CGDirectDisplayID, brightness: Double) {
+        let alpha = CGFloat(1.0 - brightness) * 0.85
+
+        // Fully un-dimmed → the overlay must be OFF screen, not merely
+        // transparent. A parked invisible window at shielding level sits
+        // above the menu bar, and macOS's Control-Center-composited menu bar
+        // routes status item clicks via an accessibility hit-test into the
+        // app — which resolved to this overlay instead of the chevron,
+        // making every Pulse menu bar item click-dead after the first
+        // brightness change ("frozen chevron").
+        if alpha <= 0.001 {
+            overlayWindows[displayID]?.orderOut(nil)
+            return
+        }
+
         var window: NSWindow
         if let existing = self.overlayWindows[displayID] {
             window = existing
@@ -67,6 +81,11 @@ public class SoftwareDimmer: @unchecked Sendable {
                 defer: false
             )
             
+            // ARC owns this window via `overlayWindows`. The AppKit default
+            // (isReleasedWhenClosed = true) makes close() ALSO release it —
+            // pruneStaleOverlays' close() then over-released and crashed the
+            // app the moment an external display was unplugged.
+            window.isReleasedWhenClosed = false
             window.backgroundColor = .clear
             window.isOpaque = false
             window.hasShadow = false
@@ -80,8 +99,7 @@ public class SoftwareDimmer: @unchecked Sendable {
             view.alphaValue = 0.0
             
             window.contentView = view
-            window.orderFront(nil)
-            
+
             self.overlayWindows[displayID] = window
         }
         
@@ -90,8 +108,11 @@ public class SoftwareDimmer: @unchecked Sendable {
         }) {
             window.setFrame(screen.frame, display: true)
         }
-        
-        let alpha = CGFloat(1.0 - brightness) * 0.85
+
+        // Re-order front on every apply: the window is ordered out whenever
+        // dimming drops to zero.
+        window.orderFront(nil)
+
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.15
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
