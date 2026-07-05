@@ -52,6 +52,7 @@ enum {
     kPulseSMCGetKeyInfo = 9,
 };
 
+#include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include "DDC.h"
 
@@ -62,5 +63,12 @@ extern int DisplayServicesCanChangeBrightness(CGDirectDisplayID display) __attri
 extern int DisplayServicesGetBrightness(CGDirectDisplayID display, float *brightness) __attribute__((weak_import));
 extern int DisplayServicesSetBrightness(CGDirectDisplayID display, float brightness) __attribute__((weak_import));
 extern int DisplayServicesSetLinearBrightness(CGDirectDisplayID display, float brightness) __attribute__((weak_import));
+
+/* Fires whenever the display's brightness changes from ANY source (media
+   keys handled by macOS, Control Center, auto-brightness, ramp animation).
+   userInfo carries {"value": double 0...1}. The observer argument is round-
+   tripped verbatim — pass the display ID so the callback knows the source. */
+extern int DisplayServicesRegisterForBrightnessChangeNotifications(CGDirectDisplayID display, CGDirectDisplayID observer, CFNotificationCallback callback) __attribute__((weak_import));
+extern int DisplayServicesUnregisterForBrightnessChangeNotifications(CGDirectDisplayID display, CGDirectDisplayID observer) __attribute__((weak_import));
 
 #endif /* CPULSE_H */

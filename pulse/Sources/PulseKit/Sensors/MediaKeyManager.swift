@@ -153,10 +153,10 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
         guard let monitor = engine.monitors.first(where: { $0.id == displayID }) else { return }
 
         if monitor.isBuiltIn {
-            // macOS already adjusted hardware — read back & sync map.
-            let hw = engine.getBrightness(for: monitor)
-            engine.brightnessMap[monitor.id] = hw
-            engine.saveBrightnessMap()
+            // macOS already adjusted hardware. Reading it back here landed
+            // mid-ramp and stored a stale intermediate value — the
+            // DisplayServices brightness-change notification in
+            // BrightnessEngine now syncs the map with the settled value.
         } else {
             let delta = isUp ? kBrightnessStep : -kBrightnessStep
             engine.adjustBrightness(for: monitor, delta: delta)
