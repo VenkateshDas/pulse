@@ -261,7 +261,10 @@ public struct StorageScanner: Sendable {
         return StorageNode(id: path, name: name, path: path, sizeBytes: totalBytes, isDirectory: true, children: childNodes)
     }
     
-    private func fastDirectorySize(_ pathPtr: UnsafePointer<CChar>) -> (UInt64, Int) {
+    func fastDirectorySize(_ pathPtr: UnsafePointer<CChar>) -> (UInt64, Int) {
+        // Without this guard, sizing /System descends the /System/Volumes/Data
+        // firmlink and counts the entire data volume under "System".
+        if Self.prunedPaths.contains(String(cString: pathPtr)) { return (0, 0) }
         guard let dir = opendir(pathPtr) else { return (0, 0) }
         var totalSize: UInt64 = 0
         var totalCount: Int = 0
