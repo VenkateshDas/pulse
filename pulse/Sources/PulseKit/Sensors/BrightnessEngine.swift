@@ -149,10 +149,19 @@ public class BrightnessEngine: ObservableObject {
 
         if DisplayServicesCanChangeBrightness(monitor.id) != 0 {
             _ = DisplayServicesSetBrightness(monitor.id, Float(clampedValue))
-            _ = DisplayServicesSetLinearBrightness(monitor.id, Float(clampedValue))
-        } else {
+            // User scale and linear scale are different curves — writing the
+            // same number to both corrupts brightness (0.78 user + 0.78
+            // linear lands at 0.91 user; measured). They only agree at 1.0,
+            // which is the single case Lunar writes linear too.
+            if clampedValue == 1.0 {
+                _ = DisplayServicesSetLinearBrightness(monitor.id, Float(clampedValue))
+            }
+        } else if monitor.isBuiltIn {
             CoreDisplay_Display_SetUserBrightness(monitor.id, clampedValue)
         }
+        // Non-DisplayServices externals are DDC-only below — CoreDisplay user
+        // brightness on them is gamma dimming that would stack on top of the
+        // DDC backlight change and double-dim the panel.
 
         brightnessMap[monitor.id] = clampedValue
         lastAppSet[monitor.id] = Date()
