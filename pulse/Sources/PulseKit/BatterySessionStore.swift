@@ -74,12 +74,14 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
     }
 
     /// Apps as fractions of total CPU-time weight (0–1), highest first.
+    /// Capped to top-N + "Other" even while live — a live session's raw app
+    /// list is unbounded, and rendering ~100 bar segments per session froze
+    /// the Health page in a 35s layout pass.
     public var shares: [(app: AppEnergyShare, fraction: Double)] {
-        let total = apps.reduce(0) { $0 + $1.cpuTimeSeconds }
+        let capped = BatterySessionStore.capApps(apps)
+        let total = capped.reduce(0) { $0 + $1.cpuTimeSeconds }
         guard total > 0 else { return [] }
-        return apps
-            .map { ($0, $0.cpuTimeSeconds / total) }
-            .sorted { $0.1 > $1.1 }
+        return capped.map { ($0, $0.cpuTimeSeconds / total) }
     }
 }
 
