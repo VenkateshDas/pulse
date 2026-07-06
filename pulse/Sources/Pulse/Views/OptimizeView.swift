@@ -36,12 +36,17 @@ struct OptimizeView: View {
                     .foregroundStyle(Halo.pulseGreen)
             }
             Button {
-                Task { await model.runAllSafe() }
+                Task { await model.runAll() }
             } label: {
-                Label("Run safe tasks", systemImage: "sparkles")
+                if model.isAnyRunning {
+                    Label("Optimizing…", systemImage: "hourglass")
+                } else {
+                    Label("Optimize now", systemImage: "sparkles")
+                }
             }
             .buttonStyle(.borderedProminent)
             .tint(Halo.pulseGreen)
+            .disabled(model.isAnyRunning)
         }
     }
 
@@ -49,7 +54,7 @@ struct OptimizeView: View {
     private var adminBanner: some View {
         HStack(spacing: 10) {
             Image(systemName: "lock.shield.fill").foregroundStyle(Halo.volt)
-            Text("Tasks marked ADMIN run as root — macOS asks for your password when you run one.")
+            Text("Tasks marked ADMIN run as root — macOS asks for your password for each one.")
                 .font(.system(size: 11))
                 .foregroundStyle(Halo.textDim)
             Spacer()
@@ -115,27 +120,19 @@ struct OptimizeView: View {
         }
     }
 
+    /// Status only — tasks run in bulk from the header's Optimize now button.
     @ViewBuilder
     private func actionControl(_ task: OptimizeTask, _ s: OptimizeModel.TaskState) -> some View {
         if s.isRunning {
             ProgressView().controlSize(.small)
-        } else if s.skipReason != nil {
+        } else if s.skipReason != nil || s.result?.success == true {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 14))
                 .foregroundStyle(Halo.pulseGreen)
-        } else {
-            Button {
-                Task { await model.run(task) }
-            } label: {
-                if task.needsSudo {
-                    Label("Run", systemImage: "lock.fill")
-                } else {
-                    Text("Run")
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(task.needsSudo ? Halo.volt : nil)
+        } else if s.result?.success == false {
+            Image(systemName: "exclamationmark.circle")
+                .font(.system(size: 14))
+                .foregroundStyle(Halo.flare)
         }
     }
 
