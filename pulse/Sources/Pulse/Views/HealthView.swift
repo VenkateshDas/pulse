@@ -206,10 +206,15 @@ private struct BatteryCard: View {
             fact("CONDITION", battery.condition,
                  battery.condition == "Normal" ? Halo.pulseGreen : Halo.amber)
 
+            // |InstantAmperage| × Voltage measures battery current in either
+            // direction — while charging it's power INTO the battery, not the
+            // machine's consumption, so label it as such.
+            let powerLabel = battery.isCharging ? "CHARGING AT" : "POWER DRAW"
             if let watts = battery.powerWatts {
-                fact("POWER DRAW", String(format: "%.1f W", watts), Halo.ion)
+                fact(powerLabel, String(format: "%.1f W", watts),
+                     battery.isCharging ? Halo.pulseGreen : Halo.ion)
             } else {
-                fact("POWER DRAW", "—", Halo.textDim)
+                fact(powerLabel, "—", Halo.textDim)
             }
             let left = battery.cyclesRemaining
             fact("CYCLES LEFT", "\(left)",
