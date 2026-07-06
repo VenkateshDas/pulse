@@ -810,7 +810,9 @@ private struct BatterySessionsCard: View {
     private func shareBar(_ shares: [(app: AppEnergyShare, fraction: Double)]) -> some View {
         GeometryReader { geo in
             HStack(spacing: 1) {
-                ForEach(Array(shares.enumerated()), id: \.element.app.id) { index, entry in
+                // Index-keyed: app.id is the name, and a duplicate name must
+                // never corrupt the layout.
+                ForEach(Array(shares.enumerated()), id: \.offset) { index, entry in
                     Rectangle()
                         .fill(color(for: entry.app.name, index: index))
                         .frame(width: max(geo.size.width * entry.fraction - 1, 0))
@@ -828,7 +830,7 @@ private struct BatterySessionsCard: View {
         let cols = [GridItem(.flexible(), alignment: .leading),
                     GridItem(.flexible(), alignment: .leading)]
         LazyVGrid(columns: cols, alignment: .leading, spacing: 4) {
-            ForEach(Array(shares.enumerated()), id: \.element.app.id) { index, entry in
+            ForEach(Array(shares.enumerated()), id: \.offset) { index, entry in
                 HStack(spacing: 6) {
                     Circle()
                         .fill(color(for: entry.app.name, index: index))
