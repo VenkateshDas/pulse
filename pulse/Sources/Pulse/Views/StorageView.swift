@@ -13,6 +13,7 @@ struct StorageView: View {
     @Environment(StorageModel.self) private var storage
 
     @State private var selectedID: String?
+    @State private var hoveredRowID: String?
     /// Quick Look target (spacebar on a selected row, like Finder).
     @State private var previewURL: URL?
     @State private var keyMonitor: Any?
@@ -205,6 +206,22 @@ struct StorageView: View {
                     }
                     .frame(height: 3)
                 }
+                // Hover-revealed trash, Finder-quiet: always laid out (no row
+                // jump), visible only on hover, and only for deletable rows.
+                if !info.isPseudo && !info.isProtected && info.grade != .review {
+                    Button {
+                        storage.cleanNode(node)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10))
+                            .foregroundStyle(hoveredRowID == node.id ? Halo.flare : Halo.textDim)
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(hoveredRowID == node.id ? 1 : 0)
+                    .disabled(storage.isCleaning)
+                    .help("Move to Trash")
+                    .accessibilityLabel("Move \(node.name) to Trash")
+                }
                 if node.isDirectory && !info.isPseudo {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .bold))
@@ -220,6 +237,7 @@ struct StorageView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 6)
+        .onHover { hoveredRowID = $0 ? node.id : (hoveredRowID == node.id ? nil : hoveredRowID) }
         .contextMenu {
             if !info.isPseudo {
                 Button("Reveal in Finder") {
