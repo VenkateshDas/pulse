@@ -23,6 +23,7 @@ struct RootView: View {
                 switch selection {
                 case .storage: DiskView()
                 case .timeline: TimelineView()
+                case .optimize: OptimizeView()
                 case .uninstall: UninstallView()
                 case .monitor: MonitorView()
                 case .displays: DisplaysView()
@@ -64,7 +65,7 @@ struct RootView: View {
             PermissionsGate.markPrompted()
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
-            storage.pendingDiskTab = 2
+            storage.pendingDiskTab = 1
             selection = .storage
         }
         .onReceive(NotificationCenter.default.publisher(for: DashboardView.navigateToMonitor)) { note in
@@ -74,8 +75,7 @@ struct RootView: View {
             selection = .monitor
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToOptimize)) { _ in
-            storage.pendingDiskTab = 4
-            selection = .storage
+            selection = .optimize
         }
         .onReceive(
             NotificationCenter.default.publisher(

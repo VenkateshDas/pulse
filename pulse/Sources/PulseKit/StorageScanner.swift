@@ -21,6 +21,38 @@ public struct StorageNode: Identifiable, Sendable, Equatable {
     }
 }
 
+/// True when `parent` is a strict path ancestor of `child`.
+private func isPathAncestor(_ parent: String, of child: String) -> Bool {
+    parent == "/" ? child != "/" : child.hasPrefix(parent + "/")
+}
+
+extension [StorageNode] {
+    /// Column model after deleting `deletedPath`: drops columns at/below the
+    /// deleted node, removes it from its parent's children, and subtracts its
+    /// size from every ancestor column and ancestor child entry — so the UI
+    /// reflects a deletion instantly, without any rescan.
+    public func pruning(deletedPath: String, bytes: UInt64) -> [StorageNode] {
+        var columns = self
+        if let idx = columns.firstIndex(where: { $0.path == deletedPath || isPathAncestor(deletedPath, of: $0.path) }) {
+            columns = Array(columns.prefix(idx))
+        }
+        return columns.map { col in
+            guard isPathAncestor(col.path, of: deletedPath) else { return col }
+            let newChildren = col.children.map { kids in
+                kids.compactMap { child -> StorageNode? in
+                    if child.id == deletedPath { return nil }
+                    // Pseudo entries ("Other Files") share the column's path; leave them.
+                    guard child.path != col.path, isPathAncestor(child.path, of: deletedPath) else { return child }
+                    let shrunk = child.sizeBytes >= bytes ? child.sizeBytes - bytes : 0
+                    return StorageNode(id: child.id, name: child.name, path: child.path, sizeBytes: shrunk, isDirectory: child.isDirectory, fileCount: child.fileCount, children: child.children)
+                }
+            }
+            let shrunk = col.sizeBytes >= bytes ? col.sizeBytes - bytes : 0
+            return StorageNode(id: col.id, name: col.name, path: col.path, sizeBytes: shrunk, isDirectory: col.isDirectory, fileCount: col.fileCount, children: newChildren)
+        }
+    }
+}
+
 public struct StorageScanner: Sendable {
     public let rootURL: URL
     

@@ -158,30 +158,18 @@ final class StorageModel {
         }
     }
     
+    /// Miller-column drill: truncate to the clicked column, then open `node`
+    /// as the next column. No-op when that column is already open.
+    func openColumn(_ node: StorageNode, fromColumn index: Int) {
+        guard node.isDirectory else { return }
+        if navigationPath.indices.contains(index + 1), navigationPath[index + 1].path == node.path { return }
+        navigationPath = Array(navigationPath.prefix(index + 1))
+        pushDirectory(node)
+    }
+
     func popDirectory() {
         if navigationPath.count > 1 {
             navigationPath.removeLast()
-        }
-    }
-
-    func navigateToPath(_ path: String, name: String) {
-        scanState = .scanning
-        
-        let node = StorageScanner(rootURL: URL(fileURLWithPath: path)).shallowScan(path: path)
-        let anchor = StorageNode(
-            id: node.id, name: name, path: node.path,
-            sizeBytes: node.sizeBytes, isDirectory: true, children: node.children)
-        self.navigationPath = [anchor]
-        
-        isStreamingSizes = true
-        Task {
-            for await updatedNode in StorageScanner().scanSizesStream(node: anchor) {
-                if self.navigationPath.first?.id == updatedNode.id {
-                    self.navigationPath[0] = updatedNode
-                }
-            }
-            self.isStreamingSizes = false
-            self.scanState = .done(Date())
         }
     }
 
@@ -203,8 +191,7 @@ final class StorageModel {
         let nodeName = node.name
         let nodeSizeBytes = node.sizeBytes
         Task {
-            let report = await Task.detached(priority: .userInitiated) {
-                var rep: String
+            let (report, trashed) = await Task.detached(priority: .userInitiated) {
                 do {
                     var trashedURL: NSURL?
                     try FileManager.default.trashItem(at: URL(fileURLWithPath: nodePath), resultingItemURL: &trashedURL)
@@ -212,19 +199,21 @@ final class StorageModel {
                         let item = TrashedItem(originalPath: nodePath, trashPath: trashPath)
                         await UndoJournal.shared.record(UndoEntry(op: "Storage Map Clean", items: [item], bytesFreed: Int64(nodeSizeBytes)))
                     }
-                    rep = "\(ByteFormat.string(nodeSizeBytes)) moved to Trash"
+                    return ("\(ByteFormat.string(nodeSizeBytes)) moved to Trash", true)
                 } catch {
-                    rep = "Failed to move \(nodeName) to Trash"
+                    return ("Failed to move \(nodeName) to Trash", false)
                 }
-                return rep
             }.value
             self.isCleaning = false
             self.cleanReport = report
-            self.refreshTrashInfo()
-            if let current = self.navigationPath.last {
-                self.navigationPath.removeLast()
-                self.pushDirectory(current)
+            if trashed {
+                TrashSound.moveToTrash()
+                // In-place sync: no rescan — remove the node and subtract its
+                // size from every ancestor column so all views agree instantly.
+                self.navigationPath = self.navigationPath.pruning(deletedPath: nodePath, bytes: nodeSizeBytes)
             }
+            self.refreshTrashInfo()
+            self.refreshPurgeable()
         }
     }
 
@@ -261,10 +250,11 @@ final class StorageModel {
                 } else {
                     rep = "Failed to move items to Trash"
                 }
-                return rep
+                return (rep, count)
             }.value
             self.isCleaning = false
-            self.cleanReport = report
+            self.cleanReport = report.0
+            if report.1 > 0 { TrashSound.moveToTrash() }
             self.selection.removeAll()
             self.refreshTrashInfo()
             self.refreshPurgeable()
@@ -285,7 +275,7 @@ final class StorageModel {
                     .appendingPathComponent(".Trash")
                 guard let entries = try? FileManager.default.contentsOfDirectory(
                     at: trash, includingPropertiesForKeys: nil, options: [])
-                else { return "Failed to empty Trash" }
+                else { return ("Failed to empty Trash", 0) }
                 var count = 0
                 for url in entries {
                     do {
@@ -293,10 +283,11 @@ final class StorageModel {
                         count += 1
                     } catch {}
                 }
-                return count > 0 ? "Emptied \(count) items from Trash" : "Failed to empty Trash"
+                return (count > 0 ? "Emptied \(count) items from Trash" : "Failed to empty Trash", count)
             }.value
             self.isCleaning = false
-            self.cleanReport = report
+            self.cleanReport = report.0
+            if report.1 > 0 { TrashSound.emptyTrash() }
             self.refreshTrashInfo()
             self.refreshPurgeable()
         }
@@ -304,6 +295,9 @@ final class StorageModel {
 
     func refreshUndoHistory() {
         Task {
+            // Trash may have been emptied (here or in Finder) — drop history
+            // items that can no longer be restored before showing the list.
+            await UndoJournal.shared.pruneMissing()
             self.undoEntries = await UndoJournal.shared.entries
         }
     }

@@ -66,13 +66,16 @@ final class OptimizeModel {
         s.result = result
         states[task.id] = s
         if result.success { totalBytesFreed += result.bytesFreed }
+        if result.trashed { TrashSound.moveToTrash() }
         await refresh(task)
     }
 
-    /// Runs every safe, non-skipped, in-process task in sequence.
-    func runAllSafe() async {
-        for task in tasks
-        where task.risk == .safe && !task.needsSudo && state(for: task.id).skipReason == nil {
+    var isAnyRunning: Bool { states.values.contains { $0.isRunning } }
+
+    /// Runs every non-skipped task in sequence — admin ones included, each
+    /// raising its own macOS password prompt via PrivilegedRunner.
+    func runAll() async {
+        for task in tasks where state(for: task.id).skipReason == nil {
             await run(task)
         }
     }

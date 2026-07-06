@@ -114,6 +114,24 @@ public actor UndoJournal {
         return restored
     }
 
+    /// Drops items whose trashed copy no longer exists (Trash emptied in
+    /// Finder or Pulse), so history never shows a Restore that can't work.
+    /// Entries left with no restorable items disappear entirely.
+    public func pruneMissing() {
+        let fm = FileManager.default
+        var changed = false
+        entries = entries.compactMap { entry in
+            let alive = entry.items.filter { fm.fileExists(atPath: $0.trashPath) }
+            if alive.count == entry.items.count { return entry }
+            changed = true
+            guard !alive.isEmpty else { return nil }
+            return UndoEntry(
+                id: entry.id, op: entry.op, date: entry.date,
+                items: alive, bytesFreed: entry.bytesFreed)
+        }
+        if changed { save() }
+    }
+
     public func prune(olderThan days: Int = 30) {
         let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
         entries.removeAll { $0.date < cutoff }

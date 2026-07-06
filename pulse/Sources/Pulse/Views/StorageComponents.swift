@@ -1,6 +1,20 @@
 import SwiftUI
 import PulseKit
 
+/// A folder/file node enriched with the smart-scan grade, idle age, and
+/// owning category when known. Feeds the column rows and the detail panel.
+struct StorageItemInfo: Identifiable, Equatable {
+    let node: StorageNode
+    let grade: SafetyGrade
+    let idleDays: Int?
+    let category: String
+    var isProtected: Bool { StorageScanner.isProtected(node.path) }
+    /// Synthetic rows ("Other Files") aggregate loose files; they carry the
+    /// parent directory's path, so acting on that path would hit the parent.
+    var isPseudo: Bool { node.id != node.path }
+    var id: String { node.id }
+}
+
 struct GradePill: View {
     let grade: SafetyGrade
 

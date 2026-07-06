@@ -73,6 +73,7 @@ final class CleanModel {
         report = nil
         Task {
             let result = await scheduler.runNow(autoMode: false)
+            if result.itemsCleaned > 0 { TrashSound.moveToTrash() }
             self.finish(itemsCleaned: result.itemsCleaned, bytesFreed: result.bytesFreed, notify: false)
         }
     }

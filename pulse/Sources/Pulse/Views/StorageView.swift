@@ -1,92 +1,62 @@
 import AppKit
 import PulseKit
+import QuickLook
 import SwiftUI
 
-/// Storage Map (spec §3.3): a squarified treemap of any volume/folder with
-/// Safety / Age / Owner lenses, APFS-correct purgeable explanation, and a
-/// click-to-detail panel. Replaces the old file-browser; the SmartScanner
-/// grades enrich each cell so the Safety lens is actionable, not just pretty.
+/// Storage browser: Finder-style Miller columns over any volume/folder.
+/// Every row shows its size and a bar relative to the largest sibling, so
+/// the heavy folders jump out at every level. Click a folder to open the
+/// next column; select a file (or right-click anything) for details and
+/// a safe move-to-Trash. Deletions sync in place — no rescan.
 struct StorageView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(StorageModel.self) private var storage
 
-    @State private var lens: StorageLens = .safety
     @State private var selectedID: String?
+    @State private var hoveredRowID: String?
+    /// Quick Look target (spacebar on a selected row, like Finder).
+    @State private var previewURL: URL?
+    @State private var keyMonitor: Any?
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-                .frame(width: 220)
-                .background { GlassLayer(tint: Halo.surface1.opacity(0.6)) }
-            Rectangle().fill(Halo.surface2).frame(width: 1)
-
-            VStack(spacing: 0) {
-                topBar
-                Rectangle().fill(Halo.surface2).frame(height: 1)
-                HStack(spacing: 0) {
-                    mapArea
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if selectedID != nil {
-                        Rectangle().fill(Halo.surface2).frame(width: 1)
-                        detailArea
-                            .frame(width: 280)
-                    }
+        VStack(spacing: 0) {
+            topBar
+            Rectangle().fill(Halo.surface2).frame(height: 1)
+            HStack(spacing: 0) {
+                columnsArea
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if selectedItem != nil {
+                    Rectangle().fill(Halo.surface2).frame(width: 1)
+                    detailArea
+                        .frame(width: 280)
                 }
-                Rectangle().fill(Halo.surface2).frame(height: 1)
-                bottomBar
             }
-            .background(Halo.void)
+            Rectangle().fill(Halo.surface2).frame(height: 1)
+            bottomBar
         }
+        .background(Halo.void)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { storage.appeared() }
+        .quickLookPreview($previewURL)
+        .onAppear {
+            storage.appeared()
+            startKeyMonitor()
+        }
+        .onDisappear {
+            if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+            keyMonitor = nil
+        }
     }
 
-    // MARK: Sidebar — real volumes + favorite folders (AR-3)
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("VOLUMES")
-                .font(.system(size: 10, weight: .bold)).tracking(1.5)
-                .foregroundStyle(Halo.textDim)
-            ForEach(Self.mountedVolumes(), id: \.path) { vol in
-                sidebarRow(icon: "internaldrive", title: vol.name, subtitle: vol.capacity) {
-                    storage.navigateToPath(vol.path, name: vol.name)
-                    selectedID = nil
-                }
-            }
-
-            Text("FAVORITE FOLDERS")
-                .font(.system(size: 10, weight: .bold)).tracking(1.5)
-                .foregroundStyle(Halo.textDim).padding(.top, 8)
-            ForEach(Self.favoriteFolders(), id: \.path) { fav in
-                sidebarRow(icon: fav.icon, title: fav.name, subtitle: nil) {
-                    storage.navigateToPath(fav.path, name: fav.name)
-                    selectedID = nil
-                }
-            }
-            Spacer()
+    /// Spacebar toggles Quick Look for the selected row, like Finder.
+    private func startKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.keyCode == 49, event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+                let item = selectedItem, !item.isPseudo
+            else { return event }
+            previewURL = previewURL == nil ? URL(fileURLWithPath: item.node.path) : nil
+            return nil
         }
-        .padding(16)
-    }
-
-    private func sidebarRow(icon: String, title: String, subtitle: String?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: icon).frame(width: 20).foregroundStyle(Halo.ion)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Halo.textPrimary).lineLimit(1)
-                    if let subtitle {
-                        Text(subtitle).font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(Halo.textDim)
-                    }
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: Top bar — breadcrumb + lens switcher
@@ -127,96 +97,200 @@ struct StorageView: View {
                 }
             }
             Spacer()
-            lensSwitcher
         }
         .padding(.horizontal, 16)
         .frame(height: 50)
         .background(Halo.surface1)
     }
 
-    private var lensSwitcher: some View {
-        SegmentPicker(
-            options: StorageLens.allCases.map { ($0, $0.rawValue) },
-            selection: $lens,
-            help: { "\($0.rawValue) lens" })
-    }
+    // MARK: Columns
 
-    // MARK: Map
-
-    private var mapArea: some View {
+    private var columnsArea: some View {
         ZStack {
-            if storage.scanState == .scanning && currentChildren.isEmpty {
+            if storage.scanState == .scanning && storage.navigationPath.first?.children?.isEmpty != false {
                 VStack(spacing: 10) {
                     ProgressView()
                     Text("Scanning \(storage.navigationPath.last?.name ?? "disk")…")
                         .font(.system(size: 12)).foregroundStyle(Halo.textDim)
                 }
-            } else if currentCells.isEmpty {
+            } else if storage.navigationPath.isEmpty {
                 EmptyState(
                     icon: "folder.badge.questionmark",
-                    title: "Nothing to map",
+                    title: "Nothing to browse",
                     hint: "Folder is empty or restricted.")
             } else {
-                TreemapView(cells: currentCells, lens: lens, selectedID: $selectedID) { node in
-                    storage.pushDirectory(node)
-                    selectedID = nil
-                }
-                .padding(10)
-            }
-            legend
-        }
-    }
-
-    private var legend: some View {
-        VStack {
-            Spacer()
-            HStack(spacing: 14) {
-                ForEach(legendItems, id: \.0) { item in
-                    HStack(spacing: 5) {
-                        RoundedRectangle(cornerRadius: 2).fill(item.1).frame(width: 10, height: 10)
-                        Text(item.0).font(.system(size: 9, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        HStack(spacing: 0) {
+                            ForEach(Array(storage.navigationPath.enumerated()), id: \.element.id) { index, column in
+                                columnView(index: index, column: column)
+                                    .frame(width: 260)
+                                    .id(column.id)
+                                Rectangle().fill(Halo.surface2).frame(width: 1)
+                            }
+                        }
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    }
+                    .onChange(of: storage.navigationPath.count) {
+                        if let last = storage.navigationPath.last {
+                            withAnimation(Halo.Motion.snappy) { proxy.scrollTo(last.id, anchor: .trailing) }
+                        }
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Halo.surface1, in: Capsule())
-            .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
-            .padding(10)
         }
     }
 
-    private var legendItems: [(String, Color)] {
-        switch lens {
-        case .safety:
-            return [("Safe", Halo.pulseGreen), ("Careful", Halo.amber), ("Review", Halo.flare), ("Protected", Halo.textDim)]
-        case .age:
-            return [("<30d", Halo.pulseGreen), ("30–180d", Halo.amber), (">180d", Halo.flare), ("unknown", Halo.textDim)]
-        case .owner:
-            var categories = [String]()
-            for cell in currentCells {
-                if !categories.contains(cell.category) {
-                    categories.append(cell.category)
+    private func columnView(index: Int, column: StorageNode) -> some View {
+        let children = column.children ?? []
+        let maxBytes = children.first?.sizeBytes ?? 0
+        let openChildPath = index + 1 < storage.navigationPath.count
+            ? storage.navigationPath[index + 1].path : nil
+        let scanItems = storage.scanItemsByPath
+        return ScrollView(.vertical) {
+            LazyVStack(spacing: 1) {
+                if children.isEmpty {
+                    Text("Empty or restricted")
+                        .font(.system(size: 11)).foregroundStyle(Halo.textDim)
+                        .padding(.top, 24)
+                } else {
+                    ForEach(children) { child in
+                        rowView(
+                            child, columnIndex: index, maxBytes: maxBytes,
+                            isOpen: child.path == openChildPath,
+                            info: itemInfo(child, scanItems: scanItems))
+                    }
                 }
             }
-            let palette = [Halo.ion, Halo.volt, Halo.amber, Halo.pulseGreen, Halo.flare]
-            return categories.prefix(5).map { cat in
-                (cat, palette[cat.paletteIndex(palette.count)])
+            .padding(.vertical, 6)
+        }
+    }
+
+    private func rowView(_ node: StorageNode, columnIndex: Int, maxBytes: UInt64, isOpen: Bool, info: StorageItemInfo) -> some View {
+        let isSelected = selectedID == node.id
+        let fraction = maxBytes > 0 ? Double(node.sizeBytes) / Double(maxBytes) : 0
+        return Button {
+            if node.isDirectory && !info.isPseudo {
+                selectedID = nil
+                storage.openColumn(node, fromColumn: columnIndex)
+            } else {
+                selectedID = isSelected ? nil : node.id
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: node.path))
+                    .resizable().frame(width: 18, height: 18)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(node.name)
+                            .font(.system(size: 12, weight: isOpen ? .semibold : .regular))
+                            .foregroundStyle(Halo.textPrimary)
+                            .lineLimit(1)
+                        if info.isProtected {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Halo.textDim)
+                        }
+                        Spacer(minLength: 4)
+                        Text(node.sizeBytes > 0 ? ByteFormat.string(node.sizeBytes) : "—")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
+                    }
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Halo.surface2.opacity(0.5))
+                            Capsule()
+                                .fill(info.isProtected ? AnyShapeStyle(Halo.textDim.opacity(0.5)) : AnyShapeStyle(gradeColor(info.grade)))
+                                .frame(width: max(geo.size.width * fraction, node.sizeBytes > 0 ? 2 : 0))
+                        }
+                    }
+                    .frame(height: 3)
+                }
+                // Hover-revealed trash, Finder-quiet: always laid out (no row
+                // jump), visible only on hover, and only for deletable rows.
+                if !info.isPseudo && !info.isProtected && info.grade != .review {
+                    Button {
+                        storage.cleanNode(node)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10))
+                            .foregroundStyle(hoveredRowID == node.id ? Halo.flare : Halo.textDim)
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(hoveredRowID == node.id ? 1 : 0)
+                    .disabled(storage.isCleaning)
+                    .help("Move to Trash")
+                    .accessibilityLabel("Move \(node.name) to Trash")
+                }
+                if node.isDirectory && !info.isPseudo {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(isOpen ? Halo.ion : Halo.textDim.opacity(0.6))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                (isOpen || isSelected) ? Halo.ion.opacity(isOpen ? 0.18 : 0.12) : .clear,
+                in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 6)
+        .onHover { hoveredRowID = $0 ? node.id : (hoveredRowID == node.id ? nil : hoveredRowID) }
+        .contextMenu {
+            if !info.isPseudo {
+                Button("Reveal in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: node.path)])
+                }
+                Button("Get Info") { selectedID = node.id }
+                if !info.isProtected && info.grade != .review {
+                    Divider()
+                    Button("Move to Trash", role: .destructive) {
+                        storage.cleanNode(node)
+                    }
+                    .disabled(storage.isCleaning)
+                }
             }
         }
+        .help("\(node.name) · \(ByteFormat.string(node.sizeBytes))")
     }
 
     // MARK: Detail
 
+    private var selectedItem: StorageItemInfo? {
+        guard let id = selectedID else { return nil }
+        let scanItems = storage.scanItemsByPath
+        for column in storage.navigationPath {
+            if let node = column.children?.first(where: { $0.id == id }) {
+                return itemInfo(node, scanItems: scanItems, includeAge: true)
+            }
+        }
+        return nil
+    }
+
     @ViewBuilder
     private var detailArea: some View {
-        if let id = selectedID, let cell = currentCells.first(where: { $0.id == id }) {
-            StorageDetailPanel(cell: cell) { node in
-                storage.pushDirectory(node)
-                selectedID = nil
+        if let item = selectedItem {
+            StorageDetailPanel(cell: item) { node in
+                if let index = storage.navigationPath.lastIndex(where: { $0.children?.contains(where: { $0.id == node.id }) == true }) {
+                    selectedID = nil
+                    storage.openColumn(node, fromColumn: index)
+                }
             }
             .padding(12)
         }
+    }
+
+    /// `includeAge` triggers a stat() for mtime — detail panel only, too
+    /// costly to run per visible row.
+    private func itemInfo(_ node: StorageNode, scanItems: [String: CleanItem], includeAge: Bool = false) -> StorageItemInfo {
+        let item = scanItems[node.path]
+        return StorageItemInfo(
+            node: node,
+            grade: item?.grade ?? Self.heuristicGrade(node),
+            idleDays: item?.idleDays ?? (includeAge ? Self.mtimeDays(node.path) : nil),
+            category: item?.category ?? Self.heuristicCategory(node))
     }
 
     // MARK: Bottom bar — purgeable explanation (SM-2) + total
@@ -288,26 +362,6 @@ struct StorageView: View {
         }
     }
 
-    // MARK: Cell building
-
-    private var currentChildren: [StorageNode] {
-        storage.navigationPath.last?.children ?? []
-    }
-
-    private var currentCells: [TreemapCell] {
-        let items = storage.scanItemsByPath
-        // Children arrive size-sorted; cap to the largest so the map stays
-        // readable and per-cell mtime lookups stay cheap.
-        return currentChildren.prefix(60).map { node in
-            let item = items[node.path]
-            return TreemapCell(
-                node: node,
-                grade: item?.grade ?? Self.heuristicGrade(node),
-                idleDays: item?.idleDays ?? Self.mtimeDays(node.path),
-                category: item?.category ?? Self.heuristicCategory(node))
-        }
-    }
-
     // MARK: Heuristics + helpers
 
     private static func heuristicGrade(_ node: StorageNode) -> SafetyGrade {
@@ -332,33 +386,4 @@ struct StorageView: View {
         return max(0, Int(Date.now.timeIntervalSince(modified) / 86400))
     }
 
-    private struct Volume { let name: String; let path: String; let capacity: String }
-    private struct Favorite { let name: String; let path: String; let icon: String }
-
-    private static func mountedVolumes() -> [Volume] {
-        let keys: [URLResourceKey] = [.volumeNameKey, .volumeTotalCapacityKey, .volumeIsBrowsableKey]
-        let urls = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
-        return urls.compactMap { url in
-            guard let values = try? url.resourceValues(forKeys: Set(keys)),
-                values.volumeIsBrowsable == true
-            else { return nil }
-            let name = values.volumeName ?? url.lastPathComponent
-            let cap = values.volumeTotalCapacity.map { ByteFormat.string(UInt64($0)) } ?? ""
-            return Volume(name: name, path: url.path, capacity: cap)
-        }
-    }
-
-    private static func favoriteFolders() -> [Favorite] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let specs: [(String, String)] = [
-            ("Downloads", "arrow.down.circle"), ("Desktop", "menubar.dock.rectangle"),
-            ("Documents", "doc"), ("Pictures", "photo"),
-        ]
-        return specs.compactMap { name, icon in
-            let path = home.appendingPathComponent(name).path
-            guard FileManager.default.fileExists(atPath: path) else { return nil }
-            return Favorite(name: name, path: path, icon: icon)
-        }
-    }
 }
