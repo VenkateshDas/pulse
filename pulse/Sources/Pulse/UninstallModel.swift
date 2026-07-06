@@ -243,6 +243,7 @@ final class UninstallModel {
                 guard let self else { return }
                 self.isUninstalling = false
                 self.result = receipt
+                if trashed || !trashedLeftovers.isEmpty { TrashSound.moveToTrash() }
                 if trashed {
                     self.installedApps.removeAll { $0.path == appURL.path }
                     // Self-healing: a removed app may leave launch agents/daemons
@@ -358,6 +359,7 @@ final class UninstallModel {
             await MainActor.run { [weak self] in
                 guard let self else { return }
                 self.isRemovingOrphans = false
+                if !trashedPaths.isEmpty { TrashSound.moveToTrash() }
                 self.report = report
                 self.orphans.removeAll { trashedPaths.contains($0.id) }
                 self.orphanSelection.subtract(trashedPaths)

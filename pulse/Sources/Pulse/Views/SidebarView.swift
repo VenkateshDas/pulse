@@ -7,6 +7,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case storage = "Storage"
     case timeline = "Timeline"
+    case optimize = "Optimize"
     case uninstall = "Uninstall"
     case monitor = "Monitor"
     case displays = "Displays"
@@ -21,6 +22,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .dashboard: "heart.fill"
         case .storage: "internaldrive.fill"
         case .timeline: "chart.xyaxis.line"
+        case .optimize: "sparkles"
         case .uninstall: "trash.slash.fill"
         case .monitor: "waveform.path.ecg"
         case .displays: "display"
@@ -44,7 +46,7 @@ enum SidebarSection: String, CaseIterable {
         case .overview: [.dashboard]
         case .insights: [.storage, .timeline]
         case .system: [.monitor, .displays, .health]
-        case .tools: [.uninstall, .settings, .diagnostics]
+        case .tools: [.optimize, .uninstall, .settings, .diagnostics]
         }
     }
 }

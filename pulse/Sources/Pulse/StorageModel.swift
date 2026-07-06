@@ -173,27 +173,6 @@ final class StorageModel {
         }
     }
 
-    func navigateToPath(_ path: String, name: String) {
-        scanState = .scanning
-        
-        let node = StorageScanner(rootURL: URL(fileURLWithPath: path)).shallowScan(path: path)
-        let anchor = StorageNode(
-            id: node.id, name: name, path: node.path,
-            sizeBytes: node.sizeBytes, isDirectory: true, children: node.children)
-        self.navigationPath = [anchor]
-        
-        isStreamingSizes = true
-        Task {
-            for await updatedNode in StorageScanner().scanSizesStream(node: anchor) {
-                if self.navigationPath.first?.id == updatedNode.id {
-                    self.navigationPath[0] = updatedNode
-                }
-            }
-            self.isStreamingSizes = false
-            self.scanState = .done(Date())
-        }
-    }
-
     var scanItemsByPath: [String: CleanItem] {
         guard let scan else { return [:] }
         return Dictionary(scan.items.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
@@ -228,6 +207,7 @@ final class StorageModel {
             self.isCleaning = false
             self.cleanReport = report
             if trashed {
+                TrashSound.moveToTrash()
                 // In-place sync: no rescan — remove the node and subtract its
                 // size from every ancestor column so all views agree instantly.
                 self.navigationPath = self.navigationPath.pruning(deletedPath: nodePath, bytes: nodeSizeBytes)
@@ -270,10 +250,11 @@ final class StorageModel {
                 } else {
                     rep = "Failed to move items to Trash"
                 }
-                return rep
+                return (rep, count)
             }.value
             self.isCleaning = false
-            self.cleanReport = report
+            self.cleanReport = report.0
+            if report.1 > 0 { TrashSound.moveToTrash() }
             self.selection.removeAll()
             self.refreshTrashInfo()
             self.refreshPurgeable()
@@ -294,7 +275,7 @@ final class StorageModel {
                     .appendingPathComponent(".Trash")
                 guard let entries = try? FileManager.default.contentsOfDirectory(
                     at: trash, includingPropertiesForKeys: nil, options: [])
-                else { return "Failed to empty Trash" }
+                else { return ("Failed to empty Trash", 0) }
                 var count = 0
                 for url in entries {
                     do {
@@ -302,10 +283,11 @@ final class StorageModel {
                         count += 1
                     } catch {}
                 }
-                return count > 0 ? "Emptied \(count) items from Trash" : "Failed to empty Trash"
+                return (count > 0 ? "Emptied \(count) items from Trash" : "Failed to empty Trash", count)
             }.value
             self.isCleaning = false
-            self.cleanReport = report
+            self.cleanReport = report.0
+            if report.1 > 0 { TrashSound.emptyTrash() }
             self.refreshTrashInfo()
             self.refreshPurgeable()
         }

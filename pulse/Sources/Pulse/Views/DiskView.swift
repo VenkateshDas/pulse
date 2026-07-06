@@ -12,23 +12,16 @@ struct DiskView: View {
                 if selectedTab == 0 {
                     StorageView()
                 } else if selectedTab == 1 {
-                    InsightsView()
-                } else if selectedTab == 2 {
                     CleanView()
-                } else if selectedTab == 3 {
+                } else if selectedTab == 2 {
                     TrashView()
-                } else if selectedTab == 4 {
-                    OptimizeView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         // Already-visible case: the notification arrives while this view lives.
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToOptimize)) { _ in
-            open(tab: 4)
-        }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
-            open(tab: 2)
+            open(tab: 1)
         }
         // Cross-pane case: RootView stashed the target tab before this view existed.
         .onAppear {
@@ -44,10 +37,7 @@ struct DiskView: View {
     private var tabBar: some View {
         HStack {
             SegmentPicker(
-                options: [
-                    (0, "Browse"), (1, "Hidden Space"), (2, "Reclaim"),
-                    (3, "Trash"), (4, "Optimize"),
-                ],
+                options: [(0, "Browse"), (1, "Reclaim"), (2, "Trash")],
                 selection: $selectedTab,
                 style: .tab)
             Spacer()

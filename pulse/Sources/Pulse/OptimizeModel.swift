@@ -66,6 +66,7 @@ final class OptimizeModel {
         s.result = result
         states[task.id] = s
         if result.success { totalBytesFreed += result.bytesFreed }
+        if result.trashed { TrashSound.moveToTrash() }
         await refresh(task)
     }
 

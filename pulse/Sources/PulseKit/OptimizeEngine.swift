@@ -5,11 +5,14 @@ public struct OptimizeResult: Sendable, Equatable {
     public let success: Bool
     public let summary: String       // "Cleared 312 MB of saved app state"
     public let bytesFreed: Int64
+    /// True when the task moved files to the Trash (drives the trash sound).
+    public let trashed: Bool
 
-    public init(success: Bool, summary: String, bytesFreed: Int64 = 0) {
+    public init(success: Bool, summary: String, bytesFreed: Int64 = 0, trashed: Bool = false) {
         self.success = success
         self.summary = summary
         self.bytesFreed = bytesFreed
+        self.trashed = trashed
     }
 }
 
@@ -254,6 +257,7 @@ public enum OptimizeEngine {
         return OptimizeResult(
             success: ok,
             summary: "Moved \(moved) \(label) item(s) to Trash",
-            bytesFreed: ok ? bytes : 0)
+            bytesFreed: ok ? bytes : 0,
+            trashed: moved > 0)
     }
 }

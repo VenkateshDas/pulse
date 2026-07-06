@@ -1,5 +1,6 @@
 import AppKit
 import PulseKit
+import QuickLook
 import SwiftUI
 
 /// Storage browser: Finder-style Miller columns over any volume/folder.
@@ -12,81 +13,49 @@ struct StorageView: View {
     @Environment(StorageModel.self) private var storage
 
     @State private var selectedID: String?
+    /// Quick Look target (spacebar on a selected row, like Finder).
+    @State private var previewURL: URL?
+    @State private var keyMonitor: Any?
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-                .frame(width: 220)
-                .background { GlassLayer(tint: Halo.surface1.opacity(0.6)) }
-            Rectangle().fill(Halo.surface2).frame(width: 1)
-
-            VStack(spacing: 0) {
-                topBar
-                Rectangle().fill(Halo.surface2).frame(height: 1)
-                HStack(spacing: 0) {
-                    columnsArea
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if selectedItem != nil {
-                        Rectangle().fill(Halo.surface2).frame(width: 1)
-                        detailArea
-                            .frame(width: 280)
-                    }
+        VStack(spacing: 0) {
+            topBar
+            Rectangle().fill(Halo.surface2).frame(height: 1)
+            HStack(spacing: 0) {
+                columnsArea
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if selectedItem != nil {
+                    Rectangle().fill(Halo.surface2).frame(width: 1)
+                    detailArea
+                        .frame(width: 280)
                 }
-                Rectangle().fill(Halo.surface2).frame(height: 1)
-                bottomBar
             }
-            .background(Halo.void)
+            Rectangle().fill(Halo.surface2).frame(height: 1)
+            bottomBar
         }
+        .background(Halo.void)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { storage.appeared() }
+        .quickLookPreview($previewURL)
+        .onAppear {
+            storage.appeared()
+            startKeyMonitor()
+        }
+        .onDisappear {
+            if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+            keyMonitor = nil
+        }
     }
 
-    // MARK: Sidebar — real volumes + favorite folders (AR-3)
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("VOLUMES")
-                .font(.system(size: 10, weight: .bold)).tracking(1.5)
-                .foregroundStyle(Halo.textDim)
-            ForEach(Self.mountedVolumes(), id: \.path) { vol in
-                sidebarRow(icon: "internaldrive", title: vol.name, subtitle: vol.capacity) {
-                    storage.navigateToPath(vol.path, name: vol.name)
-                    selectedID = nil
-                }
-            }
-
-            Text("FAVORITE FOLDERS")
-                .font(.system(size: 10, weight: .bold)).tracking(1.5)
-                .foregroundStyle(Halo.textDim).padding(.top, 8)
-            ForEach(Self.favoriteFolders(), id: \.path) { fav in
-                sidebarRow(icon: fav.icon, title: fav.name, subtitle: nil) {
-                    storage.navigateToPath(fav.path, name: fav.name)
-                    selectedID = nil
-                }
-            }
-            Spacer()
+    /// Spacebar toggles Quick Look for the selected row, like Finder.
+    private func startKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            guard event.keyCode == 49, event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+                let item = selectedItem, !item.isPseudo
+            else { return event }
+            previewURL = previewURL == nil ? URL(fileURLWithPath: item.node.path) : nil
+            return nil
         }
-        .padding(16)
-    }
-
-    private func sidebarRow(icon: String, title: String, subtitle: String?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: icon).frame(width: 20).foregroundStyle(Halo.ion)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Halo.textPrimary).lineLimit(1)
-                    if let subtitle {
-                        Text(subtitle).font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(Halo.textDim)
-                    }
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 10).padding(.vertical, 8)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: Top bar — breadcrumb + lens switcher
@@ -399,33 +368,4 @@ struct StorageView: View {
         return max(0, Int(Date.now.timeIntervalSince(modified) / 86400))
     }
 
-    private struct Volume { let name: String; let path: String; let capacity: String }
-    private struct Favorite { let name: String; let path: String; let icon: String }
-
-    private static func mountedVolumes() -> [Volume] {
-        let keys: [URLResourceKey] = [.volumeNameKey, .volumeTotalCapacityKey, .volumeIsBrowsableKey]
-        let urls = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
-        return urls.compactMap { url in
-            guard let values = try? url.resourceValues(forKeys: Set(keys)),
-                values.volumeIsBrowsable == true
-            else { return nil }
-            let name = values.volumeName ?? url.lastPathComponent
-            let cap = values.volumeTotalCapacity.map { ByteFormat.string(UInt64($0)) } ?? ""
-            return Volume(name: name, path: url.path, capacity: cap)
-        }
-    }
-
-    private static func favoriteFolders() -> [Favorite] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let specs: [(String, String)] = [
-            ("Downloads", "arrow.down.circle"), ("Desktop", "menubar.dock.rectangle"),
-            ("Documents", "doc"), ("Pictures", "photo"),
-        ]
-        return specs.compactMap { name, icon in
-            let path = home.appendingPathComponent(name).path
-            guard FileManager.default.fileExists(atPath: path) else { return nil }
-            return Favorite(name: name, path: path, icon: icon)
-        }
-    }
 }
