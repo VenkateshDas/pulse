@@ -603,6 +603,11 @@ private struct BatteryConsumptionCard: View {
 private struct BatterySessionsCard: View {
     @Environment(DashboardModel.self) private var dashboardModel
     @State private var expanded: Set<UUID> = []
+    @State private var showAllSessions = false
+
+    /// Rows rendered by default. Every row costs a full layout pass (bars,
+    /// legend grid), so keep the initial page light; "Show all" opts in.
+    private static let sessionLimit = 10
 
     /// Segment colors for the stacked share bar; "Other" always renders dim.
     private static let palette: [Color] = [
@@ -629,10 +634,24 @@ private struct BatterySessionsCard: View {
                     .foregroundStyle(Halo.textDim)
                     .padding(.vertical, 8)
             } else {
+                let all = Array(dashboardModel.batterySessions.reversed())
+                let visible = showAllSessions ? all : Array(all.prefix(Self.sessionLimit))
                 LazyVStack(spacing: 8) {
-                    ForEach(dashboardModel.batterySessions.reversed()) { session in
+                    ForEach(visible) { session in
                         sessionRow(session)
                     }
+                }
+                if all.count > Self.sessionLimit {
+                    Button(
+                        showAllSessions
+                            ? "Show recent \(Self.sessionLimit)"
+                            : "Show all \(all.count) sessions"
+                    ) {
+                        showAllSessions.toggle()
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Halo.ion)
+                    .buttonStyle(.plain)
                 }
             }
         }

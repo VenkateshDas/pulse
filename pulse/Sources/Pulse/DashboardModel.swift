@@ -291,13 +291,23 @@ final class DashboardModel {
                         at: snapshot.timestamp, displayAsleep: displayAsleep)
                     lastBatterySampleAt = snapshot.timestamp
                 } else if slept || elapsed >= Self.sleepGapSeconds {
-                    // Genuinely slept while unplugged: close the pre-sleep
-                    // session at its last active sample, then open a fresh one.
-                    // Smaller (10–90s) gaps are transient stalls — keep the
-                    // session open rather than fragmenting it.
-                    batterySessionStore.endSession(
-                        charge: charge, at: lastBatterySampleAt ?? snapshot.timestamp)
-                    batterySessionStore.beginSession(charge: charge, at: snapshot.timestamp)
+                    // Slept while unplugged (lid closed). The Mac kept draining,
+                    // so credit the wall-clock gap to the live session as
+                    // screen-off time and keep it continuous — ending it here
+                    // made lid-closed drain invisible and fragmented sessions.
+                    // Split only when the gap is implausibly long or the charge
+                    // rose (it was plugged in while asleep); ±1% tolerates
+                    // charge-read noise without fragmenting.
+                    let lastCharge = batterySessionStore.liveSession?.endCharge ?? charge
+                    if wallElapsed < 24 * 3600, charge <= lastCharge + 1 {
+                        batterySessionStore.accumulate(
+                            processes: [], elapsed: wallElapsed, charge: charge,
+                            at: snapshot.timestamp, displayAsleep: true)
+                    } else {
+                        batterySessionStore.endSession(
+                            charge: charge, at: lastBatterySampleAt ?? snapshot.timestamp)
+                        batterySessionStore.beginSession(charge: charge, at: snapshot.timestamp)
+                    }
                     lastBatterySampleAt = snapshot.timestamp
                 }
             } else if batterySessionStore.liveSession != nil {

@@ -120,6 +120,35 @@ struct BatterySessionStoreTests {
         #expect(capped.last?.cpuTimeSeconds == 21)
     }
 
+    @Test func sharesAreCappedEvenWhileLive() {
+        let s = store(now: t0)
+        s.beginSession(charge: 100, at: t0)
+        // More distinct apps than the cap; the live session's raw list is
+        // uncapped, but `shares` must still fold the tail into "Other".
+        let procs = (1...20).map { (name: "App\($0)", cpuPercent: Double(21 - $0)) }
+        s.accumulate(processes: procs, elapsed: 2, charge: 99, at: t0.addingTimeInterval(2))
+
+        let shares = s.liveSession!.shares
+        #expect(shares.count == BatterySessionStore.topAppsPerSession + 1)
+        #expect(shares.contains { $0.app.name == "Other" })
+        #expect(abs(shares.reduce(0) { $0 + $1.fraction } - 1) < 0.001)
+    }
+
+    @Test func sleepGapAccumulatesAsScreenOffTime() {
+        let s = store(now: t0)
+        s.beginSession(charge: 80, at: t0)
+        s.accumulate(processes: [("Chrome", 5)], elapsed: 2, charge: 79,
+                     at: t0.addingTimeInterval(2))
+        // Lid-closed gap: no processes, display asleep, wall-clock elapsed.
+        s.accumulate(processes: [], elapsed: 3600, charge: 70,
+                     at: t0.addingTimeInterval(3602), displayAsleep: true)
+
+        let live = s.liveSession!
+        #expect(live.screenOnSeconds == 2)
+        #expect(live.screenOffSeconds == 3600)
+        #expect(live.endCharge == 70)
+    }
+
     @Test func capAppsLeavesSmallListsUntouched() {
         let few = (1...3).map {
             AppEnergyShare(name: "App\($0)", cpuTimeSeconds: Double($0), firstSeen: t0, lastSeen: t0)
