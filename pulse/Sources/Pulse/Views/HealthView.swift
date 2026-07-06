@@ -206,10 +206,15 @@ private struct BatteryCard: View {
             fact("CONDITION", battery.condition,
                  battery.condition == "Normal" ? Halo.pulseGreen : Halo.amber)
 
+            // |InstantAmperage| × Voltage measures battery current in either
+            // direction — while charging it's power INTO the battery, not the
+            // machine's consumption, so label it as such.
+            let powerLabel = battery.isCharging ? "CHARGING AT" : "POWER DRAW"
             if let watts = battery.powerWatts {
-                fact("POWER DRAW", String(format: "%.1f W", watts), Halo.ion)
+                fact(powerLabel, String(format: "%.1f W", watts),
+                     battery.isCharging ? Halo.pulseGreen : Halo.ion)
             } else {
-                fact("POWER DRAW", "—", Halo.textDim)
+                fact(powerLabel, "—", Halo.textDim)
             }
             let left = battery.cyclesRemaining
             fact("CYCLES LEFT", "\(left)",
@@ -636,9 +641,12 @@ private struct BatterySessionsCard: View {
             } else {
                 let all = Array(dashboardModel.batterySessions.reversed())
                 let visible = showAllSessions ? all : Array(all.prefix(Self.sessionLimit))
-                LazyVStack(spacing: 8) {
-                    ForEach(visible) { session in
-                        sessionRow(session)
+                LazyVStack(spacing: 6) {
+                    ForEach(dayGroups(visible), id: \.day) { group in
+                        dayHeader(group)
+                        ForEach(group.sessions) { session in
+                            sessionRow(session)
+                        }
                     }
                 }
                 if all.count > Self.sessionLimit {
@@ -658,75 +666,130 @@ private struct BatterySessionsCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+        .onAppear {
+            // The live session is what you opened the page for — start it open.
+            if let live = dashboardModel.batterySessions.last, live.isLive {
+                expanded.insert(live.id)
+            }
+        }
+    }
+
+    /// Consecutive sessions bucketed by calendar day, preserving newest-first
+    /// order. Input is already sorted, so a single pass suffices.
+    private func dayGroups(_ sessions: [BatterySession])
+        -> [(day: Date, sessions: [BatterySession])]
+    {
+        let cal = Calendar.current
+        var groups: [(day: Date, sessions: [BatterySession])] = []
+        for session in sessions {
+            let day = cal.startOfDay(for: session.startedAt)
+            if let last = groups.indices.last, groups[last].day == day {
+                groups[last].sessions.append(session)
+            } else {
+                groups.append((day, [session]))
+            }
+        }
+        return groups
+    }
+
+    private func dayHeader(_ group: (day: Date, sessions: [BatterySession])) -> some View {
+        let drop = group.sessions.reduce(0) { $0 + $1.chargeDrop }
+        let count = group.sessions.count
+        return HStack(alignment: .firstTextBaseline) {
+            Text(dayLabel(group.day))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+            Spacer()
+            Text("−\(drop)% · \(count) session\(count == 1 ? "" : "s")")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+        }
+        .padding(.top, 6)
     }
 
     @ViewBuilder
     private func sessionRow(_ session: BatterySession) -> some View {
         let shares = session.shares
-        let isExpanded = expanded.contains(session.id)
+        // Backfilled sessions carry no app data — nothing to expand into.
+        let expandable = !shares.isEmpty || session.isLive
+        let isExpanded = expandable && expanded.contains(session.id)
         VStack(alignment: .leading, spacing: 9) {
-            // Header: when + how long + charge drop.
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(dayLabel(session.startedAt))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Halo.textPrimary)
-                        if session.isLive {
-                            Text("LIVE")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Halo.pulseGreen)
-                                .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(Halo.pulseGreen.opacity(0.15), in: Capsule())
-                        }
-                    }
-                    Text(windowText(session))
-                        .font(.system(size: 10, design: .monospaced))
+            Button {
+                if isExpanded { expanded.remove(session.id) } else { expanded.insert(session.id) }
+            } label: {
+                collapsedLine(session, shares: shares, expandable: expandable, isExpanded: isExpanded)
+            }
+            .buttonStyle(.plain)
+            .disabled(!expandable)
+
+            if isExpanded {
+                // Charge depletion: full bar = startCharge, filled portion =
+                // what remained at the end; the dim tail is what drained.
+                chargeBar(session)
+                if !shares.isEmpty {
+                    shareBar(shares)
+                    legend(shares)
+                } else {
+                    Text("Measuring app activity…")
+                        .font(.system(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("−\(session.chargeDrop)%")
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundStyle(dropColor(session.chargeDrop))
-                    Text("\(session.startCharge)% → \(session.endCharge)%")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Halo.textDim)
-                }
-            }
-
-            // Screen on/off breakdown (live sessions only).
-            if (session.screenOnSeconds ?? 0) > 0 || (session.screenOffSeconds ?? 0) > 0 {
-                screenTimeRow(on: session.screenOnSeconds ?? 0, off: session.screenOffSeconds ?? 0)
-            }
-
-            // Charge depletion: full bar = startCharge, filled portion = what
-            // remained at the end; the dim tail is what drained.
-            chargeBar(session)
-
-            if !shares.isEmpty {
-                shareBar(shares)
-                legend(shares, expanded: isExpanded)
-                if shares.count > 4 {
-                    Button(isExpanded ? "Show less" : "Show all \(shares.count) apps") {
-                        if isExpanded { expanded.remove(session.id) } else { expanded.insert(session.id) }
-                    }
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Halo.ion)
-                    .buttonStyle(.plain)
-                }
-            } else if session.isLive {
-                Text("Measuring app activity…")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-            } else {
-                Text("Per-app energy needs Pulse running while unplugged — macOS keeps no per-app history.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim.opacity(0.85))
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// The always-visible one-liner: time window, badges, screen on/off,
+    /// top app, charge drop.
+    private func collapsedLine(
+        _ session: BatterySession,
+        shares: [(app: AppEnergyShare, fraction: Double)],
+        expandable: Bool, isExpanded: Bool
+    ) -> some View {
+        HStack(spacing: 8) {
+            if expandable {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(Halo.textDim)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+            Text(windowText(session))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Halo.textPrimary)
+            if session.isLive {
+                Text("LIVE")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Halo.pulseGreen)
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Halo.pulseGreen.opacity(0.15), in: Capsule())
+            }
+            if session.isBackfilled {
+                Text("pmset")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim.opacity(0.7))
+            }
+            if (session.screenOnSeconds ?? 0) > 0 || (session.screenOffSeconds ?? 0) > 0 {
+                screenGlyphs(on: session.screenOnSeconds ?? 0, off: session.screenOffSeconds ?? 0)
+            }
+            Spacer(minLength: 8)
+            if let top = shares.first {
+                Text(top.app.name)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: 140, alignment: .trailing)
+            }
+            Text("−\(session.chargeDrop)%")
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundStyle(dropColor(session.chargeDrop))
+            Text("\(session.startCharge)→\(session.endCharge)")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+        }
+        .contentShape(Rectangle())
     }
 
     /// Horizontal charge gauge: solid up to the end charge, a dimmed segment for
@@ -752,7 +815,9 @@ private struct BatterySessionsCard: View {
     private func shareBar(_ shares: [(app: AppEnergyShare, fraction: Double)]) -> some View {
         GeometryReader { geo in
             HStack(spacing: 1) {
-                ForEach(Array(shares.enumerated()), id: \.element.app.id) { index, entry in
+                // Index-keyed: app.id is the name, and a duplicate name must
+                // never corrupt the layout.
+                ForEach(Array(shares.enumerated()), id: \.offset) { index, entry in
                     Rectangle()
                         .fill(color(for: entry.app.name, index: index))
                         .frame(width: max(geo.size.width * entry.fraction - 1, 0))
@@ -764,15 +829,13 @@ private struct BatterySessionsCard: View {
     }
 
     @ViewBuilder
-    private func legend(
-        _ shares: [(app: AppEnergyShare, fraction: Double)], expanded: Bool
-    ) -> some View {
-        let shown = expanded ? shares : Array(shares.prefix(4))
+    private func legend(_ shares: [(app: AppEnergyShare, fraction: Double)]) -> some View {
         // Two-column grid keeps long app names readable at any window width.
+        // Shares are already capped to top-N + "Other", so show them all.
         let cols = [GridItem(.flexible(), alignment: .leading),
                     GridItem(.flexible(), alignment: .leading)]
         LazyVGrid(columns: cols, alignment: .leading, spacing: 4) {
-            ForEach(Array(shown.enumerated()), id: \.element.app.id) { index, entry in
+            ForEach(Array(shares.enumerated()), id: \.offset) { index, entry in
                 HStack(spacing: 6) {
                     Circle()
                         .fill(color(for: entry.app.name, index: index))
@@ -795,27 +858,23 @@ private struct BatterySessionsCard: View {
         name == "Other" ? Halo.textDim.opacity(0.5) : Self.palette[index % Self.palette.count]
     }
 
-    private func screenTimeRow(on: TimeInterval, off: TimeInterval) -> some View {
-        let total = on + off
-        let onFrac = total > 0 ? on / total : 1
-        return HStack(spacing: 12) {
-            HStack(spacing: 4) {
-                Image(systemName: "display")
-                    .font(.system(size: 9))
-                Text("Screen on \(Self.shortDuration(on))")
+    /// Compact screen on/off durations for the collapsed line.
+    private func screenGlyphs(on: TimeInterval, off: TimeInterval) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 3) {
+                Image(systemName: "display").font(.system(size: 8))
+                Text(Self.shortDuration(on))
             }
             .foregroundStyle(Halo.ion)
-            HStack(spacing: 4) {
-                Image(systemName: "moon.fill")
-                    .font(.system(size: 9))
-                Text("Off \(Self.shortDuration(off))")
-            }
-            .foregroundStyle(Halo.textDim)
-            Spacer()
-            Text("\(Int((onFrac * 100).rounded()))%")
+            if off > 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "moon.fill").font(.system(size: 8))
+                    Text(Self.shortDuration(off))
+                }
                 .foregroundStyle(Halo.textDim)
+            }
         }
-        .font(.system(size: 10, weight: .medium, design: .monospaced))
+        .font(.system(size: 9, weight: .medium, design: .monospaced))
     }
 
     private static func shortDuration(_ s: TimeInterval) -> String {

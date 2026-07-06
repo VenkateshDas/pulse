@@ -149,6 +149,23 @@ struct BatterySessionStoreTests {
         #expect(live.endCharge == 70)
     }
 
+    @Test func capAppsIsIdempotent() {
+        // A closed session's apps are already top-N + "Other"; re-capping (the
+        // `shares` getter does) must merge into that bucket, never append a
+        // second "Other" — duplicate names broke ForEach identity in the UI.
+        let many = (1...12).map {
+            AppEnergyShare(name: "App\($0)", cpuTimeSeconds: Double(20 - $0),
+                           firstSeen: t0, lastSeen: t0)
+        }
+        let once = BatterySessionStore.capApps(many)
+        let twice = BatterySessionStore.capApps(once)
+        #expect(twice.filter { $0.name == "Other" }.count == 1)
+        #expect(twice.count <= BatterySessionStore.topAppsPerSession + 1)
+        // Total weight is conserved through both passes.
+        let total = many.reduce(0) { $0 + $1.cpuTimeSeconds }
+        #expect(twice.reduce(0) { $0 + $1.cpuTimeSeconds } == total)
+    }
+
     @Test func capAppsLeavesSmallListsUntouched() {
         let few = (1...3).map {
             AppEnergyShare(name: "App\($0)", cpuTimeSeconds: Double($0), firstSeen: t0, lastSeen: t0)

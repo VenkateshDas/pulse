@@ -242,14 +242,23 @@ public final class BatterySessionStore {
     }
 
     /// Sorts apps by weight, keeps the top N, and rolls the remainder into a
-    /// single "Other" entry so shares still sum to 100%.
+    /// single "Other" entry so shares still sum to 100%. Idempotent: capping an
+    /// already-capped list (top-N + "Other") merges into the existing bucket —
+    /// appending a second "Other" gave ForEach duplicate ids (id = name) and
+    /// corrupted the share-bar layout.
     static func capApps(_ apps: [AppEnergyShare]) -> [AppEnergyShare] {
         let sorted = apps.sorted { $0.cpuTimeSeconds > $1.cpuTimeSeconds }
         guard sorted.count > topAppsPerSession else { return sorted }
-        let kept = Array(sorted.prefix(topAppsPerSession))
+        var kept = Array(sorted.prefix(topAppsPerSession))
         let rest = sorted.dropFirst(topAppsPerSession)
         let otherWeight = rest.reduce(0) { $0 + $1.cpuTimeSeconds }
         guard otherWeight > 0 else { return kept }
+        if let index = kept.firstIndex(where: { $0.name == otherBucketName }) {
+            kept[index].cpuTimeSeconds += otherWeight
+            kept[index].firstSeen = min(kept[index].firstSeen, rest.map(\.firstSeen).min() ?? kept[index].firstSeen)
+            kept[index].lastSeen = max(kept[index].lastSeen, rest.map(\.lastSeen).max() ?? kept[index].lastSeen)
+            return kept
+        }
         let other = AppEnergyShare(
             name: otherBucketName,
             cpuTimeSeconds: otherWeight,
