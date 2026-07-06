@@ -25,3 +25,26 @@ private func setModified(_ url: URL, daysAgo: Int) throws {
         ofItemAtPath: url.path)
 }
 
+// MARK: - StorageScanner
+
+@Suite struct FastDirectorySizeTests {
+    @Test func prunedPathReturnsZero() {
+        let scanner = StorageScanner()
+        let (size, count) = "/System/Volumes/Data".withCString { scanner.fastDirectorySize($0) }
+        #expect(size == 0)
+        #expect(count == 0)
+    }
+
+    @Test func countsFilesInTempTree() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try writeFile(at: dir.appendingPathComponent("a.bin"), megabytes: 2)
+        try writeFile(at: dir.appendingPathComponent("sub/b.bin"), megabytes: 3)
+
+        let scanner = StorageScanner()
+        let (size, count) = dir.path.withCString { scanner.fastDirectorySize($0) }
+        #expect(size >= 5_000_000)
+        #expect(count == 3)
+    }
+}
+
