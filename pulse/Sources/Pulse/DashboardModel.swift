@@ -67,7 +67,16 @@ final class DashboardModel {
     static let historyLength = 900
     static let activeInterval: Duration = .seconds(3)
     static let idleInterval: Duration = .seconds(5)
+    /// Screen locked: nobody can see the menu bar or any window, so the loop
+    /// drops to a slow keep-alive tick that only maintains battery bookkeeping.
+    static let lockedInterval: Duration = .seconds(30)
     static let processEveryNTicks = 3
+    /// No window open: the menu bar integer is the only consumer, so process
+    /// enumeration (~every pid × proc_pidinfo) can run less often.
+    static let idleProcessEveryNTicks = 5
+    /// Sample gap accepted as continuous live use for battery crediting.
+    /// Must exceed the longest sampling interval (locked, 30s) with margin.
+    static let maxSampleGapSeconds: TimeInterval = 45
     /// Uptime gap above which an on-battery break is treated as real sleep
     /// (ends the session), not a transient sampling stall.
     static let sleepGapSeconds: TimeInterval = 90
@@ -161,12 +170,20 @@ final class DashboardModel {
             self.batterySessions = self.batterySessionStore.allSessions
         }
 
+        startSamplingLoop()
+    }
+
+    private func startSamplingLoop() {
         loop = Task { [weak self, engine] in
             while !Task.isCancelled {
                 guard let self else { return }
-                let dashboardOpen = self.visibleViews > 0 && !self.screenLocked
+                let locked = self.screenLocked
+                let dashboardOpen = self.visibleViews > 0 && !locked
                 self.tickCount += 1
-                let needsProcesses = self.tickCount % Self.processEveryNTicks == 0
+                // Locked: skip process enumeration entirely — nobody can see
+                // the result, and it's the most expensive part of a sample.
+                let cadence = dashboardOpen ? Self.processEveryNTicks : Self.idleProcessEveryNTicks
+                let needsProcesses = !locked && self.tickCount % cadence == 0
 
                 let snapshot: SystemSnapshot
                 if needsProcesses {
@@ -178,7 +195,9 @@ final class DashboardModel {
                 }
 
                 await self.ingest(snapshot)
-                let interval = dashboardOpen ? Self.activeInterval : Self.idleInterval
+                let interval =
+                    locked ? Self.lockedInterval
+                    : dashboardOpen ? Self.activeInterval : Self.idleInterval
                 try? await Task.sleep(for: interval)
             }
         }
@@ -211,34 +230,40 @@ final class DashboardModel {
 
     private func ingest(_ snapshot: SystemSnapshot) async {
         latest = snapshot
-        // Replace AlertsEngine's instantaneous cpu-hog with a windowed one:
-        // a process must stay hot for the full window before it alerts.
-        var evaluated = AlertsEngine.evaluate(snapshot, ownPID: getpid())
-        evaluated.removeAll { $0.id == "cpu-hog" }
-        let sustained = processWatcher.ingest(
-            snapshot.topProcesses.filter { $0.pid != getpid() }, now: snapshot.timestamp)
-        if let hog = sustained.first {
-            evaluated.insert(Self.windowedCPUAlert(hog), at: 0)
+        // Locked ticks carry stale processes (enumeration is skipped), so the
+        // whole alert/diagnosis/attention pipeline pauses — its outputs are
+        // invisible until unlock anyway, and pausing it (plus notifications)
+        // is what makes the 30s locked tick nearly free.
+        if !screenLocked {
+            // Replace AlertsEngine's instantaneous cpu-hog with a windowed one:
+            // a process must stay hot for the full window before it alerts.
+            var evaluated = AlertsEngine.evaluate(snapshot, ownPID: getpid())
+            evaluated.removeAll { $0.id == "cpu-hog" }
+            let sustained = processWatcher.ingest(
+                snapshot.topProcesses.filter { $0.pid != getpid() }, now: snapshot.timestamp)
+            if let hog = sustained.first {
+                evaluated.insert(Self.windowedCPUAlert(hog), at: 0)
+            }
+            for anomaly in sustained where anomaly.isNewlySustained {
+                anomalyStore.record(AnomalyRecord(
+                    processName: anomaly.name, pid: anomaly.pid, cpuPercent: anomaly.cpuPercent,
+                    date: snapshot.timestamp, sustainedSeconds: anomaly.sustainedSeconds))
+            }
+            latestAlerts = evaluated
+            latestDiagnosis = DiagnosisEngine.evaluate(snapshot)
+            latestHealth = HealthScore.evaluate(snapshot)
+            latestAttentionItems = await attentionEngine.currentItems(
+                diagnosis: latestDiagnosis, alerts: latestAlerts)
+            // A dismissed alert resets once its condition clears, so a fresh
+            // occurrence shows (and notifies) again.
+            let activeIDs = Set(latestAlerts.map(\.id))
+            let cleared = dismissedAlerts.subtracting(activeIDs)
+            if !cleared.isEmpty {
+                dismissedAlerts.subtract(cleared)
+                UserDefaults.standard.set(Array(dismissedAlerts), forKey: "PulseDismissedAlerts")
+            }
+            fireCriticalNotifications(latestAlerts)
         }
-        for anomaly in sustained where anomaly.isNewlySustained {
-            anomalyStore.record(AnomalyRecord(
-                processName: anomaly.name, pid: anomaly.pid, cpuPercent: anomaly.cpuPercent,
-                date: snapshot.timestamp, sustainedSeconds: anomaly.sustainedSeconds))
-        }
-        latestAlerts = evaluated
-        latestDiagnosis = DiagnosisEngine.evaluate(snapshot)
-        latestHealth = HealthScore.evaluate(snapshot)
-        latestAttentionItems = await attentionEngine.currentItems(
-            diagnosis: latestDiagnosis, alerts: latestAlerts)
-        // A dismissed alert resets once its condition clears, so a fresh
-        // occurrence shows (and notifies) again.
-        let activeIDs = Set(latestAlerts.map(\.id))
-        let cleared = dismissedAlerts.subtracting(activeIDs)
-        if !cleared.isEmpty {
-            dismissedAlerts.subtract(cleared)
-            UserDefaults.standard.set(Array(dismissedAlerts), forKey: "PulseDismissedAlerts")
-        }
-        fireCriticalNotifications(latestAlerts)
 
         append(snapshot.cpuTotalPercent, to: &cpuBuffer)
         cpuDayStore.record(snapshot.cpuTotalPercent, at: snapshot.timestamp)
@@ -270,12 +295,13 @@ final class DashboardModel {
             let wallElapsed =
                 lastIngestDate.map { snapshot.timestamp.timeIntervalSince($0) } ?? 0
             let slept = wallElapsed - elapsed >= Self.sleepGapSeconds
-            // A gap >10s between samples (or a sleep) means not live use.
-            let validDelta = elapsed > 0 && elapsed < 10 && !slept
+            // A gap beyond the slowest sampling tick (or a sleep) means not
+            // live use.
+            let validDelta = elapsed > 0 && elapsed < Self.maxSampleGapSeconds && !slept
 
             if !battery.isOnAC {
-                // Time-on-battery crediting is unchanged: only count gaps that
-                // look like live use (≤10s between 2s samples).
+                // Time-on-battery crediting: only count gaps that look like
+                // live use (within one sampling tick of the slowest cadence).
                 if validDelta {
                     batteryHistory.addTimeOnBattery(elapsed, at: snapshot.timestamp)
                 }
@@ -393,6 +419,12 @@ final class DashboardModel {
                 guard let self else { return }
                 self.screenLocked = false
                 if self.visibleViews > 0 { self.publishLatest() }
+                // The loop may be mid-30s locked sleep — restart it so the
+                // menu bar integer refreshes promptly on unlock.
+                if self.loop != nil {
+                    self.loop?.cancel()
+                    self.startSamplingLoop()
+                }
             }
         }
     }

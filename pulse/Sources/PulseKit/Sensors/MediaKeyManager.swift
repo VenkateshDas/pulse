@@ -47,11 +47,13 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
         startGlobalMonitor()
     }
 
-    /// Polls every 2s until Accessibility is granted, then starts Tier 1.
+    /// Polls until Accessibility is granted, then starts Tier 1. 30s + wide
+    /// tolerance: a user who never grants it shouldn't pay a 2s wakeup
+    /// forever, and 30s latency on a Settings toggle is fine.
     @MainActor
     private func startAccessibilityPoll() {
         guard accessibilityPollTimer == nil else { return }
-        accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 guard self.isTrusted(prompt: false) else { return }
@@ -61,6 +63,8 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
                 print("[MediaKeys] Accessibility granted — MediaKeyTap started.")
             }
         }
+        timer.tolerance = 10
+        accessibilityPollTimer = timer
     }
 
     public func stop() {

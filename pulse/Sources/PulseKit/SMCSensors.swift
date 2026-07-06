@@ -168,11 +168,19 @@ final class SMCSensors {
         return output
     }
 
+    /// Key info (size/type) is static per key, but fetching it costs an
+    /// IOKit syscall — uncached, every sensor read paid two syscalls
+    /// (info + read) per key, every sample tick. Cache it forever.
+    private var keyInfoCache: [UInt32: PulseSMCKeyInfo] = [:]
+
     private func keyInfo(_ key: UInt32) -> PulseSMCKeyInfo? {
+        if let cached = keyInfoCache[key] { return cached }
         var input = PulseSMCKeyData()
         input.key = key
         input.data8 = UInt8(kPulseSMCGetKeyInfo)
-        return call(&input)?.keyInfo
+        guard let info = call(&input)?.keyInfo else { return nil }
+        keyInfoCache[key] = info
+        return info
     }
 
     private func keyAtIndex(_ index: UInt32) -> UInt32? {
