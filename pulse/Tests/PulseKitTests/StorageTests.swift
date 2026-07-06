@@ -80,6 +80,37 @@ private func setModified(_ url: URL, daysAgo: Int) throws {
     }
 }
 
+// MARK: - UndoJournal pruneMissing
+
+@Suite struct UndoJournalPruneMissingTests {
+    @Test func dropsEntriesWhoseTrashedCopiesAreGone() async throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let alivePath = dir.appendingPathComponent("alive.bin")
+        try writeFile(at: alivePath, megabytes: 1)
+
+        let journal = UndoJournal(storeURL: dir.appendingPathComponent("journal.json"))
+        await journal.record(UndoEntry(
+            op: "Mixed",
+            items: [
+                TrashedItem(originalPath: "/tmp/a", trashPath: alivePath.path),
+                TrashedItem(originalPath: "/tmp/b", trashPath: dir.appendingPathComponent("gone.bin").path),
+            ],
+            bytesFreed: 2))
+        await journal.record(UndoEntry(
+            op: "All gone",
+            items: [TrashedItem(originalPath: "/tmp/c", trashPath: dir.appendingPathComponent("gone2.bin").path)],
+            bytesFreed: 1))
+
+        await journal.pruneMissing()
+
+        let entries = await journal.entries
+        #expect(entries.count == 1)
+        #expect(entries[0].op == "Mixed")
+        #expect(entries[0].items.map(\.trashPath) == [alivePath.path])
+    }
+}
+
 // MARK: - StorageScanner
 
 @Suite struct FastDirectorySizeTests {

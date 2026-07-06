@@ -295,6 +295,9 @@ final class StorageModel {
 
     func refreshUndoHistory() {
         Task {
+            // Trash may have been emptied (here or in Finder) — drop history
+            // items that can no longer be restored before showing the list.
+            await UndoJournal.shared.pruneMissing()
             self.undoEntries = await UndoJournal.shared.entries
         }
     }
