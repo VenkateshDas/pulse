@@ -37,7 +37,11 @@ struct UninstallView: View {
             "Uninstall",
             subtitle:
                 "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app goes to the Trash and every leftover is staged in the Vault — nothing is ever destroyed."
-        )
+        ) {
+            RefreshButton(help: "Reload installed apps", disabled: model.isLoadingApps) {
+                model.loadInstalledApps()
+            }
+        }
     }
 
     private var tabBar: some View {

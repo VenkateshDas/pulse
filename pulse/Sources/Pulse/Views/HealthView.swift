@@ -72,7 +72,13 @@ struct HealthView: View {
         PageHeader(
             "Health",
             subtitle: "Battery, startup agents, and repeatable performance benchmarks."
-        )
+        ) {
+            // Battery/bluetooth re-sample every 5s on their own — startup
+            // items are the cached bit worth a manual refresh.
+            RefreshButton(help: "Refresh startup items") {
+                model.refreshStartupItems()
+            }
+        }
         .padding(.bottom, 4)
     }
 }

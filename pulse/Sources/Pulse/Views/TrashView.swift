@@ -18,6 +18,10 @@ struct TrashView: View {
                     "Trash",
                     subtitle: "\(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))) — plus every Pulse operation you can still undo."
                 ) {
+                    RefreshButton(help: "Refresh Trash contents") {
+                        storage.refreshTrashInfo()
+                        storage.refreshUndoHistory()
+                    }
                     if selectedTab == .raw {
                         Button(role: .destructive) {
                             storage.emptyTrash()
