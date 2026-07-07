@@ -33,8 +33,9 @@ struct SettingsView: View {
                     permissionsSection
                     aboutSection
                 }
-                .frame(maxWidth: 720, alignment: .leading)
             }
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
             .padding(28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
