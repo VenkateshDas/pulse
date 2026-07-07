@@ -31,6 +31,12 @@ final class StorageModel {
         let sizeBytes: UInt64
     }
 
+    /// Yesterday's (or the last earlier day's) root-folder sizes, for the
+    /// per-folder ▲/▼ growth chips in Browse. Keyed by path.
+    private(set) var rootBaseline: [String: UInt64] = [:]
+    private static let rootBaselineKey = "PulseRootFolderBaseline"
+    private static let rootBaselineDateKey = "PulseRootFolderBaselineDate"
+
     private(set) var trashItemCount: Int = 0
     private(set) var trashBytes: UInt64 = 0
     private(set) var trashItems: [TrashItem] = []
@@ -42,6 +48,35 @@ final class StorageModel {
 
     init() {
         startTrashObserver()
+        if let saved = UserDefaults.standard.dictionary(forKey: Self.rootBaselineKey) as? [String: Int] {
+            rootBaseline = saved.mapValues { UInt64($0) }
+        }
+    }
+
+    /// Growth since the saved baseline day for a root folder, nil when the
+    /// folder is new or the baseline was taken today (no earlier day yet).
+    func rootDelta(for path: String) -> Int64? {
+        guard let old = rootBaseline[path], old > 0 else { return nil }
+        guard let node = navigationPath.first?.children?.first(where: { $0.path == path }),
+            node.sizeBytes > 0
+        else { return nil }
+        return Int64(node.sizeBytes) - Int64(old)
+    }
+
+    /// Once per day, after root sizes finish streaming: persist them so the
+    /// next day's Browse can show per-folder growth. In-memory baseline keeps
+    /// the earlier day's values for the rest of this session.
+    private func saveRootBaselineIfNewDay() {
+        let today = Calendar.current.startOfDay(for: .now).timeIntervalSince1970
+        guard UserDefaults.standard.double(forKey: Self.rootBaselineDateKey) != today,
+            let children = navigationPath.first?.children, !children.isEmpty
+        else { return }
+        let sizes = Dictionary(
+            children.filter { $0.sizeBytes > 0 }.map { ($0.path, Int($0.sizeBytes)) },
+            uniquingKeysWith: { a, _ in a })
+        UserDefaults.standard.set(sizes, forKey: Self.rootBaselineKey)
+        UserDefaults.standard.set(today, forKey: Self.rootBaselineDateKey)
+        if rootBaseline.isEmpty { rootBaseline = sizes.mapValues { UInt64($0) } }
     }
     
     private func startTrashObserver() {
@@ -93,8 +128,9 @@ final class StorageModel {
                 }
             }
             self.isStreamingSizes = false
+            self.saveRootBaselineIfNewDay()
         }
-        
+
         Task {
             let result = await Task.detached(priority: .userInitiated) {
                 SmartScanner().scan()
