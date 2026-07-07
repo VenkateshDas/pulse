@@ -2,12 +2,12 @@ import AppKit
 import PulseKit
 import SwiftUI
 
-/// Centralized Settings page: General, Menu Bar, Notifications, Attention &
-/// Snooze, Cleanup, Displays, Permissions, and About. Cleanup and Displays
-/// already own full-featured controls on their own sidebar pages
-/// (`CleanView`/`AutoCleanCard`, `DisplaysView`) — this page only summarizes
-/// them with a quick link, so there's exactly one place that owns each
-/// setting's UI.
+/// Centralized Settings page: a single readable column of icon-badged
+/// sections — General, Menu Bar, Notifications, Dashboard, Managed Elsewhere
+/// (quick links), Permissions, and About. Cleanup and Displays own their
+/// full controls on their sidebar pages (`CleanView`/`AutoCleanCard`,
+/// `DisplaysView`); this page only summarizes them with a link so exactly
+/// one place owns each setting's UI.
 struct SettingsView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(Updater.self) private var updater
@@ -16,40 +16,36 @@ struct SettingsView: View {
     private static let autoHideOptions: [TimeInterval] = [0, 5, 10, 15, 30]
     private static let maxItemsOptions = [1, 2, 3, 4, 5]
     private static let snoozeOptions: [TimeInterval] = [3600, 4 * 3600, 24 * 3600]
-    private static let gridColumns = [GridItem(.adaptive(minimum: 340), spacing: 16, alignment: .top)]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                header
-                LazyVGrid(columns: Self.gridColumns, alignment: .leading, spacing: 16) {
+                PageHeader(
+                    "Settings",
+                    subtitle: "Customize how Pulse runs, what it shows, and what it's allowed to do."
+                )
+                VStack(alignment: .leading, spacing: 16) {
                     generalSection
                     menuBarSection
                     notificationsSection
                     attentionSection
-                    cleanupSection
-                    displaysSection
+                    quickLinksSection
+                    permissionsSection
                     aboutSection
                 }
-                permissionsSection
             }
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
             .padding(28)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Halo.void)
     }
 
-    private var header: some View {
-        PageHeader(
-            "Settings",
-            subtitle: "Customize how Pulse runs, what it shows, and what it's allowed to do."
-        )
-    }
-
     // MARK: - General
 
     private var generalSection: some View {
-        section("General") {
+        section("General", icon: "gearshape.fill", tint: Halo.textDim) {
             settingsRow(
                 title: "Show Dock Icon",
                 detail: "Keep a permanent Dock icon. Otherwise Pulse only appears in the Dock while the Command Center is open."
@@ -58,7 +54,7 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
             }
-            Divider().overlay(Halo.borderSubtle)
+            rowDivider
             settingsRow(
                 title: "Launch at Login",
                 detail: "Start Pulse automatically when you sign in."
@@ -87,7 +83,8 @@ struct SettingsView: View {
     // MARK: - Menu Bar
 
     private var menuBarSection: some View {
-        section("Menu Bar") {
+        let enabled = MenuBarManager.shared.isEnabled
+        return section("Menu Bar", icon: "menubar.rectangle", tint: Halo.ion) {
             settingsRow(
                 title: "Show in Menu Bar",
                 detail: "Adds a collapsible chevron so you can hide other menu-bar icons to its left."
@@ -96,23 +93,22 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
             }
-
-            if MenuBarManager.shared.isEnabled {
-                Divider().overlay(Halo.borderSubtle)
-
-                settingsRow(
-                    title: "Auto-Hide Delay",
-                    detail: "How long after launch before hidden icons collapse automatically."
-                ) {
-                    Picker("", selection: autoHideDelayBinding) {
-                        ForEach(Self.autoHideOptions, id: \.self) { delay in
-                            Text(delay == 0 ? "Off" : "\(Int(delay))s").tag(delay)
-                        }
+            rowDivider
+            settingsRow(
+                title: "Auto-Hide Delay",
+                detail: "How long after launch before hidden icons collapse automatically."
+            ) {
+                Picker("", selection: autoHideDelayBinding) {
+                    ForEach(Self.autoHideOptions, id: \.self) { delay in
+                        Text(delay == 0 ? "Off" : "\(Int(delay))s").tag(delay)
                     }
-                    .labelsHidden()
-                    .frame(width: 90)
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 230)
+                .disabled(!enabled)
             }
+            .opacity(enabled ? 1 : 0.45)
         }
     }
 
@@ -133,7 +129,10 @@ struct SettingsView: View {
     // MARK: - Notifications
 
     private var notificationsSection: some View {
-        section("Notifications") {
+        section(
+            "Notifications", icon: "bell.badge.fill", tint: Halo.flare,
+            footnote: "Auto-clean completion notices are set on the Storage page."
+        ) {
             settingsRow(
                 title: "Critical Alerts",
                 detail: "Notify when something needs attention now — runaway process, low disk, thermal throttling."
@@ -142,7 +141,7 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
             }
-            Divider().overlay(Halo.borderSubtle)
+            rowDivider
             settingsRow(
                 title: "Weekly Report",
                 detail: "A Monday-morning summary of reclaimed space and Mac health."
@@ -151,10 +150,6 @@ struct SettingsView: View {
                     .toggleStyle(.switch)
                     .labelsHidden()
             }
-            Divider().overlay(Halo.borderSubtle)
-            Text("Auto-clean completion notices are set on the Storage page.")
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.textDim.opacity(0.8))
         }
     }
 
@@ -172,12 +167,12 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: - Attention & Snooze
+    // MARK: - Dashboard (attention & snooze)
 
     private var attentionSection: some View {
-        section("Attention & Snooze") {
+        section("Dashboard", icon: "rectangle.3.group.fill", tint: Halo.amber) {
             settingsRow(
-                title: "Items Shown",
+                title: "Attention Items Shown",
                 detail: "Max number of guided-focus cards on the Dashboard at once."
             ) {
                 Picker("", selection: maxItemsBinding) {
@@ -185,10 +180,11 @@ struct SettingsView: View {
                         Text("\(count)").tag(count)
                     }
                 }
+                .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 70)
+                .frame(width: 170)
             }
-            Divider().overlay(Halo.borderSubtle)
+            rowDivider
             settingsRow(
                 title: "Default Snooze",
                 detail: "How long the quick \u{2018}Snooze\u{2019} action hides an item."
@@ -198,15 +194,16 @@ struct SettingsView: View {
                         Text(snoozeLabel(duration)).tag(duration)
                     }
                 }
+                .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 90)
+                .frame(width: 150)
             }
         }
     }
 
     private func snoozeLabel(_ duration: TimeInterval) -> String {
         let hours = Int(duration / 3600)
-        return hours >= 24 ? "\(hours / 24)d" : "\(hours)h"
+        return hours >= 24 ? "\(hours / 24) day" : "\(hours)h"
     }
 
     private var maxItemsBinding: Binding<Int> {
@@ -223,22 +220,21 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: - Cleanup
+    // MARK: - Quick links to settings owned by other pages
 
-    private var cleanupSection: some View {
-        section("Cleanup") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(cleanupSummary)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Halo.textPrimary)
-                Text("Schedule, safe-tier auto-clean, and completion notices live on the Storage page.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Manage in Storage \u{2192}") { selection = .storage }
-                    .buttonStyle(.bordered)
-                    .tint(Halo.ion)
-            }
+    private var quickLinksSection: some View {
+        section("Managed Elsewhere", icon: "arrow.uturn.forward", tint: Halo.ion) {
+            linkRow(
+                title: "Cleanup Schedule",
+                detail: "Schedule, safe-tier auto-clean, and completion notices.",
+                summary: cleanupSummary
+            ) { selection = .storage }
+            rowDivider
+            linkRow(
+                title: "Displays",
+                detail: "Per-monitor brightness and adaptive sync.",
+                summary: displaysSummary
+            ) { selection = .displays }
         }
     }
 
@@ -246,26 +242,7 @@ struct SettingsView: View {
         let schedule = clean.schedule
         let freq = schedule.frequency.rawValue.capitalized
         let time = schedule.timePreference.rawValue.capitalized
-        return "\(freq) \u{00b7} \(time)" + (schedule.autoCleanSafeTier ? " \u{00b7} auto-clean on" : " \u{00b7} auto-clean off")
-    }
-
-    // MARK: - Displays
-
-    private var displaysSection: some View {
-        section("Displays") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(displaysSummary)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Halo.textPrimary)
-                Text("Per-monitor brightness and adaptive sync live on the Displays page.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Manage in Displays \u{2192}") { selection = .displays }
-                    .buttonStyle(.bordered)
-                    .tint(Halo.ion)
-            }
-        }
+        return "\(freq) \u{00b7} \(time) \u{00b7} auto-clean \(schedule.autoCleanSafeTier ? "on" : "off")"
     }
 
     private var displaysSummary: String {
@@ -273,17 +250,31 @@ struct SettingsView: View {
         return count == 0 ? "No displays detected" : "\(count) display\(count == 1 ? "" : "s") connected"
     }
 
+    // MARK: - Permissions
+
+    private var permissionsSection: some View {
+        section(
+            "Permissions", icon: "lock.shield.fill", tint: Halo.pulseGreen,
+            footnote: "Pulse asks for the minimum it needs; optional grants unlock specific features."
+        ) {
+            PermissionsSection()
+        }
+    }
+
     // MARK: - About
 
     private var aboutSection: some View {
-        section("About") {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Pulse \u{00b7} v\(updater.currentVersion)")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Halo.textPrimary)
-                aboutStatusText
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
+        section("About", icon: "info.circle.fill", tint: Halo.textDim) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Pulse \u{00b7} v\(updater.currentVersion)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Halo.textPrimary)
+                    aboutStatusText
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textDim)
+                }
+                Spacer(minLength: 12)
                 aboutAction
             }
         }
@@ -309,32 +300,47 @@ struct SettingsView: View {
         } else {
             Button("Check for Updates\u{2026}") { updater.checkForUpdates(userInitiated: true) }
                 .buttonStyle(.bordered)
+                .disabled(updater.status == .checking)
         }
-    }
-
-    // MARK: - Permissions
-
-    private var permissionsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("PERMISSIONS")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(Halo.textDim.opacity(0.7))
-            PermissionsSection()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .premiumCard(cornerRadius: Halo.Radius.medium)
     }
 
     // MARK: - Shared layout
 
-    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(title.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.2)
-                .foregroundStyle(Halo.textDim.opacity(0.7))
+    private var rowDivider: some View {
+        Divider().overlay(Halo.borderSubtle).padding(.vertical, 2)
+    }
+
+    private func section(
+        _ title: String, icon: String, tint: Color, footnote: String? = nil,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(
+                                LinearGradient(
+                                    colors: [tint.opacity(0.85), tint.opacity(0.55)],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                    )
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Halo.textPrimary)
+            }
+            .padding(.bottom, 2)
             content()
+            if let footnote {
+                Text(footnote)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Halo.textDim.opacity(0.8))
+                    .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .premiumCard(cornerRadius: Halo.Radius.medium)
@@ -343,7 +349,7 @@ struct SettingsView: View {
     private func settingsRow(
         title: String, detail: String, @ViewBuilder control: () -> some View
     ) -> some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
@@ -356,5 +362,32 @@ struct SettingsView: View {
             Spacer(minLength: 12)
             control()
         }
+    }
+
+    /// Whole-row button linking to the page that owns the setting.
+    private func linkRow(
+        title: String, detail: String, summary: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Halo.textPrimary)
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textDim)
+                }
+                Spacer(minLength: 12)
+                Text(summary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Halo.textDim)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Halo.textDim)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
