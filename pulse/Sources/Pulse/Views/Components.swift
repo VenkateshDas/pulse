@@ -48,6 +48,29 @@ enum ProcessIconCache {
     }
 }
 
+// MARK: - Refresh button
+
+/// Small header refresh control, shared by every page that shows cached
+/// scan data (live-sampled pages update themselves and don't need one).
+struct RefreshButton: View {
+    let help: String
+    var disabled = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 13, weight: .semibold))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Halo.textDim)
+        .help(help)
+        .accessibilityLabel(help)
+        .disabled(disabled)
+        .opacity(disabled ? 0.4 : 1)
+    }
+}
+
 // MARK: - Page header
 
 /// Standard page header: 24pt bold title, dim one-line subtitle, optional

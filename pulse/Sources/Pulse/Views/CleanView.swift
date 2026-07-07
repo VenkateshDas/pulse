@@ -57,6 +57,13 @@ struct CleanView: View {
             "Reclaim",
             subtitle: "Everything safe to remove, grouped by kind — safe items pre-selected, careful items opt-in."
         ) {
+            RefreshButton(
+                help: "Rescan cleanable items",
+                disabled: storage.scanState == .scanning
+            ) {
+                storage.refreshAll()
+                insights.scan()
+            }
             Button("Select All Safe") {
                 storage.selectAllSafe()
             }

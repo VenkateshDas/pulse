@@ -538,10 +538,13 @@ final class MenuBarManager {
     /// The reconcile is cheap and write-only-on-change, so polling is safe.
     private func startHeartbeat() {
         stopHeartbeat()
-        let timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+        // 30s + wide tolerance: wake/screen-change observers catch the common
+        // breakages immediately; the heartbeat is only the slow safety net,
+        // and a 5s cadence kept waking the app for nothing.
+        let timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
             Task { @MainActor in MenuBarManager.shared.reconcile() }
         }
-        timer.tolerance = 2
+        timer.tolerance = 10
         heartbeatTimer = timer
     }
 

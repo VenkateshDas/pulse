@@ -193,6 +193,12 @@ public class BrightnessEngine: ObservableObject {
         if showOSD {
             BrightnessOSD.shared.show(fraction: clampedValue, on: monitor.id)
         }
+
+        // Pulse's own built-in writes (slider, media keys) don't come back
+        // through hardwareBrightnessDidChange (echo guard) — sync here.
+        if monitor.isBuiltIn {
+            syncExternalsToBuiltIn()
+        }
     }
 
     // MARK: - Async DDC writes
@@ -254,6 +260,11 @@ public class BrightnessEngine: ObservableObject {
         guard abs((brightnessMap[id] ?? -1) - clamped) > 0.005 else { return }
         brightnessMap[id] = clamped
         saveBrightnessMap()
+        // Built-in changed outside Pulse (macOS keys, Control Center,
+        // auto-brightness) — follow it on the externals right away.
+        if monitors.first(where: { $0.id == id })?.isBuiltIn == true {
+            syncExternalsToBuiltIn()
+        }
     }
 
     public func adjustBrightness(for monitor: Monitor, delta: Double) {
@@ -279,41 +290,42 @@ public class BrightnessEngine: ObservableObject {
     }
     
     private var syncTask: Task<Void, Never>?
-    
+
+    /// Adaptive sync is event-driven: built-in brightness changes arrive via
+    /// the DisplayServices notification (`hardwareBrightnessDidChange`) and
+    /// Pulse's own `setBrightness`, both of which trigger
+    /// `syncExternalsToBuiltIn`. This loop is only a slow safety net for a
+    /// setup where the notification doesn't fire — the old 2s poll kept the
+    /// CPU warm around the clock whenever adaptive mode was on.
     private func startAdaptiveSync() {
         guard syncTask == nil else { return }
-        syncTask = Task.detached { [weak self] in
+        syncExternalsToBuiltIn()
+        syncTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self = self else { return }
-                
-                let (builtIn, externals, currentMap) = await MainActor.run { 
-                    (
-                        self.monitors.first { $0.isBuiltIn }, 
-                        self.monitors.filter { !$0.isBuiltIn },
-                        self.brightnessMap
-                    ) 
-                }
-                
-                if let builtIn = builtIn, !externals.isEmpty {
-                    let sourceBrightness = currentMap[builtIn.id] ?? self.getBrightness(for: builtIn)
-                    for ext in externals {
-                        let currentExt = currentMap[ext.id] ?? self.getBrightness(for: ext)
-                        if abs(currentExt - sourceBrightness) > 0.02 {
-                            await MainActor.run {
-                                self.setBrightness(for: ext, to: sourceBrightness, showOSD: false)
-                            }
-                        }
-                    }
-                }
-                
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // check every 2 seconds
+                try? await Task.sleep(for: .seconds(60))
+                guard let self else { return }
+                self.syncExternalsToBuiltIn()
             }
         }
     }
-    
+
     private func stopAdaptiveSync() {
         syncTask?.cancel()
         syncTask = nil
+    }
+
+    /// Mirrors the built-in display's brightness onto every external monitor.
+    /// No-op unless adaptive mode is on and a built-in display exists.
+    private func syncExternalsToBuiltIn() {
+        guard isAdaptiveModeEnabled,
+              let builtIn = monitors.first(where: { $0.isBuiltIn }) else { return }
+        let source = brightnessMap[builtIn.id] ?? getBrightness(for: builtIn)
+        for ext in monitors where !ext.isBuiltIn {
+            let current = brightnessMap[ext.id] ?? getBrightness(for: ext)
+            if abs(current - source) > 0.02 {
+                setBrightness(for: ext, to: source, showOSD: false)
+            }
+        }
     }
     
     private struct DDCPayload {

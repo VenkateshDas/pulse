@@ -35,6 +35,9 @@ struct OptimizeView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.pulseGreen)
             }
+            RefreshButton(help: "Re-check task previews", disabled: model.isAnyRunning) {
+                model.refreshAllStatuses()
+            }
             Button {
                 Task { await model.runAll() }
             } label: {

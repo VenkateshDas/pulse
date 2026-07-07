@@ -4,9 +4,11 @@ import Foundation
 /// Uses `volumeAvailableCapacityForImportantUsage` so the number matches
 /// Finder (counts purgeable space as available).
 final class DiskSampler {
-    private let rootURL = URL(fileURLWithPath: "/")
-
     func sample() -> (freeBytes: UInt64, totalBytes: UInt64) {
+        // NSURL caches resource values per URL instance — a stored URL froze
+        // free space at its first read for the app's whole lifetime (values
+        // only refreshed on relaunch). A fresh URL per sample reads live.
+        let rootURL = URL(fileURLWithPath: "/")
         let keys: Set<URLResourceKey> = [
             .volumeAvailableCapacityForImportantUsageKey,
             .volumeTotalCapacityKey,

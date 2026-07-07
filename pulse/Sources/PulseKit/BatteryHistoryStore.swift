@@ -32,6 +32,12 @@ public final class BatteryHistoryStore {
 
     public private(set) var entries: [Entry]
     private let fileURL: URL?
+    /// Time-on-battery accrues every sample tick (3–30s); persisting each
+    /// tick meant an atomic disk write that often, which itself costs battery.
+    /// Same-day accrual is throttled; a new day's first entry writes at once.
+    /// A crash loses at most this window of on-battery time.
+    private static let persistThrottle: TimeInterval = 60
+    private var lastTimePersist = Date.distantPast
 
     public init(fileURL: URL? = BatteryHistoryStore.defaultFileURL(), now: Date = .now) {
         self.fileURL = fileURL
@@ -53,6 +59,7 @@ public final class BatteryHistoryStore {
         guard date.timeIntervalSince(Calendar.current.startOfDay(for: date)) >= 0 else { return }
         let startOfDay = Calendar.current.startOfDay(for: date)
         let sessionStart = date.addingTimeInterval(-duration)
+        let isNewDay = !entries.contains { $0.date == startOfDay }
 
         if let index = entries.firstIndex(where: { $0.date == startOfDay }) {
             entries[index].timeOnBattery += duration
@@ -68,7 +75,10 @@ public final class BatteryHistoryStore {
             entries.sort { $0.date < $1.date }
         }
         entries.removeAll { date.timeIntervalSince($0.date) > Self.maxAge }
-        persist()
+        if isNewDay || Date().timeIntervalSince(lastTimePersist) >= Self.persistThrottle {
+            persist()
+            lastTimePersist = Date()
+        }
     }
 
     /// Records the day's battery capacity once — overwrites if already set so

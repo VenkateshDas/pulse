@@ -42,6 +42,13 @@ final class OptimizeModel {
         }
     }
 
+    /// Manual refresh: re-evaluates skip + preview for every task.
+    func refreshAllStatuses() {
+        for task in tasks {
+            Task { await refresh(task) }
+        }
+    }
+
     /// Re-evaluates skip + preview for one task (after a run, things change).
     func refresh(_ task: OptimizeTask) async {
         let skip = await task.skipCheck()
