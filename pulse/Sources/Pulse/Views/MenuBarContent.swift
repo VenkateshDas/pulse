@@ -2,10 +2,6 @@ import AppKit
 import PulseKit
 import SwiftUI
 
-extension Notification.Name {
-    static let navigateToOptimize = Notification.Name("PulseNavigateToOptimize")
-}
-
 /// Compact popover shown from the menu bar item: live vitals with 30s
 /// sparklines, top processes, the 7-day disk delta, and quick actions
 /// (Open Command Center, Quick Clean, Empty Trash).
@@ -21,6 +17,7 @@ struct MenuBarContent: View {
     @State private var optimizeReport: String?
     @State private var menuBarCollapsed = false
     @State private var confirmAttentionQuit: (pid: Int32, name: String)?
+    @State private var confirmEmptyTrash = false
 
     /// 30s ≈ 15 two-second samples — the popover's sparkline window.
     private static let sparkSamples = 15
@@ -107,6 +104,15 @@ struct MenuBarContent: View {
         } message: {
             Text("Sends a normal Quit signal. Unsaved work in that app may be lost.")
         }
+        .confirmationDialog(
+            "Empty the Trash?",
+            isPresented: $confirmEmptyTrash, titleVisibility: .visible
+        ) {
+            Button("Empty Trash", role: .destructive) { storage.emptyTrash() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Permanently erases \(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))). This can't be undone.")
+        }
     }
 
     // MARK: HUD (top attention item + score)
@@ -164,10 +170,19 @@ struct MenuBarContent: View {
                     .tint(Halo.ion.opacity(0.85))
                     .controlSize(.mini)
             case .cleanJunk:
-                Button("Clean") { clean.runNow() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Halo.amber.opacity(0.85))
-                    .controlSize(.mini)
+                Button {
+                    clean.runNow()
+                } label: {
+                    if clean.isRunning {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Text("Clean")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Halo.amber.opacity(0.85))
+                .controlSize(.mini)
+                .disabled(clean.isRunning)
             case .openPane(let target):
                 Button("Review") { navigateAttention(to: target) }
                     .buttonStyle(.bordered)
@@ -186,7 +201,9 @@ struct MenuBarContent: View {
         case .monitor:
             NotificationCenter.default.post(name: DashboardView.navigateToMonitor, object: nil)
         case .storage:
-            NotificationCenter.default.post(name: .navigateToOptimize, object: nil)
+            // Low-disk review belongs on Storage → Reclaim (the cleanable
+            // list), not Optimize — same route the Timeline spike tap uses.
+            NotificationCenter.default.post(name: TimelineView.navigateToClean, object: nil)
         }
     }
 
@@ -226,8 +243,9 @@ struct MenuBarContent: View {
             }
             bar(snapshot.diskUsedFraction)
             if let weekly = snapshot.diskWeeklyGrowthBytes {
-                let sign = weekly >= 0 ? "−" : "+"  // growth shrinks free space
-                Text("\(sign)\(ByteFormat.string(UInt64(abs(weekly)))) this week")
+                // Same sign semantics as the Dashboard disk card: + = usage grew.
+                let sign = weekly >= 0 ? "+" : "−"
+                Text("\(sign)\(ByteFormat.string(UInt64(abs(weekly)))) used this week")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(weekly >= 0 ? Halo.amber : Halo.pulseGreen)
             }
@@ -448,7 +466,7 @@ struct MenuBarContent: View {
                 .disabled(isOptimizing)
 
                 Button {
-                    storage.emptyTrash()
+                    confirmEmptyTrash = true
                 } label: {
                     Label(trashLabel, systemImage: "trash")
                         .frame(maxWidth: .infinity)

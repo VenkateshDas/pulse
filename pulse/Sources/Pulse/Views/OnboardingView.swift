@@ -21,7 +21,7 @@ struct OnboardingView: View {
                 Text("Welcome to Pulse")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Halo.textPrimary)
-                Text("Grant what you'll use and you're set. Pulse never moves a file without staging it in the Vault first — everything is restorable.")
+                Text("Grant what you'll use and you're set. Pulse never destroys a file — removals go to the Trash and stay restorable.")
                     .font(.system(size: 13))
                     .foregroundStyle(Halo.textDim)
                     .fixedSize(horizontal: false, vertical: true)

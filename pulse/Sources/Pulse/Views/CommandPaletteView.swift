@@ -35,12 +35,21 @@ struct CommandPaletteView: View {
             Command(
                 title: "Run Quick Clean", subtitle: "Move the safe tier to Trash",
                 symbol: "sparkles"
-            ) { selection = .storage; clean.runNow() })
+            ) {
+                storage.pendingDiskTab = 1  // land on Reclaim, where the result shows
+                selection = .storage
+                clean.runNow()
+            })
         list.append(
             Command(
-                title: "Empty Trash", subtitle: "Empty the macOS Trash",
+                title: "Empty Trash", subtitle: "Review and empty the macOS Trash",
                 symbol: "trash"
-            ) { selection = .storage; storage.emptyTrash() })
+            ) {
+                // Destructive — open the Trash tab so emptying goes through
+                // its confirmation instead of firing straight from the palette.
+                storage.pendingDiskTab = 2
+                selection = .storage
+            })
         list.append(
             Command(
                 title: "Scan Orphaned Files",

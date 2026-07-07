@@ -493,8 +493,8 @@ struct TimelineView: View {
     }
 
     private func deltaSub(_ delta: Int64) -> String {
-        let grew = delta >= 0
-        return "\(grew ? "▲" : "▼") \(grew ? "+" : "−")\(ByteFormat.string(UInt64(abs(delta))))"
+        // Arrow already carries the direction — no redundant +/− sign.
+        "\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))"
     }
 
     private func diskDeltaColor(_ delta: Int64) -> Color {

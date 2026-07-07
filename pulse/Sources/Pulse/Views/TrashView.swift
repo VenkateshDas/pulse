@@ -5,7 +5,8 @@ import SwiftUI
 struct TrashView: View {
     @Environment(StorageModel.self) private var storage
     @State private var selectedTab: Tab = .raw
-    
+    @State private var confirmEmpty = false
+
     enum Tab {
         case raw
         case history
@@ -22,9 +23,17 @@ struct TrashView: View {
                         storage.refreshTrashInfo()
                         storage.refreshUndoHistory()
                     }
+                    if storage.isCleaning {
+                        ProgressView().controlSize(.small)
+                    } else if let report = storage.cleanReport {
+                        Text(report)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Halo.pulseGreen)
+                            .lineLimit(1)
+                    }
                     if selectedTab == .raw {
                         Button(role: .destructive) {
-                            storage.emptyTrash()
+                            confirmEmpty = true
                         } label: {
                             Text("Empty Trash")
                                 .font(.system(size: 11, weight: .semibold))
@@ -67,6 +76,15 @@ struct TrashView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Halo.void)
+        .confirmationDialog(
+            "Empty the Trash?",
+            isPresented: $confirmEmpty, titleVisibility: .visible
+        ) {
+            Button("Empty Trash", role: .destructive) { storage.emptyTrash() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Permanently erases \(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))). This can't be undone.")
+        }
         .onAppear {
             storage.refreshTrashInfo()
             storage.refreshUndoHistory()

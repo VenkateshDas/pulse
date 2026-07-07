@@ -74,9 +74,6 @@ struct RootView: View {
             if let pid = note.object as? Int32 { monitorModel.select(pid) }
             selection = .monitor
         }
-        .onReceive(NotificationCenter.default.publisher(for: .navigateToOptimize)) { _ in
-            selection = .optimize
-        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)
