@@ -9,6 +9,7 @@ struct RootView: View {
     @Environment(UninstallModel.self) private var uninstall
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
+    @Environment(TimelineModel.self) private var timeline
     @State private var selection: SidebarItem = .dashboard
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
@@ -63,6 +64,12 @@ struct RootView: View {
             clean.start()
             // Record this build so a post-update re-prompt fires at most once.
             PermissionsGate.markPrompted()
+        }
+        // Every finished scan updates today's timeline snapshot, so growth
+        // attribution has category data even when Timeline is never opened
+        // that day. RootView outlives every pane, so no completion is missed.
+        .onChange(of: storage.scanState) { _, state in
+            if case .done = state { timeline.recordToday(scan: storage.scan) }
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
             storage.pendingDiskTab = 1

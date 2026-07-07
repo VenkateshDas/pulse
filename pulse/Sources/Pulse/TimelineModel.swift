@@ -37,6 +37,12 @@ final class TimelineModel {
     /// Day-over-day used-space change, oldest first.
     var deltas: [(date: Date, deltaBytes: Int64)] { store.dailyDeltas() }
 
+    /// Per-category breakdown of where `date`'s disk change happened, or nil
+    /// when no scan ran on that day (or any earlier day).
+    func attribution(for date: Date) -> TimelineStore.DayAttribution? {
+        store.attribution(for: date)
+    }
+
     /// Total used-space change across the recorded window.
     var weeklyDeltaBytes: Int64 {
         let cutoff = Calendar.current.startOfDay(for: Date.now.addingTimeInterval(-7 * 86400))
