@@ -58,7 +58,7 @@ public struct RecentGrowthScanner: Sendable {
     /// locations ("/Users/x/Library/Caches") instead of one row per leaf dir.
     static let groupDepth = 4
     /// Groups smaller than this are summed into the report total but not listed.
-    static let minimumGroupBytes: UInt64 = 100_000_000
+    static let minimumGroupBytes: UInt64 = 25_000_000
     static let topFilesPerGroup = 8
 
     public init() {}
@@ -71,7 +71,7 @@ public struct RecentGrowthScanner: Sendable {
         let fm = FileManager.default
         let keys: [URLResourceKey] = [
             .isRegularFileKey, .isSymbolicLinkKey, .totalFileAllocatedSizeKey,
-            .contentModificationDateKey,
+            .contentModificationDateKey, .creationDateKey,
         ]
         let enumerator = fm.enumerator(
             at: URL(fileURLWithPath: "/"), includingPropertiesForKeys: keys,
@@ -92,13 +92,20 @@ public struct RecentGrowthScanner: Sendable {
             }
             guard values.isRegularFile == true else { continue }
             scanned += 1
-            guard let modified = values.contentModificationDate, modified >= cutoff,
+            // Copies and unarchives preserve mtime, so a file downloaded
+            // yesterday can carry a years-old modification date — its
+            // birthtime is when it landed on this disk. Newest of the two
+            // decides membership in the window.
+            let modified = values.contentModificationDate ?? .distantPast
+            let created = values.creationDate ?? .distantPast
+            let arrived = max(modified, created)
+            guard arrived >= cutoff,
                 let size = values.totalFileAllocatedSize, size > 0
             else { continue }
             files.append(
                 RecentFile(
                     path: path, name: url.lastPathComponent,
-                    sizeBytes: UInt64(size), modified: modified))
+                    sizeBytes: UInt64(size), modified: arrived))
         }
         return Self.report(from: files, scannedFiles: scanned, cutoff: cutoff)
     }

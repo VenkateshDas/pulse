@@ -179,30 +179,46 @@ struct StorageView: View {
         let total = model.snapshot?.diskTotalBytes ?? 0
         let used = total > free ? total - free : 0
         if !storage.isStreamingSizes, used > listed, used - listed > 1_000_000_000 {
-            HStack(spacing: 8) {
-                Image(systemName: "eye.slash")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.textDim)
-                    .frame(width: 18)
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("Hidden & system data")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Halo.textDim)
-                        Spacer(minLength: 4)
-                        Text("~\(ByteFormat.string(used - listed))")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Halo.textDim)
-                    }
-                    Text("Snapshots, purgeable & system files outside these folders")
-                        .font(.system(size: 9))
-                        .foregroundStyle(Halo.textDim.opacity(0.7))
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            pseudoRow(
+                icon: "eye.slash",
+                title: "Hidden & system data",
+                subtitle: "Snapshots, purgeable & system files outside these folders",
+                value: "~\(ByteFormat.string(used - listed))",
+                valueColor: Halo.textDim)
             .help("Folders above sum to \(ByteFormat.string(listed)); used space is \(ByteFormat.string(used)). The difference is APFS snapshots, purgeable space and hidden system data macOS doesn't expose as folders.")
+            // With free space listed too, the column visibly sums to Total.
+            pseudoRow(
+                icon: "circle.dashed",
+                title: "Free space",
+                subtitle: "Folders + hidden + free = \(ByteFormat.string(total)) total",
+                value: ByteFormat.string(free),
+                valueColor: Halo.pulseGreen)
         }
+    }
+
+    private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textDim)
+                    Spacer(minLength: 4)
+                    Text(value)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(valueColor)
+                }
+                Text(subtitle)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.textDim.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
     }
 
     private func rowView(_ node: StorageNode, columnIndex: Int, maxBytes: UInt64, isOpen: Bool, info: StorageItemInfo, delta: Int64? = nil) -> some View {

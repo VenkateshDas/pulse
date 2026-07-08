@@ -54,7 +54,7 @@ struct GrowthView: View {
                 EmptyState(
                     icon: "checkmark.circle",
                     title: "No big growth here",
-                    hint: "Nothing over 100 MB was written in this window. Growth may be in snapshots or purgeable space — see the Hidden & system data row in Browse.")
+                    hint: "Checked \(report.scannedFiles.formatted()) files; \(ByteFormat.string(report.totalRecentBytes)) arrived in this window but no folder gathered over 25 MB. Growth may be in snapshots or purgeable space — see the Hidden & system data row in Browse.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 2) {
@@ -64,7 +64,7 @@ struct GrowthView: View {
                                 ForEach(group.topFiles) { file in fileRow(file) }
                             }
                         }
-                        Text("Files written in this window, grouped by folder. Rewritten files count at full size; deleted files and snapshot churn aren't listed.")
+                        Text("Checked \(report.scannedFiles.formatted()) files across the disk. Files created or modified in this window, grouped by folder; folders under 25 MB and snapshot churn aren't listed — those live in Browse's Hidden & system data row.")
                             .font(.system(size: 10))
                             .foregroundStyle(Halo.textDim.opacity(0.7))
                             .frame(maxWidth: .infinity, alignment: .leading)
