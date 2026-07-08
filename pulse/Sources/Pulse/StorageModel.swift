@@ -62,6 +62,66 @@ final class StorageModel {
         }
     }
 
+    // MARK: Usage graph ("what uses this")
+
+    /// Path currently shown in the usage graph sheet; nil hides it.
+    var usageGraphTarget: String?
+    private(set) var usageGraphEdges: [UsageEdge] = []
+    private(set) var isScanningUsage = false
+    @ObservationIgnored private let usageScanner = UsageGraphScanner()
+
+    func findUsage(for path: String, forceRescan: Bool = false) {
+        usageGraphTarget = path
+        isScanningUsage = true
+        usageGraphEdges = []
+        Task {
+            let edges = await usageScanner.referrers(
+                for: URL(fileURLWithPath: path),
+                forceRescan: forceRescan ? Set(ReferenceSignal.allCases) : [])
+            guard self.usageGraphTarget == path else { return }
+            self.usageGraphEdges = edges
+            self.isScanningUsage = false
+        }
+    }
+
+    func dismissUsageGraph() {
+        usageGraphTarget = nil
+        usageGraphEdges = []
+    }
+
+    /// Trashes the folder currently shown in the usage graph sheet — only
+    /// offered in the UI once it has zero referrers.
+    func trashUsageTarget() {
+        guard let path = usageGraphTarget, !isCleaning else { return }
+        isCleaning = true
+        let size = Self.itemSize(URL(fileURLWithPath: path))
+        let name = (path as NSString).lastPathComponent
+        Task {
+            let (report, trashed) = await Task.detached(priority: .userInitiated) {
+                do {
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: &trashedURL)
+                    if let trashPath = trashedURL?.path {
+                        let item = TrashedItem(originalPath: path, trashPath: trashPath)
+                        await UndoJournal.shared.record(UndoEntry(op: "Usage Graph Clean", items: [item], bytesFreed: Int64(size)))
+                    }
+                    return ("\(ByteFormat.string(size)) moved to Trash", true)
+                } catch {
+                    return ("Failed to move \(name) to Trash", false)
+                }
+            }.value
+            self.isCleaning = false
+            self.cleanReport = report
+            if trashed {
+                TrashSound.moveToTrash()
+                self.dismissUsageGraph()
+                self.navigationPath = self.navigationPath.pruning(deletedPath: path, bytes: size)
+            }
+            self.refreshTrashInfo()
+            self.refreshPurgeable()
+        }
+    }
+
     private(set) var trashItemCount: Int = 0
     private(set) var trashBytes: UInt64 = 0
     private(set) var trashItems: [TrashItem] = []
