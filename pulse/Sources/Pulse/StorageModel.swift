@@ -37,6 +37,31 @@ final class StorageModel {
     private static let rootBaselineKey = "PulseRootFolderBaseline"
     private static let rootBaselineDateKey = "PulseRootFolderBaselineDate"
 
+    // MARK: Growth scan ("where did my free space go")
+
+    private(set) var growthReport: GrowthReport?
+    private(set) var isGrowthScanning = false
+    var growthWindowDays = 2 {
+        didSet { if growthWindowDays != oldValue { runGrowthScan() } }
+    }
+    @ObservationIgnored private var growthTask: Task<Void, Never>?
+
+    func runGrowthScan() {
+        growthTask?.cancel()
+        isGrowthScanning = true
+        growthReport = nil
+        let cutoff = Calendar.current.startOfDay(
+            for: .now.addingTimeInterval(-Double(growthWindowDays) * 86400))
+        growthTask = Task {
+            let report = await Task.detached(priority: .userInitiated) {
+                RecentGrowthScanner().scan(since: cutoff)
+            }.value
+            guard !Task.isCancelled else { return }
+            self.growthReport = report
+            self.isGrowthScanning = false
+        }
+    }
+
     private(set) var trashItemCount: Int = 0
     private(set) var trashBytes: UInt64 = 0
     private(set) var trashItems: [TrashItem] = []
