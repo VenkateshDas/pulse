@@ -1088,8 +1088,8 @@ private struct BenchmarkCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     baselineFact("GOOD", "> 1000", "M1+ Class", color: Halo.pulseGreen)
-                    baselineFact("BAD", "500-1000", "Older Intel", color: Halo.amber)
-                    baselineFact("WORSE", "< 500", "Thermal Throttling", color: Halo.flare)
+                    baselineFact("FAIR", "500-1000", "Older Intel", color: Halo.amber)
+                    baselineFact("LOW", "< 500", "Thermal Throttling", color: Halo.flare)
                 }
                 .padding(.leading, 16)
                 .frame(maxHeight: .infinity)

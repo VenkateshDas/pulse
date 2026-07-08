@@ -102,10 +102,19 @@ private struct AttentionCard: View {
                 .tint(Halo.ion.opacity(0.85))
                 .controlSize(.small)
         case .cleanJunk:
-            Button("Clean") { clean.runNow() }
-                .buttonStyle(.borderedProminent)
-                .tint(Halo.amber.opacity(0.85))
-                .controlSize(.small)
+            Button {
+                clean.runNow()
+            } label: {
+                if clean.isRunning {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Text("Clean")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Halo.amber.opacity(0.85))
+            .controlSize(.small)
+            .disabled(clean.isRunning)
         case .openPane(let target):
             Button("Review") { navigate(to: target) }
                 .buttonStyle(.bordered)
@@ -149,7 +158,9 @@ private struct AttentionCard: View {
         case .monitor:
             NotificationCenter.default.post(name: DashboardView.navigateToMonitor, object: nil)
         case .storage:
-            NotificationCenter.default.post(name: .navigateToOptimize, object: nil)
+            // Storage review opens Storage → Reclaim, where the cleanable
+            // items actually live.
+            NotificationCenter.default.post(name: TimelineView.navigateToClean, object: nil)
         }
     }
 

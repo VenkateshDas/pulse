@@ -406,7 +406,7 @@ struct AutoCleanCard: View {
         }
         .buttonStyle(.plain)
         .disabled(model.isRunning)
-        .help("Scan and stage every safe-tier item into the Vault now")
+        .help("Scan and move every safe-tier item to the Trash now")
     }
 
     private func scheduleFact(label: String, value: String, tint: Color) -> some View {

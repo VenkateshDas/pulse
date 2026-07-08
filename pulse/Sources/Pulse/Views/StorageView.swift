@@ -158,7 +158,11 @@ struct StorageView: View {
                         rowView(
                             child, columnIndex: index, maxBytes: maxBytes,
                             isOpen: child.path == openChildPath,
-                            info: itemInfo(child, scanItems: scanItems))
+                            info: itemInfo(child, scanItems: scanItems),
+                            delta: index == 0 ? storage.rootDelta(for: child.path) : nil)
+                    }
+                    if index == 0, column.path == "/" {
+                        hiddenRemainderRow(listed: children.reduce(0) { $0 + $1.sizeBytes })
                     }
                 }
             }
@@ -166,7 +170,58 @@ struct StorageView: View {
         }
     }
 
-    private func rowView(_ node: StorageNode, columnIndex: Int, maxBytes: UInt64, isOpen: Bool, info: StorageItemInfo) -> some View {
+    /// Root folders never sum to "Used": APFS snapshots, purgeable space and
+    /// hidden system data live outside every listed folder. Say so instead of
+    /// letting the math silently not add up.
+    @ViewBuilder
+    private func hiddenRemainderRow(listed: UInt64) -> some View {
+        let free = model.snapshot?.diskFreeBytes ?? 0
+        let total = model.snapshot?.diskTotalBytes ?? 0
+        let used = total > free ? total - free : 0
+        if !storage.isStreamingSizes, used > listed, used - listed > 1_000_000_000 {
+            pseudoRow(
+                icon: "eye.slash",
+                title: "Hidden & system data",
+                subtitle: "Snapshots, purgeable & system files outside these folders",
+                value: "~\(ByteFormat.string(used - listed))",
+                valueColor: Halo.textDim)
+            .help("Folders above sum to \(ByteFormat.string(listed)); used space is \(ByteFormat.string(used)). The difference is APFS snapshots, purgeable space and hidden system data macOS doesn't expose as folders.")
+            // With free space listed too, the column visibly sums to Total.
+            pseudoRow(
+                icon: "circle.dashed",
+                title: "Free space",
+                subtitle: "Folders + hidden + free = \(ByteFormat.string(total)) total",
+                value: ByteFormat.string(free),
+                valueColor: Halo.pulseGreen)
+        }
+    }
+
+    private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textDim)
+                    Spacer(minLength: 4)
+                    Text(value)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(valueColor)
+                }
+                Text(subtitle)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.textDim.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+
+    private func rowView(_ node: StorageNode, columnIndex: Int, maxBytes: UInt64, isOpen: Bool, info: StorageItemInfo, delta: Int64? = nil) -> some View {
         let isSelected = selectedID == node.id
         let fraction = maxBytes > 0 ? Double(node.sizeBytes) / Double(maxBytes) : 0
         return Button {
@@ -192,6 +247,13 @@ struct StorageView: View {
                                 .foregroundStyle(Halo.textDim)
                         }
                         Spacer(minLength: 4)
+                        // ▲/▼ vs the saved daily baseline — where growth is.
+                        if let delta, abs(delta) >= 100_000_000 {
+                            Text("\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(delta >= 0 ? Halo.amber : Halo.pulseGreen)
+                                .help("Changed \(ByteFormat.string(UInt64(abs(delta)))) since the last daily size check")
+                        }
                         Text(node.sizeBytes > 0 ? ByteFormat.string(node.sizeBytes) : "—")
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(Halo.textDim)

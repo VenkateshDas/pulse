@@ -24,6 +24,9 @@ struct TimelineView: View {
 
     static let navigateToClean = Notification.Name("PulseNavigateToClean")
 
+    /// Past-day rows opened to their "where it changed" breakdown.
+    @State private var expandedDays: Set<Date> = []
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
@@ -250,6 +253,8 @@ struct TimelineView: View {
                 )
             }
 
+            attributionSection(for: Date.now, limit: 4)
+
             if let bench = todayBench {
                 HStack(spacing: 6) {
                     Image(systemName: "gauge.with.needle")
@@ -337,13 +342,23 @@ struct TimelineView: View {
         let fraction = maxDelta > 0 ? min(Double(abs(delta)) / Double(maxDelta), 1.0) : 0
         let grew = delta >= 0
         let isSpike = abs(delta) >= 2_000_000_000
+        let expandable = entry.diskDeltaBytes != nil
+        let isExpanded = expandable && expandedDays.contains(entry.date)
 
         return VStack(spacing: 4) {
             HStack(spacing: 10) {
-                Text(pastDateString(entry.date))
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.textDim)
-                    .frame(width: 72, alignment: .leading)
+                HStack(spacing: 5) {
+                    if expandable {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Halo.textDim.opacity(0.7))
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    }
+                    Text(pastDateString(entry.date))
+                        .font(.system(size: 11))
+                        .foregroundStyle(Halo.textDim)
+                }
+                .frame(width: 84, alignment: .leading)
 
                 if let delta = entry.diskDeltaBytes {
                     Text(deltaSub(delta))
@@ -397,6 +412,10 @@ struct TimelineView: View {
                 }
             }
             .frame(height: 2)
+
+            if isExpanded {
+                dayBreakdown(entry, isSpike: isSpike)
+            }
         }
         .padding(.vertical, 7)
         .overlay(alignment: .bottom) {
@@ -406,10 +425,116 @@ struct TimelineView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if isSpike {
-                NotificationCenter.default.post(name: Self.navigateToClean, object: nil)
+            guard expandable else { return }
+            withAnimation(Halo.Motion.snappy) {
+                if isExpanded {
+                    expandedDays.remove(entry.date)
+                } else {
+                    expandedDays.insert(entry.date)
+                }
             }
         }
+        .help(expandable ? "Click for the per-folder breakdown of this change" : "")
+    }
+
+    // MARK: - Growth attribution ("where it changed")
+
+    /// Expanded content of a past-day row: the per-category breakdown when a
+    /// scan ran that day, an honest explanation when it didn't, and the
+    /// Reclaim shortcut for spike days.
+    @ViewBuilder
+    private func dayBreakdown(_ entry: DayEntry, isSpike: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if model.attribution(for: entry.date) != nil {
+                attributionSection(for: entry.date, limit: 8)
+            } else {
+                Text("No breakdown for this day — Pulse can only attribute growth on days a storage scan ran on both ends of the change.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if isSpike {
+                Button {
+                    NotificationCenter.default.post(name: Self.navigateToClean, object: nil)
+                } label: {
+                    Label("Review in Reclaim", systemImage: "sparkles")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Halo.ion)
+                }
+                .buttonStyle(.plain)
+                .help("Open Storage → Reclaim to clean what grew")
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Halo.surface2.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.top, 4)
+    }
+
+    /// "WHERE IT CHANGED" list: per-category signed deltas since the baseline
+    /// scan, biggest movers first, plus the unexplained remainder. Renders
+    /// nothing when the day has no attribution.
+    @ViewBuilder
+    private func attributionSection(for date: Date, limit: Int) -> some View {
+        if let attribution = model.attribution(for: date) {
+            let changes = Array(attribution.changes.prefix(limit))
+            let maxAbs = max(
+                changes.map { abs($0.deltaBytes) }.max() ?? 1,
+                abs(attribution.otherBytes), 1)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("WHERE IT CHANGED · SINCE \(shortDate(attribution.baselineDate))")
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(1.5)
+                    .foregroundStyle(Halo.textDim)
+                if changes.isEmpty && attribution.otherBytes == 0 {
+                    Text("Only small moves — nothing shifted by more than 50 MB.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.textDim)
+                } else {
+                    ForEach(changes, id: \.name) { change in
+                        attributionRow(change.name, change.deltaBytes, maxAbs: maxAbs)
+                    }
+                    if attribution.otherBytes != 0 {
+                        attributionRow(
+                            "Elsewhere on disk", attribution.otherBytes,
+                            maxAbs: maxAbs, dim: true)
+                    }
+                }
+            }
+        }
+    }
+
+    private func attributionRow(
+        _ name: String, _ delta: Int64, maxAbs: Int64, dim: Bool = false
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(name)
+                .font(.system(size: 11))
+                .foregroundStyle(dim ? Halo.textDim : Halo.textPrimary)
+                .frame(width: 150, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(dim ? "Change outside the scanned folders — system data, apps, or other volumes" : name)
+            GeometryReader { geo in
+                HStack(spacing: 0) {
+                    Capsule()
+                        .fill((delta >= 0 ? Halo.amber : Halo.pulseGreen).opacity(dim ? 0.3 : 0.6))
+                        .frame(width: max(geo.size.width * (Double(abs(delta)) / Double(maxAbs)), 2))
+                    Spacer(minLength: 0)
+                }
+            }
+            .frame(height: 5)
+            Text(deltaSub(delta))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(diskDeltaColor(delta).opacity(dim ? 0.7 : 1))
+                .frame(width: 88, alignment: .trailing)
+        }
+    }
+
+    private func shortDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f.string(from: date).uppercased()
     }
 
     // MARK: - Disk trend chart (7+ days only)
@@ -493,8 +618,8 @@ struct TimelineView: View {
     }
 
     private func deltaSub(_ delta: Int64) -> String {
-        let grew = delta >= 0
-        return "\(grew ? "▲" : "▼") \(grew ? "+" : "−")\(ByteFormat.string(UInt64(abs(delta))))"
+        // Arrow already carries the direction — no redundant +/− sign.
+        "\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))"
     }
 
     private func diskDeltaColor(_ delta: Int64) -> Color {

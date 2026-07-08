@@ -4,7 +4,7 @@ import SwiftUI
 
 /// App Uninstaller (§3.14): drag an app or pick one from the installed list,
 /// review confidence-graded leftovers, then remove app + debris in one action.
-/// The `.app` goes to the system Trash; ticked leftovers stage to the Vault.
+/// The `.app` and every ticked leftover go to the system Trash.
 struct UninstallView: View {
     @Environment(UninstallModel.self) private var model
 
@@ -36,7 +36,7 @@ struct UninstallView: View {
         PageHeader(
             "Uninstall",
             subtitle:
-                "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app goes to the Trash and every leftover is staged in the Vault — nothing is ever destroyed."
+                "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app and every leftover go to the Trash — nothing is ever destroyed."
         ) {
             RefreshButton(help: "Reload installed apps", disabled: model.isLoadingApps) {
                 model.loadInstalledApps()
@@ -401,7 +401,7 @@ struct UninstallPlanCard: View {
         }
         .buttonStyle(.plain)
         .disabled(model.isUninstalling || model.isPlanAppRunning)
-        .help("Move the app to Trash and stage every ticked leftover into the Vault")
+        .help("Move the app and every ticked leftover to the Trash")
     }
 
     private func buttonLabel(_ plan: UninstallModel.Plan) -> String {
@@ -818,7 +818,7 @@ struct OrphanScanCard: View {
         }
         .buttonStyle(.plain)
         .disabled(model.orphanSelection.isEmpty || model.isRemovingOrphans)
-        .help("Stage every selected orphan into the Vault — restore anytime for 7 days")
+        .help("Move every selected orphan to the Trash — restorable until you empty it")
     }
 
     private var removeLabel: String {

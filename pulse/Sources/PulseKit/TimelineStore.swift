@@ -58,6 +58,71 @@ public final class TimelineStore {
         persist()
     }
 
+    // MARK: - Attribution ("where did the change happen?")
+
+    /// One category's share of a day's disk change.
+    public struct CategoryChange: Sendable, Equatable {
+        public let name: String
+        public let deltaBytes: Int64
+
+        public init(name: String, deltaBytes: Int64) {
+            self.name = name
+            self.deltaBytes = deltaBytes
+        }
+    }
+
+    /// Where a day's disk change happened: per-category signed deltas vs the
+    /// nearest earlier snapshot that also carried a category breakdown.
+    public struct DayAttribution: Sendable, Equatable {
+        /// The snapshot compared against — the previous day when scans ran
+        /// daily, further back across scan gaps.
+        public let baselineDate: Date
+        /// Sorted by magnitude, noise-level moves dropped.
+        public let changes: [CategoryChange]
+        /// Change in total used space the scanned categories don't explain
+        /// (unscanned locations; category overlap makes this approximate).
+        public let otherBytes: Int64
+
+        public init(baselineDate: Date, changes: [CategoryChange], otherBytes: Int64) {
+            self.baselineDate = baselineDate
+            self.changes = changes
+            self.otherBytes = otherBytes
+        }
+    }
+
+    /// Attribution for the snapshot on `date`'s calendar day. Returns nil when
+    /// that day (or every earlier day) has no category breakdown — attribution
+    /// needs a scan on both ends. `minimumBytes` hides noise-level moves.
+    public func attribution(
+        for date: Date, minimumBytes: Int64 = 50_000_000
+    ) -> DayAttribution? {
+        let day = Calendar.current.startOfDay(for: date)
+        guard let index = snapshots.firstIndex(where: { $0.date == day }),
+            !snapshots[index].categories.isEmpty,
+            let baseline = snapshots[..<index].last(where: { !$0.categories.isEmpty })
+        else { return nil }
+        let current = snapshots[index]
+
+        var changes: [CategoryChange] = []
+        var explained: Int64 = 0
+        let names = Set(current.categories.keys).union(baseline.categories.keys)
+        for name in names {
+            let delta =
+                Int64(current.categories[name] ?? 0) - Int64(baseline.categories[name] ?? 0)
+            explained += delta
+            if abs(delta) >= minimumBytes {
+                changes.append(CategoryChange(name: name, deltaBytes: delta))
+            }
+        }
+        changes.sort { abs($0.deltaBytes) > abs($1.deltaBytes) }
+
+        let total = Int64(current.totalUsedBytes) - Int64(baseline.totalUsedBytes)
+        var other = total - explained
+        if abs(other) < minimumBytes { other = 0 }
+        return DayAttribution(
+            baselineDate: baseline.date, changes: changes, otherBytes: other)
+    }
+
     /// Day-over-day change in total used bytes (signed), oldest first.
     public func dailyDeltas() -> [(date: Date, deltaBytes: Int64)] {
         guard snapshots.count >= 2 else { return [] }

@@ -15,6 +15,8 @@ struct DiskView: View {
                     CleanView()
                 } else if selectedTab == 2 {
                     TrashView()
+                } else if selectedTab == 3 {
+                    GrowthView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -37,7 +39,7 @@ struct DiskView: View {
     private var tabBar: some View {
         HStack {
             SegmentPicker(
-                options: [(0, "Browse"), (1, "Reclaim"), (2, "Trash")],
+                options: [(0, "Browse"), (1, "Reclaim"), (2, "Trash"), (3, "Growth")],
                 selection: $selectedTab,
                 style: .tab)
             Spacer()

@@ -188,7 +188,10 @@ struct SidebarView: View {
     }
 
     private var uptimeText: String {
-        let hours = Int(model.snapshot?.uptime ?? 0) / 3600
-        return hours >= 24 ? "\(hours / 24)d \(hours % 24)h" : "\(hours)h"
+        let minutes = Int(model.snapshot?.uptime ?? 0) / 60
+        let hours = minutes / 60
+        if hours >= 24 { return "\(hours / 24)d \(hours % 24)h" }
+        if hours >= 1 { return "\(hours)h" }
+        return "\(minutes)m"
     }
 }
