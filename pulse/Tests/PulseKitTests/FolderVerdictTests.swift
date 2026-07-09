@@ -122,25 +122,30 @@ struct ShellHistoryTests {
     @Test func matchesFirstTokenSkippingSudoAndEnv() {
         let names: Set<String> = ["wget"]
         #expect(
-            ShellHistoryProbe.matchedName(
-                command: "sudo wget -O file url", names: names, targetPath: "") == "wget")
+            ShellHistoryProbe.match(
+                command: "sudo wget -O file url", names: names, targetPath: "")?.name == "wget")
         #expect(
-            ShellHistoryProbe.matchedName(
-                command: "HTTPS_PROXY=x wget url", names: names, targetPath: "") == "wget")
+            ShellHistoryProbe.match(
+                command: "HTTPS_PROXY=x wget url", names: names, targetPath: "")?.name == "wget")
         #expect(
-            ShellHistoryProbe.matchedName(
-                command: "/opt/homebrew/bin/wget url", names: names, targetPath: "") == "wget")
+            ShellHistoryProbe.match(
+                command: "/opt/homebrew/bin/wget url", names: names, targetPath: "")?.name
+                == "wget")
         // wget as argument, not command — no match.
         #expect(
-            ShellHistoryProbe.matchedName(
+            ShellHistoryProbe.match(
                 command: "man wget", names: names, targetPath: "") == nil)
     }
 
-    @Test func matchesRawTargetPathAnywhere() {
-        let name = ShellHistoryProbe.matchedName(
+    @Test func invocationIsRanButPathMentionIsOnlyMentioned() {
+        let ran = ShellHistoryProbe.match(
+            command: "wget url", names: ["wget"], targetPath: "/x")
+        #expect(ran?.kind == .ran)
+        let mentioned = ShellHistoryProbe.match(
             command: "cd /Users/x/dev-tools/miniforge3/envs", names: [],
             targetPath: "/Users/x/dev-tools/miniforge3")
-        #expect(name == "miniforge3")
+        #expect(mentioned?.name == "miniforge3")
+        #expect(mentioned?.kind == .mentioned)
     }
 
     @Test func hitsAggregateCountAndLatestTimestamp() throws {
@@ -164,7 +169,7 @@ struct ShellHistoryTests {
 
 @Suite("StalenessProbe")
 struct StalenessTests {
-    @Test func newestMTimeWinsAcrossTree() throws {
+    @Test func newestContentMTimeWinsAcrossTree() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("stale-\(UUID().uuidString)")
         let deep = dir.appendingPathComponent("a/b")
@@ -178,10 +183,40 @@ struct StalenessTests {
             [.modificationDate: past], ofItemAtPath: oldFile.path)
 
         let result = StalenessProbe.scan(dir)
-        let newest = try #require(result.newestModified)
+        let newest = try #require(result.newestContent)
         #expect(newest.timeIntervalSinceNow > -3600)
+        #expect(result.newestContentName == "new.txt")
         #expect(result.fileCount >= 2)
         #expect(result.truncated == false)
+    }
+
+    /// The .hermes bug: dead app's folder where only housekeeping churns.
+    /// Content staleness must see through .DS_Store and log writes.
+    @Test func housekeepingChurnDoesNotCountAsContent() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("stale-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: dir.appendingPathComponent("logs"), withIntermediateDirectories: true)
+        let config = dir.appendingPathComponent("config.yaml")
+        try "cfg".write(to: config, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: -86400 * 200)],
+            ofItemAtPath: config.path)
+        // Touched today: Finder metadata, a log, a file inside logs/.
+        try "x".write(
+            to: dir.appendingPathComponent(".DS_Store"), atomically: true, encoding: .utf8)
+        try "x".write(
+            to: dir.appendingPathComponent("telemetry.log"), atomically: true, encoding: .utf8)
+        try "x".write(
+            to: dir.appendingPathComponent("logs/run.txt"), atomically: true, encoding: .utf8)
+
+        let result = StalenessProbe.scan(dir)
+        let content = try #require(result.newestContent)
+        // Content date is the 200-day-old config, not today's housekeeping.
+        #expect(content.timeIntervalSinceNow < -86400 * 199)
+        #expect(result.newestContentName == "config.yaml")
+        let any = try #require(result.newestAny)
+        #expect(any.timeIntervalSinceNow > -3600)
     }
 
     @Test func singleFileReportsItself() throws {
@@ -190,7 +225,7 @@ struct StalenessTests {
         try "x".write(to: file, atomically: true, encoding: .utf8)
         let result = StalenessProbe.scan(file)
         #expect(result.fileCount == 1)
-        #expect(result.newestModified != nil)
+        #expect(result.newestContent != nil)
     }
 }
 
@@ -271,10 +306,27 @@ struct UsageObserverSamplerTests {
 struct VerdictSynthesisTests {
     private let now = Date(timeIntervalSince1970: 1_720_000_000)
 
-    private func staleness(daysOld: Int) -> StalenessProbe.Result {
-        StalenessProbe.Result(
-            newestModified: now.addingTimeInterval(-Double(daysOld) * 86400),
+    private func staleness(daysOld: Int, noisyToday: Bool = false) -> StalenessProbe.Result {
+        let content = now.addingTimeInterval(-Double(daysOld) * 86400)
+        return StalenessProbe.Result(
+            newestContent: content, newestContentName: "config.yaml",
+            newestAny: noisyToday ? now : content,
             fileCount: 10, sizeBytes: 1_000_000, truncated: false)
+    }
+
+    /// Shorthand with the new knobs defaulted to the quiet case.
+    private func synth(
+        species: FolderSpecies? = nil, staleness: StalenessProbe.Result,
+        spotlightDays: Int? = nil, isDirectory: Bool = true,
+        historyHits: [ShellHistoryProbe.Hit] = [],
+        liveness: OwnerLivenessProbe.Liveness = .notApplicable,
+        references: [UsageEdge] = [], activity: ActivitySummary? = nil
+    ) -> FolderVerdict {
+        FolderVerdictEngine.synthesize(
+            targetPath: "/x", species: species, staleness: staleness,
+            spotlightDays: spotlightDays, targetIsDirectory: isDirectory,
+            historyHits: historyHits, liveness: liveness,
+            references: references, activity: activity, now: now)
     }
 
     private let venv = FolderSpecies(
@@ -282,74 +334,227 @@ struct VerdictSynthesisTests {
         regenerable: true, regenCommand: "python3 -m venv .venv")
     private let backup = FolderSpecies(
         id: "ios-backup", name: "iPhone backup", explanation: "x", regenerable: false)
+    private let zshrcRef = UsageEdge(
+        source: URL(fileURLWithPath: "/Users/x/.zshrc"),
+        target: URL(fileURLWithPath: "/x"), signal: .textRef, detail: ".zshrc:3")
+    private let symlinkRef = UsageEdge(
+        source: URL(fileURLWithPath: "/usr/local/bin/hermes"),
+        target: URL(fileURLWithPath: "/x"), signal: .symlink, detail: "symlink")
 
     @Test func regenerableStaleUnreferencedIsSafeToDelete() {
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: venv, staleness: staleness(daysOld: 90),
-            spotlightDays: nil, historyHits: [], references: [], activity: nil, now: now)
+        let verdict = synth(species: venv, staleness: staleness(daysOld: 90))
         #expect(verdict.verdict == .safeToDelete)
         #expect(verdict.regenCommand == "python3 -m venv .venv")
     }
 
-    @Test func recentMTimeMeansInUse() {
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: venv, staleness: staleness(daysOld: 2),
-            spotlightDays: nil, historyHits: [], references: [], activity: nil, now: now)
+    @Test func recentContentMTimeMeansInUse() {
+        let verdict = synth(species: venv, staleness: staleness(daysOld: 2))
         #expect(verdict.verdict == .inUse)
     }
 
-    @Test func recentShellHistoryMeansInUse() {
+    // The .hermes case: owner uninstalled, only housekeeping churns.
+    @Test func uninstalledOwnerWithStaleContentIsSafeToDelete() {
+        let verdict = synth(
+            staleness: staleness(daysOld: 200, noisyToday: true),
+            liveness: .missing(toolName: "hermes"),
+            references: [symlinkRef])
+        #expect(verdict.verdict == .safeToDelete)
+        #expect(verdict.headline.contains("hermes"))
+        // Leftover symlink surfaced as cleanup pointer, leaning delete.
+        #expect(verdict.evidence.contains { $0.kind == .references && $0.favorsDeletion == true })
+    }
+
+    // The .nvm guard: no binary exists, but .zshrc sources it every launch.
+    @Test func uninstalledOwnerWithRcReferenceIsNeverSafeToDelete() {
+        let verdict = synth(
+            staleness: staleness(daysOld: 200),
+            liveness: .missing(toolName: "nvm"),
+            references: [zshrcRef])
+        #expect(verdict.verdict == .likelyUnused)
+        #expect(verdict.headline.contains("shell config"))
+    }
+
+    // Spotlight "opened today" on a directory is browse noise (often us).
+    @Test func recentSpotlightOnDirectoryDoesNotBlockDeletion() {
+        let verdict = synth(
+            species: venv, staleness: staleness(daysOld: 90), spotlightDays: 0,
+            isDirectory: true)
+        #expect(verdict.verdict == .safeToDelete)
+    }
+
+    @Test func recentSpotlightOnFileCountsAsUse() {
+        let verdict = synth(
+            species: venv, staleness: staleness(daysOld: 90), spotlightDays: 0,
+            isDirectory: false)
+        #expect(verdict.verdict == .inUse)
+    }
+
+    @Test func recentRanHistoryMeansInUse() {
         let hit = ShellHistoryProbe.Hit(
-            command: "wget", count: 3, lastUsed: now.addingTimeInterval(-86400 * 3))
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: venv, staleness: staleness(daysOld: 90),
-            spotlightDays: nil, historyHits: [hit], references: [], activity: nil, now: now)
+            command: "wget", kind: .ran, count: 3,
+            lastUsed: now.addingTimeInterval(-86400 * 3))
+        let verdict = synth(species: venv, staleness: staleness(daysOld: 90), historyHits: [hit])
         #expect(verdict.verdict == .inUse)
     }
 
-    @Test func recentObservedActivityMeansInUse() {
+    // Path mentions (old cd, stale export) must not keep a folder alive —
+    // and neither may date-unknown hits.
+    @Test func mentionedOrUndatedHistoryHitsDoNotBlockDeletion() {
+        let mentioned = ShellHistoryProbe.Hit(
+            command: ".hermes", kind: .mentioned, count: 7, lastUsed: now)
+        let undatedRan = ShellHistoryProbe.Hit(
+            command: "hermes", kind: .ran, count: 2, lastUsed: nil)
+        let verdict = synth(
+            species: venv, staleness: staleness(daysOld: 90),
+            historyHits: [mentioned, undatedRan])
+        #expect(verdict.verdict == .safeToDelete)
+    }
+
+    @Test func recentObservedOpenWithValidWindowMeansInUse() {
         let activity = ActivitySummary(
             lastWrite: nil, lastOpen: now.addingTimeInterval(-86400 * 5),
             lastOpenProcess: "python3",
             trackingSince: now.addingTimeInterval(-86400 * 60))
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: venv, staleness: staleness(daysOld: 90),
-            spotlightDays: nil, historyHits: [], references: [], activity: activity, now: now)
+        let verdict = synth(species: venv, staleness: staleness(daysOld: 90), activity: activity)
         #expect(verdict.verdict == .inUse)
         #expect(verdict.evidence.contains { $0.kind == .observer && $0.headline.contains("python3") })
     }
 
+    // The "watching for 0 days" bug: a fresh observer's sightings are the
+    // ambient startup burst, not proof of use.
+    @Test func observerIgnoredUntilWindowIsValid() {
+        let activity = ActivitySummary(
+            lastWrite: now, lastOpen: now, lastOpenProcess: "SomeApp",
+            trackingSince: now.addingTimeInterval(-3600))
+        let verdict = synth(species: venv, staleness: staleness(daysOld: 90), activity: activity)
+        #expect(verdict.verdict == .safeToDelete)
+    }
+
+    // FSEvents writes have no process attribution (.DS_Store looks like a
+    // real write) — informational only.
+    @Test func unattributedWriteDoesNotBlockDeletion() {
+        let activity = ActivitySummary(
+            lastWrite: now, lastOpen: nil, lastOpenProcess: nil,
+            trackingSince: now.addingTimeInterval(-86400 * 60))
+        let verdict = synth(species: venv, staleness: staleness(daysOld: 90), activity: activity)
+        #expect(verdict.verdict == .safeToDelete)
+    }
+
     @Test func regenerableButReferencedIsLikelyUnusedNotSafe() {
-        let edge = UsageEdge(
-            source: URL(fileURLWithPath: "/Users/x/.zshrc"),
-            target: URL(fileURLWithPath: "/x"), signal: .textRef, detail: ".zshrc:3")
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: venv, staleness: staleness(daysOld: 90),
-            spotlightDays: nil, historyHits: [], references: [edge], activity: nil, now: now)
+        let verdict = synth(
+            species: venv, staleness: staleness(daysOld: 90), references: [zshrcRef])
         #expect(verdict.verdict == .likelyUnused)
     }
 
     @Test func irreplaceableStaleIsReviewNeverDelete() {
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: backup, staleness: staleness(daysOld: 400),
-            spotlightDays: nil, historyHits: [], references: [], activity: nil, now: now)
+        let verdict = synth(species: backup, staleness: staleness(daysOld: 400))
         #expect(verdict.verdict == .staleReview)
         #expect(verdict.regenCommand == nil)
     }
 
     @Test func unrecognizedRecentishIsUnknown() {
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: nil, staleness: staleness(daysOld: 60),
-            spotlightDays: nil, historyHits: [], references: [], activity: nil, now: now)
+        let verdict = synth(staleness: staleness(daysOld: 60))
         #expect(verdict.verdict == .unknown)
     }
 
     @Test func evidenceAlwaysIncludesIdentityAndReferences() {
-        let verdict = FolderVerdictEngine.synthesize(
-            targetPath: "/x", species: nil, staleness: staleness(daysOld: 10),
-            spotlightDays: nil, historyHits: [], references: [], activity: nil, now: now)
+        let verdict = synth(staleness: staleness(daysOld: 10))
         #expect(verdict.evidence.contains { $0.kind == .identity })
         #expect(verdict.evidence.contains { $0.kind == .references })
         #expect(verdict.evidence.contains { $0.kind == .staleness })
+    }
+}
+
+// MARK: - Owner liveness
+
+@Suite("OwnerLivenessProbe")
+struct OwnerLivenessTests {
+    @Test func toolNameShapes() {
+        let home = "/Users/tester"
+        #expect(
+            OwnerLivenessProbe.toolName(
+                for: URL(fileURLWithPath: "/Users/tester/.hermes"), home: home) == "hermes")
+        #expect(
+            OwnerLivenessProbe.toolName(
+                for: URL(fileURLWithPath: "/Users/tester/.config/hermes"), home: home)
+                == "hermes")
+        #expect(
+            OwnerLivenessProbe.toolName(
+                for: URL(fileURLWithPath: "/Users/tester/Library/Application Support/Hermes"),
+                home: home) == "Hermes")
+        // Non-tool shapes: deep paths, visible home folders.
+        #expect(
+            OwnerLivenessProbe.toolName(
+                for: URL(fileURLWithPath: "/Users/tester/Documents"), home: home) == nil)
+        #expect(
+            OwnerLivenessProbe.toolName(
+                for: URL(fileURLWithPath: "/Users/tester/dev/project/.venv"), home: home) == nil)
+    }
+
+    @Test func missingWhenNothingInstalled() throws {
+        let empty = FileManager.default.temporaryDirectory
+            .appendingPathComponent("owner-\(UUID().uuidString)").path
+        let probe = OwnerLivenessProbe(
+            binDirectories: [empty], appDirectories: [empty], cellarDirectories: [empty])
+        #expect(probe.check(toolName: "hermes") == .missing(toolName: "hermes"))
+    }
+
+    @Test func installedViaExecutable() throws {
+        let bin = FileManager.default.temporaryDirectory
+            .appendingPathComponent("owner-bin-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let exe = bin.appendingPathComponent("hermes")
+        FileManager.default.createFile(atPath: exe.path, contents: Data())
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: exe.path)
+        let probe = OwnerLivenessProbe(
+            binDirectories: [bin.path], appDirectories: [], cellarDirectories: [])
+        #expect(probe.check(toolName: "hermes") == .installed(at: exe.path))
+    }
+
+    @Test func installedViaAppBundlePrefixMatch() throws {
+        let apps = FileManager.default.temporaryDirectory
+            .appendingPathComponent("owner-apps-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: apps.appendingPathComponent("Docker.app"), withIntermediateDirectories: true)
+        let probe = OwnerLivenessProbe(
+            binDirectories: [], appDirectories: [apps.path], cellarDirectories: [])
+        #expect(probe.check(toolName: "docker") == .installed(at: apps.path + "/Docker.app"))
+    }
+
+    @Test func aliasResolvesGnupgToGpg() throws {
+        let bin = FileManager.default.temporaryDirectory
+            .appendingPathComponent("owner-alias-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let gpg = bin.appendingPathComponent("gpg")
+        FileManager.default.createFile(atPath: gpg.path, contents: Data())
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755], ofItemAtPath: gpg.path)
+        let probe = OwnerLivenessProbe(
+            binDirectories: [bin.path], appDirectories: [], cellarDirectories: [])
+        #expect(probe.check(toolName: "gnupg") == .installed(at: gpg.path))
+    }
+}
+
+// MARK: - Noise process filter
+
+@Suite("UsageObserver noise filter")
+struct NoiseProcessTests {
+    @Test func systemDaemonsAreNoise() {
+        #expect(UsageObserver.isNoiseProcess(
+            name: "corespotlightd", executablePath: "/System/Library/Frameworks/x"))
+        #expect(UsageObserver.isNoiseProcess(
+            name: "UserEventAgent", executablePath: "/usr/libexec/UserEventAgent"))
+        #expect(UsageObserver.isNoiseProcess(
+            name: "mdworker_shared", executablePath: ""))
+        #expect(UsageObserver.isNoiseProcess(name: "Finder", executablePath: ""))
+        #expect(UsageObserver.isNoiseProcess(name: "Pulse", executablePath: ""))
+    }
+
+    @Test func userToolsAreSignal() {
+        #expect(!UsageObserver.isNoiseProcess(
+            name: "python3", executablePath: "/opt/homebrew/bin/python3"))
+        #expect(!UsageObserver.isNoiseProcess(
+            name: "Xcode", executablePath: "/Applications/Xcode.app/Contents/MacOS/Xcode"))
     }
 }

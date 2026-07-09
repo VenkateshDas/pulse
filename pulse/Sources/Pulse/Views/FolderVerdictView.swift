@@ -223,6 +223,7 @@ struct FolderVerdictView: View {
     private func icon(for kind: VerdictEvidence.Kind) -> String {
         switch kind {
         case .identity: "tag"
+        case .owner: "person.crop.circle.badge.questionmark"
         case .staleness: "clock"
         case .spotlight: "magnifyingglass"
         case .shellHistory: "terminal"

@@ -172,6 +172,24 @@ public final class UsageObserver: @unchecked Sendable {
         "/Library/Application Support/Pulse", "/.Trash/", "/Library/Caches/com.apple.",
     ]
 
+    /// Processes whose file access says nothing about whether the USER still
+    /// uses a folder. Primary rule: anything whose executable lives in the
+    /// OS itself (/System, /usr/libexec, /usr/sbin) is plumbing — indexers,
+    /// iCloud sync, Biome, Siri, widgets — verified empirically: corespotlightd
+    /// alone held 800+ vnodes in $HOME. The name list catches the rest:
+    /// Finder (holds dirs open just from browsing) and Pulse itself.
+    static let noiseProcessNames: Set<String> = [
+        "Finder", "Pulse", "mds", "mds_stores", "fseventsd", "deleted",
+    ]
+    static let noiseExecutablePrefixes = [
+        "/System/", "/usr/libexec/", "/usr/sbin/", "/Library/Apple/",
+    ]
+
+    static func isNoiseProcess(name: String, executablePath: String) -> Bool {
+        if noiseProcessNames.contains(name) || name.hasPrefix("mdworker") { return true }
+        return noiseExecutablePrefixes.contains { executablePath.hasPrefix($0) }
+    }
+
     public init(store: ActivityStore = ActivityStore()) {
         self.store = store
     }
@@ -278,6 +296,12 @@ public final class UsageObserver: @unchecked Sendable {
             var nameBuffer = [CChar](repeating: 0, count: 128)
             let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
             let processName = nameLength > 0 ? String(nullTerminated: nameBuffer) : "pid \(pid)"
+            var pathBuffer = [CChar](repeating: 0, count: 4096)
+            let executablePath =
+                proc_pidpath(pid, &pathBuffer, 4096) > 0 ? String(nullTerminated: pathBuffer) : ""
+            guard !isNoiseProcess(name: processName, executablePath: executablePath) else {
+                continue
+            }
 
             for fd in fds[0..<(Int(got) / MemoryLayout<proc_fdinfo>.size)]
             where fd.proc_fdtype == PROX_FDTYPE_VNODE {
