@@ -17,6 +17,7 @@ struct StorageView: View {
     /// Quick Look target (spacebar on a selected row, like Finder).
     @State private var previewURL: URL?
     @State private var keyMonitor: Any?
+    @State private var usagePathQuery: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,6 +38,16 @@ struct StorageView: View {
         .background(Halo.void)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .quickLookPreview($previewURL)
+        .sheet(isPresented: Binding(
+            get: { storage.verdictTarget != nil },
+            set: { if !$0 { storage.dismissVerdict() } })
+        ) {
+            if let target = storage.verdictTarget {
+                FolderVerdictView(
+                    targetPath: target, verdict: storage.verdict,
+                    isScanning: storage.isScanningVerdict)
+            }
+        }
         .onAppear {
             storage.appeared()
             startKeyMonitor()
@@ -97,10 +108,34 @@ struct StorageView: View {
                 }
             }
             Spacer()
+            usagePathField
         }
         .padding(.horizontal, 16)
         .frame(height: 50)
         .background(Halo.surface1)
+    }
+
+    /// Paste any path directly to get its deletion verdict, without browsing there.
+    private var usagePathField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "questionmark.folder")
+                .font(.system(size: 10))
+                .foregroundStyle(Halo.textDim)
+            TextField("Can I delete… (paste a path)", text: $usagePathQuery)
+                .textFieldStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textPrimary)
+                .frame(width: 180)
+                .onSubmit {
+                    let path = (usagePathQuery.trimmingCharacters(in: .whitespaces) as NSString)
+                        .expandingTildeInPath
+                    guard !path.isEmpty else { return }
+                    storage.inspect(path: path)
+                }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Halo.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: Columns
@@ -306,6 +341,9 @@ struct StorageView: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: node.path)])
                 }
                 Button("Get Info") { selectedID = node.id }
+                Button("Can I delete this?") {
+                    storage.inspect(path: node.path)
+                }
                 if !info.isProtected && info.grade != .review {
                     Divider()
                     Button("Move to Trash", role: .destructive) {

@@ -62,6 +62,70 @@ final class StorageModel {
         }
     }
 
+    // MARK: Folder verdict ("can I delete this?")
+
+    /// Path currently shown in the verdict sheet; nil hides it.
+    var verdictTarget: String?
+    private(set) var verdict: FolderVerdict?
+    private(set) var isScanningVerdict = false
+    @ObservationIgnored private let referenceScanner = UsageGraphScanner()
+
+    func inspect(path: String, forceRescan: Bool = false) {
+        verdictTarget = path
+        isScanningVerdict = true
+        verdict = nil
+        let scanner = referenceScanner
+        Task {
+            if forceRescan {
+                _ = await scanner.referrers(
+                    for: URL(fileURLWithPath: path), forceRescan: Set(ReferenceSignal.allCases))
+            }
+            let engine = FolderVerdictEngine(referenceScanner: scanner)
+            let result = await engine.verdict(for: URL(fileURLWithPath: path))
+            guard self.verdictTarget == path else { return }
+            self.verdict = result
+            self.isScanningVerdict = false
+        }
+    }
+
+    func dismissVerdict() {
+        verdictTarget = nil
+        verdict = nil
+    }
+
+    /// Trashes the folder currently shown in the verdict sheet — only
+    /// offered by the UI for delete-leaning verdict classes.
+    func trashInspectedTarget() {
+        guard let path = verdictTarget, !isCleaning else { return }
+        isCleaning = true
+        let size = Self.itemSize(URL(fileURLWithPath: path))
+        let name = (path as NSString).lastPathComponent
+        Task {
+            let (report, trashed) = await Task.detached(priority: .userInitiated) {
+                do {
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: &trashedURL)
+                    if let trashPath = trashedURL?.path {
+                        let item = TrashedItem(originalPath: path, trashPath: trashPath)
+                        await UndoJournal.shared.record(UndoEntry(op: "Verdict Clean", items: [item], bytesFreed: Int64(size)))
+                    }
+                    return ("\(ByteFormat.string(size)) moved to Trash", true)
+                } catch {
+                    return ("Failed to move \(name) to Trash", false)
+                }
+            }.value
+            self.isCleaning = false
+            self.cleanReport = report
+            if trashed {
+                TrashSound.moveToTrash()
+                self.dismissVerdict()
+                self.navigationPath = self.navigationPath.pruning(deletedPath: path, bytes: size)
+            }
+            self.refreshTrashInfo()
+            self.refreshPurgeable()
+        }
+    }
+
     private(set) var trashItemCount: Int = 0
     private(set) var trashBytes: UInt64 = 0
     private(set) var trashItems: [TrashItem] = []
