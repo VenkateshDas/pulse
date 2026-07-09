@@ -62,37 +62,41 @@ final class StorageModel {
         }
     }
 
-    // MARK: Usage graph ("what uses this")
+    // MARK: Folder verdict ("can I delete this?")
 
-    /// Path currently shown in the usage graph sheet; nil hides it.
-    var usageGraphTarget: String?
-    private(set) var usageGraphEdges: [UsageEdge] = []
-    private(set) var isScanningUsage = false
-    @ObservationIgnored private let usageScanner = UsageGraphScanner()
+    /// Path currently shown in the verdict sheet; nil hides it.
+    var verdictTarget: String?
+    private(set) var verdict: FolderVerdict?
+    private(set) var isScanningVerdict = false
+    @ObservationIgnored private let referenceScanner = UsageGraphScanner()
 
-    func findUsage(for path: String, forceRescan: Bool = false) {
-        usageGraphTarget = path
-        isScanningUsage = true
-        usageGraphEdges = []
+    func inspect(path: String, forceRescan: Bool = false) {
+        verdictTarget = path
+        isScanningVerdict = true
+        verdict = nil
+        let scanner = referenceScanner
         Task {
-            let edges = await usageScanner.referrers(
-                for: URL(fileURLWithPath: path),
-                forceRescan: forceRescan ? Set(ReferenceSignal.allCases) : [])
-            guard self.usageGraphTarget == path else { return }
-            self.usageGraphEdges = edges
-            self.isScanningUsage = false
+            if forceRescan {
+                _ = await scanner.referrers(
+                    for: URL(fileURLWithPath: path), forceRescan: Set(ReferenceSignal.allCases))
+            }
+            let engine = FolderVerdictEngine(referenceScanner: scanner)
+            let result = await engine.verdict(for: URL(fileURLWithPath: path))
+            guard self.verdictTarget == path else { return }
+            self.verdict = result
+            self.isScanningVerdict = false
         }
     }
 
-    func dismissUsageGraph() {
-        usageGraphTarget = nil
-        usageGraphEdges = []
+    func dismissVerdict() {
+        verdictTarget = nil
+        verdict = nil
     }
 
-    /// Trashes the folder currently shown in the usage graph sheet — only
-    /// offered in the UI once it has zero referrers.
-    func trashUsageTarget() {
-        guard let path = usageGraphTarget, !isCleaning else { return }
+    /// Trashes the folder currently shown in the verdict sheet — only
+    /// offered by the UI for delete-leaning verdict classes.
+    func trashInspectedTarget() {
+        guard let path = verdictTarget, !isCleaning else { return }
         isCleaning = true
         let size = Self.itemSize(URL(fileURLWithPath: path))
         let name = (path as NSString).lastPathComponent
@@ -103,7 +107,7 @@ final class StorageModel {
                     try FileManager.default.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: &trashedURL)
                     if let trashPath = trashedURL?.path {
                         let item = TrashedItem(originalPath: path, trashPath: trashPath)
-                        await UndoJournal.shared.record(UndoEntry(op: "Usage Graph Clean", items: [item], bytesFreed: Int64(size)))
+                        await UndoJournal.shared.record(UndoEntry(op: "Verdict Clean", items: [item], bytesFreed: Int64(size)))
                     }
                     return ("\(ByteFormat.string(size)) moved to Trash", true)
                 } catch {
@@ -114,7 +118,7 @@ final class StorageModel {
             self.cleanReport = report
             if trashed {
                 TrashSound.moveToTrash()
-                self.dismissUsageGraph()
+                self.dismissVerdict()
                 self.navigationPath = self.navigationPath.pruning(deletedPath: path, bytes: size)
             }
             self.refreshTrashInfo()

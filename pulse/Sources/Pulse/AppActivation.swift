@@ -115,6 +115,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // until the popover first opens — media-key / Control Center changes
         // made before that were never reflected in the sliders. Touch it now.
         _ = BrightnessEngine.shared
+
+        // Resident usage observation: folder-level "last seen in use" log
+        // (FSEvents writes + sparse open-handle samples) feeding the storage
+        // verdict card. Must run from launch — its value IS the watching time.
+        UsageObserver.shared.start()
     }
 
     /// Closing the Command Center must not quit Pulse — it returns to the menu

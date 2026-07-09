@@ -39,13 +39,13 @@ struct StorageView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .quickLookPreview($previewURL)
         .sheet(isPresented: Binding(
-            get: { storage.usageGraphTarget != nil },
-            set: { if !$0 { storage.dismissUsageGraph() } })
+            get: { storage.verdictTarget != nil },
+            set: { if !$0 { storage.dismissVerdict() } })
         ) {
-            if let target = storage.usageGraphTarget {
-                UsageGraphView(
-                    targetPath: target, edges: storage.usageGraphEdges,
-                    isScanning: storage.isScanningUsage)
+            if let target = storage.verdictTarget {
+                FolderVerdictView(
+                    targetPath: target, verdict: storage.verdict,
+                    isScanning: storage.isScanningVerdict)
             }
         }
         .onAppear {
@@ -115,21 +115,22 @@ struct StorageView: View {
         .background(Halo.surface1)
     }
 
-    /// Paste any path directly to find what uses it, without browsing there.
+    /// Paste any path directly to get its deletion verdict, without browsing there.
     private var usagePathField: some View {
         HStack(spacing: 6) {
             Image(systemName: "questionmark.folder")
                 .font(.system(size: 10))
                 .foregroundStyle(Halo.textDim)
-            TextField("Find what uses a path…", text: $usagePathQuery)
+            TextField("Can I delete… (paste a path)", text: $usagePathQuery)
                 .textFieldStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 180)
                 .onSubmit {
-                    let path = usagePathQuery.trimmingCharacters(in: .whitespaces)
+                    let path = (usagePathQuery.trimmingCharacters(in: .whitespaces) as NSString)
+                        .expandingTildeInPath
                     guard !path.isEmpty else { return }
-                    storage.findUsage(for: path)
+                    storage.inspect(path: path)
                 }
         }
         .padding(.horizontal, 8)
@@ -340,8 +341,8 @@ struct StorageView: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: node.path)])
                 }
                 Button("Get Info") { selectedID = node.id }
-                Button("Find what uses this…") {
-                    storage.findUsage(for: node.path)
+                Button("Can I delete this?") {
+                    storage.inspect(path: node.path)
                 }
                 if !info.isProtected && info.grade != .review {
                     Divider()
