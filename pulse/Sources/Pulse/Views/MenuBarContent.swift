@@ -165,7 +165,10 @@ struct MenuBarContent: View {
             Spacer(minLength: 8)
             switch item.action {
             case .quitProcess(let pid, let name):
-                Button("Quit") { confirmAttentionQuit = (pid, name) }
+                Button("Quit") {
+                    NSApp.activate(ignoringOtherApps: true)
+                    confirmAttentionQuit = (pid, name)
+                }
                     .buttonStyle(.borderedProminent)
                     .tint(Halo.ion.opacity(0.85))
                     .controlSize(.mini)
@@ -466,6 +469,7 @@ struct MenuBarContent: View {
                 .disabled(isOptimizing)
 
                 Button {
+                    NSApp.activate(ignoringOtherApps: true)
                     confirmEmptyTrash = true
                 } label: {
                     Label(trashLabel, systemImage: "trash")
