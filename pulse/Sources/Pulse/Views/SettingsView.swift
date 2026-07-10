@@ -35,6 +35,7 @@ struct SettingsView: View {
                 )
                 VStack(alignment: .leading, spacing: 16) {
                     appearanceSection
+                    displayModeSection
                     generalSection
                     menuBarSection
                     keyboardShortcutsSection
@@ -63,6 +64,34 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Display Mode
+
+    private var displayModeSection: some View {
+        let mode = DisplayModeManager.shared.current
+        return section(
+            "Display Mode", icon: "eye.fill", tint: Halo.interactive,
+            footnote: "Switch anytime — nothing is removed, only shown or hidden."
+        ) {
+            settingsRow(title: "Interface", detail: mode.subtitle) {
+                Picker("", selection: displayModeBinding) {
+                    ForEach(DisplayMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 160)
+            }
+        }
+    }
+
+    private var displayModeBinding: Binding<DisplayMode> {
+        Binding(
+            get: { DisplayModeManager.shared.current },
+            set: { DisplayModeManager.shared.set($0) }
+        )
     }
 
     private func themeCard(_ theme: AppTheme) -> some View {
