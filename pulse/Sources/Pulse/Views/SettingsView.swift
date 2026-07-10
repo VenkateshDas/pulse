@@ -13,6 +13,12 @@ struct SettingsView: View {
     @Environment(Updater.self) private var updater
     @Binding var selection: SidebarItem
 
+    @State private var recordingAction: PulseAction?
+    @State private var conflictMessages: [PulseAction: String] = [:]
+    /// Bumped after every keybinding write to force the shortcuts section to
+    /// re-read `KeybindingStore`, which isn't `@Observable`.
+    @State private var keybindingsVersion = 0
+
     private static let autoHideOptions: [TimeInterval] = [0, 5, 10, 15, 30]
     private static let maxItemsOptions = [1, 2, 3, 4, 5]
     private static let snoozeOptions: [TimeInterval] = [3600, 4 * 3600, 24 * 3600]
@@ -27,6 +33,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     generalSection
                     menuBarSection
+                    keyboardShortcutsSection
                     notificationsSection
                     attentionSection
                     quickLinksSection
@@ -124,6 +131,88 @@ struct SettingsView: View {
             get: { MenuBarManager.shared.autoHideDelay },
             set: { MenuBarManager.shared.autoHideDelay = $0 }
         )
+    }
+
+    // MARK: - Keyboard Shortcuts
+
+    private var keyboardShortcutsSection: some View {
+        section(
+            "Keyboard Shortcuts", icon: "keyboard.fill", tint: Halo.ion,
+            footnote: "Shortcuts work anywhere on the Mac, even when Pulse isn't focused."
+        ) {
+            let _ = keybindingsVersion  // re-read the store when this changes
+            ForEach(Array(PulseAction.allCases.enumerated()), id: \.element) { index, action in
+                if index > 0 { rowDivider }
+                shortcutRow(action)
+            }
+        }
+    }
+
+    private func shortcutRow(_ action: PulseAction) -> some View {
+        let store = KeybindingStore.shared
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(action.displayName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Halo.textPrimary)
+                    Text(action.detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Halo.textDim)
+                }
+                Spacer(minLength: 12)
+                Toggle("", isOn: Binding(
+                    get: { store.isEnabled(action) },
+                    set: {
+                        store.setEnabled($0, for: action)
+                        keybindingsVersion += 1
+                    }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                ShortcutRecorderField(
+                    combo: store.combo(for: action),
+                    isRecording: recordingAction == action,
+                    onStartRecording: {
+                        conflictMessages[action] = nil
+                        recordingAction = action
+                    },
+                    onCapture: { event in handleCapture(event, for: action) }
+                )
+                .disabled(!store.isEnabled(action))
+                .opacity(store.isEnabled(action) ? 1 : 0.45)
+                Button {
+                    store.resetToDefault(action)
+                    conflictMessages[action] = nil
+                    keybindingsVersion += 1
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Halo.textDim)
+                .help("Reset to default")
+            }
+            if let message = conflictMessages[action] {
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Halo.flare)
+            }
+        }
+    }
+
+    private func handleCapture(_ event: NSEvent, for action: PulseAction) {
+        recordingAction = nil
+        guard event.keyCode != 53 else { return }  // Escape cancels recording
+        guard let combo = KeyCombo(event: event) else {
+            conflictMessages[action] = "Shortcuts need at least one modifier key (\u{2318}\u{2325}\u{2303}\u{21e7})."
+            return
+        }
+        if let conflict = KeybindingStore.shared.setCombo(combo, for: action) {
+            conflictMessages[action] = "Already used by \(conflict.displayName)."
+        } else {
+            conflictMessages[action] = nil
+        }
+        keybindingsVersion += 1
     }
 
     // MARK: - Notifications
