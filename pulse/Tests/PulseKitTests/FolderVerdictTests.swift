@@ -463,6 +463,20 @@ struct VerdictSynthesisTests {
         #expect(verdict.evidence.contains { $0.kind == .references })
         #expect(verdict.evidence.contains { $0.kind == .staleness })
     }
+
+    // Zero recency evidence (no content mtime, no observed opens, no
+    // Spotlight hit) must never be treated as "stale" by default — that
+    // would let an unidentified folder reach safeToDelete purely from an
+    // owner-missing name match, with no actual signal it's unused.
+    @Test func noEvidenceAtAllIsNeverSafeToDelete() {
+        let noEvidence = StalenessProbe.Result(
+            newestContent: nil, newestContentName: nil,
+            newestAny: nil, fileCount: 0, sizeBytes: 0, truncated: false)
+        let verdict = synth(
+            staleness: noEvidence,
+            liveness: .missing(toolName: "ghosttool"))
+        #expect(verdict.verdict != .safeToDelete)
+    }
 }
 
 // MARK: - Owner liveness

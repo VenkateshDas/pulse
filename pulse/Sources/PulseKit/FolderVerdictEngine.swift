@@ -312,7 +312,10 @@ public actor FolderVerdictEngine {
         let fileSpotlightDays = targetIsDirectory ? nil : spotlightDays
         let useDays = [contentDays, observedOpenDays, fileSpotlightDays].compactMap { $0 }.min()
         let recentlyUsed = ranRecent || (useDays.map { $0 < recentActivityDays } ?? false)
-        let stale = useDays.map { $0 >= staleDays } ?? true
+        // No recency evidence at all (no mtime, no observed opens, no
+        // Spotlight hit) means "unknown", not "stale" — defaulting to stale
+        // let a folder Pulse has zero signal about reach safeToDelete.
+        let stale = useDays.map { $0 >= staleDays } ?? false
 
         let verdict: VerdictClass
         let headline: String

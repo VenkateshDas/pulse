@@ -22,17 +22,23 @@ final class ProcessSampler {
         defer { previousSampleAt = now }
 
         var pids = [pid_t](repeating: 0, count: 8192)
-        let pidCount = pids.withUnsafeMutableBufferPointer { buffer in
+        // proc_listallpids returns the number of *bytes* written into the
+        // buffer, not a pid count — dividing by the stride recovers the
+        // actual count. Clamp to the buffer's own bounds as well, since a
+        // process count exceeding the fixed 8192-slot buffer would otherwise
+        // report more bytes than the buffer can hold.
+        let bytesWritten = pids.withUnsafeMutableBufferPointer { buffer in
             proc_listallpids(buffer.baseAddress, Int32(buffer.count * MemoryLayout<pid_t>.size))
         }
-        guard pidCount > 0 else { return [] }
+        guard bytesWritten > 0 else { return [] }
+        let pidCount = min(Int(bytesWritten) / MemoryLayout<pid_t>.size, pids.count)
 
         var nextTaskTime: [pid_t: UInt64] = [:]
-        nextTaskTime.reserveCapacity(Int(pidCount))
+        nextTaskTime.reserveCapacity(pidCount)
         var samples: [ProcessSample] = []
-        samples.reserveCapacity(Int(pidCount))
+        samples.reserveCapacity(pidCount)
 
-        for pid in pids[0..<Int(pidCount)] where pid > 0 {
+        for pid in pids[0..<pidCount] where pid > 0 {
             var info = proc_taskinfo()
             let size = proc_pidinfo(
                 pid, PROC_PIDTASKINFO, 0, &info, Int32(MemoryLayout<proc_taskinfo>.size)

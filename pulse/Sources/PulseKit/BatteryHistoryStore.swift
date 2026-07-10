@@ -56,24 +56,30 @@ public final class BatteryHistoryStore {
     /// the UI can display a "9:00 AM – 11:30 PM" usage window.
     public func addTimeOnBattery(_ duration: TimeInterval, at date: Date = .now) {
         guard duration > 0 else { return }
-        guard date.timeIntervalSince(Calendar.current.startOfDay(for: date)) >= 0 else { return }
-        let startOfDay = Calendar.current.startOfDay(for: date)
         let sessionStart = date.addingTimeInterval(-duration)
-        let isNewDay = !entries.contains { $0.date == startOfDay }
+        // A tick can span midnight (sleep/wake over a long gap) — split it
+        // across day boundaries the same way the pmset-log backfill path does,
+        // so live-recorded and backfilled totals for a given day agree.
+        let splits = splitBatterySession(start: sessionStart, end: date)
+        let isNewDay = splits.contains { day, _ in !entries.contains { $0.date == day } }
 
-        if let index = entries.firstIndex(where: { $0.date == startOfDay }) {
-            entries[index].timeOnBattery += duration
-            entries[index].firstActiveAt = entries[index].firstActiveAt.map {
-                min($0, sessionStart)
-            } ?? sessionStart
-            entries[index].lastActiveAt = max(entries[index].lastActiveAt ?? date, date)
-        } else {
-            entries.append(
-                Entry(
-                    date: startOfDay, timeOnBattery: duration,
-                    firstActiveAt: sessionStart, lastActiveAt: date))
-            entries.sort { $0.date < $1.date }
+        for (day, dur) in splits {
+            let spanStart = max(sessionStart, day)
+            let spanEnd = min(date, day.addingTimeInterval(86400))
+            if let index = entries.firstIndex(where: { $0.date == day }) {
+                entries[index].timeOnBattery += dur
+                entries[index].firstActiveAt = entries[index].firstActiveAt.map {
+                    min($0, spanStart)
+                } ?? spanStart
+                entries[index].lastActiveAt = max(entries[index].lastActiveAt ?? spanEnd, spanEnd)
+            } else {
+                entries.append(
+                    Entry(
+                        date: day, timeOnBattery: dur,
+                        firstActiveAt: spanStart, lastActiveAt: spanEnd))
+            }
         }
+        entries.sort { $0.date < $1.date }
         entries.removeAll { date.timeIntervalSince($0.date) > Self.maxAge }
         if isNewDay || Date().timeIntervalSince(lastTimePersist) >= Self.persistThrottle {
             persist()
