@@ -7,14 +7,19 @@ public struct ProcessSample: Sendable, Identifiable, Equatable {
     /// CPU usage over the last sampling interval, 0–100 (can exceed 100 on multi-core).
     public let cpuPercent: Double
     public let residentBytes: UInt64
+    /// Owning-app name from the first "*.app" bundle in the executable path
+    /// (helpers live inside the parent bundle); nil when not app-hosted.
+    public let appName: String?
 
     public var id: Int32 { pid }
 
-    public init(pid: Int32, name: String, cpuPercent: Double, residentBytes: UInt64) {
+    public init(pid: Int32, name: String, cpuPercent: Double, residentBytes: UInt64,
+                appName: String? = nil) {
         self.pid = pid
         self.name = name
         self.cpuPercent = cpuPercent
         self.residentBytes = residentBytes
+        self.appName = appName
     }
 }
 

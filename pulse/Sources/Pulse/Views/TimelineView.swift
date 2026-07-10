@@ -76,14 +76,17 @@ struct TimelineView: View {
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(items) { anomaly in
                 HStack(spacing: 10) {
-                    Image(systemName: "bolt.horizontal.fill")
+                    let isLeak = anomaly.kind == .memoryLeak
+                    Image(systemName: isLeak ? "memorychip" : "bolt.horizontal.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(Halo.amber)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(anomaly.processName)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Halo.textPrimary)
-                        Text("\(Int(anomaly.cpuPercent))% CPU for \(Int(anomaly.sustainedSeconds / 60)) min · pid \(anomaly.pid)")
+                        Text(isLeak
+                            ? "+\(ByteFormat.string(UInt64(max(anomaly.growthBytes ?? 0, 0)))) RAM in \(Int(anomaly.sustainedSeconds / 60)) min · pid \(anomaly.pid)"
+                            : "\(Int(anomaly.cpuPercent))% CPU for \(Int(anomaly.sustainedSeconds / 60)) min · pid \(anomaly.pid)")
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(Halo.textDim)
                     }

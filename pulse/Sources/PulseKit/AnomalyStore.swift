@@ -3,21 +3,30 @@ import Foundation
 /// One logged "process stayed hot" event — the memory mole lacks. Lets the
 /// Timeline answer "when did Spotlight peg a core?" after the fact.
 public struct AnomalyRecord: Codable, Equatable, Sendable, Identifiable {
+    public enum Kind: String, Codable, Sendable { case cpu, memoryLeak }
+
     public let id: UUID
     public let processName: String
     public let pid: Int32
     public let cpuPercent: Double
     public let date: Date
     public let sustainedSeconds: TimeInterval
+    /// nil = record predates the field; treat as .cpu.
+    public let kind: Kind?
+    /// RSS growth across the window; set only for .memoryLeak.
+    public let growthBytes: Int64?
 
     public init(id: UUID = UUID(), processName: String, pid: Int32,
-                cpuPercent: Double, date: Date = .now, sustainedSeconds: TimeInterval) {
+                cpuPercent: Double, date: Date = .now, sustainedSeconds: TimeInterval,
+                kind: Kind? = .cpu, growthBytes: Int64? = nil) {
         self.id = id
         self.processName = processName
         self.pid = pid
         self.cpuPercent = cpuPercent
         self.date = date
         self.sustainedSeconds = sustainedSeconds
+        self.kind = kind
+        self.growthBytes = growthBytes
     }
 }
 
