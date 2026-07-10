@@ -40,6 +40,7 @@ enum KeybindingActions {
         alert.addButton(withTitle: "Empty Trash")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
+        MenuBarFlash.shared.flash("trash")
         var count = 0
         for url in entries {
             if (try? FileManager.default.removeItem(at: url)) != nil { count += 1 }

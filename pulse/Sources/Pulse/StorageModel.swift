@@ -394,6 +394,7 @@ final class StorageModel {
     func emptyTrash() {
         guard !isCleaning, trashItemCount > 0 else { return }
         isCleaning = true
+        MenuBarFlash.shared.flash("trash")
         Task {
             let report = await Task.detached(priority: .userInitiated) {
                 let trash = FileManager.default.homeDirectoryForCurrentUser

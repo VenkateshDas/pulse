@@ -53,6 +53,7 @@ public final class KeepAwakeController {
         }
         lastActivationFailed = false
         assertionID = id
+        MenuBarFlash.shared.flash("cup.and.saucer.fill")
         guard let duration else { return }
 
         expiresAt = Date().addingTimeInterval(duration)
@@ -91,6 +92,9 @@ public final class KeepAwakeController {
         if assertionID != 0 {
             IOPMAssertionRelease(assertionID)
             assertionID = 0
+            // Outline cup = turned off. activate() re-flashes filled right
+            // after when this deactivate was just a re-activation reset.
+            MenuBarFlash.shared.flash("cup.and.saucer")
         }
     }
 
