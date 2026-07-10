@@ -1,5 +1,9 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-07-10] Feature | Menu bar icon flash on actions
+- Added `MenuBarFlash` (PulseKit, @Observable singleton): main menu-bar icon briefly swaps to the triggered action's SF Symbol for 3s, then reverts — covers hotkey and UI triggers.
+- Hooks: `KeepAwakeController` (cup filled/outline), `BrightnessEngine.isAdaptiveModeEnabled` (sun), `OptimizeEngine.runSafeTasks` (bolt.heart), Empty Trash in `StorageModel` + `KeybindingActions` (trash).
+
 ## [2026-06-29] Fix | Performance and UX optimization
 - Disabled adaptive sync when external display brightness is overridden via media keys to fix CPU storm.
 - Removed data-driven `.animation` on `HealthHero`, `TreemapView`, and `VitalCard` to prevent layout invalidation loops.

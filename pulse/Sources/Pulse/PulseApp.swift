@@ -1,4 +1,5 @@
 import AppKit
+import PulseKit
 import SwiftUI
 import UserNotifications
 
@@ -89,7 +90,9 @@ struct PulseApp: App {
         // Reads only the gated integer property, so it re-renders only when
         // the displayed value actually changes, not on every sample.
         HStack(spacing: 6) {
-            Image(systemName: "waveform.path.ecg")
+            // Action feedback: MenuBarFlash briefly swaps the icon to the
+            // triggered action's symbol (hotkey or UI), then reverts.
+            Image(systemName: MenuBarFlash.shared.symbol ?? "waveform.path.ecg")
             Text(String(format: "%3d%%", model.menuBarCPUPercent))
                 .font(.system(size: 12, design: .monospaced))
         }

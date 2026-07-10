@@ -286,6 +286,7 @@ public class BrightnessEngine: ObservableObject {
             } else {
                 stopAdaptiveSync()
             }
+            MenuBarFlash.shared.flash(isAdaptiveModeEnabled ? "sun.max.fill" : "sun.min")
         }
     }
     

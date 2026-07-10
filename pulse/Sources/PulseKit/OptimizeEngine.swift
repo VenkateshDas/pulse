@@ -183,6 +183,7 @@ public enum OptimizeEngine {
     /// Runs all safe (no-sudo) tasks sequentially, skipping any that report
     /// nothing to do. Returns a human-readable summary.
     public static func runSafeTasks() async -> String {
+        await MenuBarFlash.shared.flash("bolt.heart.fill")
         var completed: [String] = []
         var totalFreed: Int64 = 0
         for task in inProcessTasks {
