@@ -31,6 +31,7 @@ struct SettingsView: View {
                     subtitle: "Customize how Pulse runs, what it shows, and what it's allowed to do."
                 )
                 VStack(alignment: .leading, spacing: 16) {
+                    displayModeSection
                     generalSection
                     menuBarSection
                     keyboardShortcutsSection
@@ -47,6 +48,34 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Halo.void)
+    }
+
+    // MARK: - Display Mode
+
+    private var displayModeSection: some View {
+        let mode = DisplayModeManager.shared.current
+        return section(
+            "Display Mode", icon: "eye.fill", tint: Halo.interactive,
+            footnote: "Switch anytime — nothing is removed, only shown or hidden."
+        ) {
+            settingsRow(title: "Interface", detail: mode.subtitle) {
+                Picker("", selection: displayModeBinding) {
+                    ForEach(DisplayMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 160)
+            }
+        }
+    }
+
+    private var displayModeBinding: Binding<DisplayMode> {
+        Binding(
+            get: { DisplayModeManager.shared.current },
+            set: { DisplayModeManager.shared.set($0) }
+        )
     }
 
     // MARK: - General

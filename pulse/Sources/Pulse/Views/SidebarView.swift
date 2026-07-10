@@ -33,6 +33,11 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     }
 
     var isAvailable: Bool { true }
+
+    /// Rows collapsed behind the sidebar's "Advanced" disclosure in
+    /// `.simple` mode — power-user tools a non-technical user doesn't need
+    /// to see by default, but can still reach in one tap.
+    static let advancedGatedItems: Set<SidebarItem> = [.monitor, .diagnostics]
 }
 
 enum SidebarSection: String, CaseIterable {
@@ -49,6 +54,18 @@ enum SidebarSection: String, CaseIterable {
         case .tools: [.optimize, .uninstall, .settings, .diagnostics]
         }
     }
+
+    /// Items in this section shown as top-level rows for the given mode.
+    /// `.simple` holds back `SidebarItem.advancedGatedItems` — they still
+    /// exist in `items`/`allCases` (hotkeys keep working), just not as a
+    /// row here; the sidebar surfaces them behind a single "Advanced"
+    /// disclosure instead.
+    func visibleItems(for mode: DisplayMode) -> [SidebarItem] {
+        switch mode {
+        case .pro: items
+        case .simple: items.filter { !SidebarItem.advancedGatedItems.contains($0) }
+        }
+    }
 }
 
 struct SidebarView: View {
@@ -56,8 +73,12 @@ struct SidebarView: View {
     @Environment(StorageModel.self) private var storage
     @Binding var selection: SidebarItem
     @State private var hoveredItem: SidebarItem?
+    @State private var showAdvanced = false
 
     var body: some View {
+        // Registers an Observation dependency on the current display mode so
+        // the sidebar re-renders when it's changed from Settings/Onboarding.
+        let mode = DisplayModeManager.shared.current
         VStack(alignment: .leading, spacing: 0) {
             logo
                 .padding(.bottom, Halo.Space.xxl)
@@ -70,9 +91,13 @@ struct SidebarView: View {
                     .padding(.leading, 10)
                     .padding(.top, section == .overview ? 0 : Halo.Space.lg)
                     .padding(.bottom, Halo.Space.xs)
-                ForEach(section.items) { item in
+                ForEach(section.visibleItems(for: mode)) { item in
                     row(item)
                 }
+            }
+
+            if mode == .simple {
+                advancedDisclosure
             }
 
             Spacer()
@@ -158,6 +183,42 @@ struct SidebarView: View {
         return item.isAvailable ? Halo.textPrimary.opacity(0.8) : Halo.textDim.opacity(0.6)
     }
 
+    /// Single collapsed row that reveals Monitor + Diagnostics on tap, so
+    /// `.simple` mode never fully hides a feature — just defers it one tap.
+    private var advancedDisclosure: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(Halo.Motion.snappy) { showAdvanced.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 13))
+                        .frame(width: 18)
+                    Text("Advanced")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .rotationEffect(.degrees(showAdvanced ? 90 : 0))
+                }
+                .foregroundStyle(Halo.textPrimary.opacity(0.8))
+                .padding(.horizontal, 10)
+                .padding(.vertical, Halo.Space.sm)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showAdvanced {
+                // `allCases`-ordered, not `Set` iteration order, so the two
+                // rows land in a stable position every render.
+                ForEach(SidebarItem.allCases.filter { SidebarItem.advancedGatedItems.contains($0) }) { item in
+                    row(item)
+                }
+            }
+        }
+        .padding(.top, Halo.Space.lg)
+    }
+
     private var footer: some View {
         VStack(alignment: .leading, spacing: Halo.Space.xs) {
             HStack(spacing: 6) {
@@ -165,7 +226,9 @@ struct SidebarView: View {
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
                     .shadow(color: statusColor.opacity(0.5), radius: 6)
-                Text(statusText)
+                Text(Self.statusText(mode: DisplayModeManager.shared.current,
+                                      hasCritical: model.alerts.contains { $0.severity == .critical },
+                                      hasWarning: model.alerts.contains { $0.severity == .warning }))
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(statusColor)
             }
@@ -181,10 +244,19 @@ struct SidebarView: View {
         return Halo.pulseGreen
     }
 
-    private var statusText: String {
-        if model.alerts.contains(where: { $0.severity == .critical }) { return "ATTENTION NEEDED" }
-        if model.alerts.contains(where: { $0.severity == .warning }) { return "MINOR ISSUES" }
-        return "ALL SYSTEMS NOMINAL"
+    /// Pure so it's unit-testable without a live `DashboardModel`. Pro mode
+    /// keeps the original ops-console phrasing; Simple mode says it plainly.
+    static func statusText(mode: DisplayMode, hasCritical: Bool, hasWarning: Bool) -> String {
+        switch mode {
+        case .pro:
+            if hasCritical { return "ATTENTION NEEDED" }
+            if hasWarning { return "MINOR ISSUES" }
+            return "ALL SYSTEMS NOMINAL"
+        case .simple:
+            if hasCritical { return "Needs attention" }
+            if hasWarning { return "A couple of small things" }
+            return "Everything's fine"
+        }
     }
 
     private var uptimeText: String {

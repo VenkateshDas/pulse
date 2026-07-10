@@ -5,10 +5,20 @@ import SwiftUI
 /// vitals row, CPU chart and top processes.
 struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
+    /// Gates the charts/heatmap/process-table wall behind a tap in Simple
+    /// mode, so a non-technical user's first view is verdict + vitals, not
+    /// an instrument panel. Pro mode starts expanded — nothing changes for
+    /// existing users. Set once at construction, not re-derived on every
+    /// render, so a manual toggle during the session sticks.
+    @State private var showDetails: Bool
 
     /// Posted when the user taps the diagnosis culprit chip; RootView
     /// switches the sidebar to the Monitor tab.
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
+
+    init() {
+        _showDetails = State(initialValue: DisplayModeManager.shared.current == .pro)
+    }
 
     var body: some View {
         ScrollView {
@@ -19,23 +29,41 @@ struct DashboardView: View {
                     FeedbackBadge(message: feedback)
                 }
                 vitals
-                HStack(alignment: .top, spacing: Halo.Space.lg) {
-                    VStack(spacing: Halo.Space.lg) {
-                        chartsPanel
-                        CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
-                    }
-                    .frame(maxHeight: .infinity)
+                detailsDisclosure
+                if showDetails {
+                    HStack(alignment: .top, spacing: Halo.Space.lg) {
+                        VStack(spacing: Halo.Space.lg) {
+                            chartsPanel
+                            CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                        }
+                        .frame(maxHeight: .infinity)
 
-                    TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                        .frame(width: 400)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                        TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                            .frame(width: 400)
+                            .frame(maxHeight: .infinity, alignment: .top)
+                    }
+                    .frame(minHeight: 480)
                 }
-                .frame(minHeight: 480)
             }
             .padding(Halo.Space.xxl)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background { ZStack { Halo.void; Halo.meshBackground } }
+    }
+
+    private var detailsDisclosure: some View {
+        Button {
+            withAnimation(Halo.Motion.snappy) { showDetails.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Text(showDetails ? "Hide details" : "Show details")
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(showDetails ? 90 : 0))
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Halo.textDim)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Hero (greeting + diagnosis verdict + health score)
@@ -113,14 +141,7 @@ struct DashboardView: View {
     private var cpuCard: some View {
         let snapshot = model.snapshot
         let total = snapshot?.cpuTotalPercent ?? 0
-        // Fixed-width formats keep text intrinsic size constant between
-        // samples, so value changes redraw without relaying out the window.
-        let split: String
-        if let e = snapshot?.cpuEfficiencyPercent, let p = snapshot?.cpuPerformancePercent {
-            split = String(format: "E %2d%% · P %2d%%", Int(e), Int(p))
-        } else {
-            split = "\(snapshot?.cpuPerCore.count ?? 0) cores"
-        }
+        let mode = DisplayModeManager.shared.current
         let cpuTooltip = snapshot?.cpuPerCore.enumerated().map { "Core \($0.offset): \(Int($0.element))%" }.joined(separator: "\n")
 
         // Footer chips: the biggest CPU consumer right now, and how many cores
@@ -137,19 +158,17 @@ struct DashboardView: View {
                     color: busy == cores.count ? Halo.amber : nil))
         }
 
-        let gpuStr: String
-        if let gpu = snapshot?.gpuUsage {
-            gpuStr = String(format: " · GPU %1.0f%%", gpu.deviceUtilization)
-        } else {
-            gpuStr = ""
-        }
-
         return VitalCard(
             title: "CPU",
             fraction: total / 100,
             value: String(format: "%2d%%", Int(total)),
-            line1: split + gpuStr,
-            line2: String(format: "load %5.2f", snapshot?.loadAverage1m ?? 0),
+            line1: DashboardFormatting.cpuLine1(
+                mode: mode,
+                efficiencyPercent: snapshot?.cpuEfficiencyPercent.map { Int($0) },
+                performancePercent: snapshot?.cpuPerformancePercent.map { Int($0) },
+                coreCount: snapshot?.cpuPerCore.count ?? 0,
+                gpuPercent: snapshot?.gpuUsage?.deviceUtilization),
+            line2: DashboardFormatting.cpuLine2(mode: mode, loadAverage1m: snapshot?.loadAverage1m ?? 0) ?? "",
             history: model.cpuHistory,
             cardTooltip: cpuTooltip,
             stats: cpuStats
@@ -158,6 +177,7 @@ struct DashboardView: View {
 
     private var memoryCard: some View {
         let snapshot = model.snapshot
+        let mode = DisplayModeManager.shared.current
         let pressureColor: Color =
             switch snapshot?.memoryPressure {
             case .critical: Halo.flare
@@ -170,11 +190,12 @@ struct DashboardView: View {
         let wiredF = Double(snapshot?.memoryWiredBytes ?? 0) / total
         let compF = Double(snapshot?.memoryCompressedBytes ?? 0) / total
 
-        let segments = [
+        let showBreakdown = DashboardFormatting.showsMemoryBreakdown(mode: mode)
+        let segments: [VitalCard.Segment]? = showBreakdown ? [
             VitalCard.Segment(start: 0, end: appF, color: Halo.ion),
             VitalCard.Segment(start: appF, end: appF + wiredF, color: Halo.volt),
             VitalCard.Segment(start: appF + wiredF, end: appF + wiredF + compF, color: Halo.pulseGreen)
-        ]
+        ] : nil
 
         let breakdownTooltip = [
             "App Memory: \(ByteFormat.string(snapshot?.memoryAppBytes ?? 0))",
@@ -193,19 +214,19 @@ struct DashboardView: View {
             default: ""
             }
 
-        let legend = [
+        let legend: [VitalCard.LegendItem]? = showBreakdown ? [
             VitalCard.LegendItem(color: Halo.ion, label: "App"),
             VitalCard.LegendItem(color: Halo.volt, label: "Wired"),
             VitalCard.LegendItem(color: Halo.pulseGreen, label: "Comp")
-        ]
+        ] : nil
 
         return VitalCard(
             title: "MEMORY",
             fraction: snapshot?.memoryUsedFraction ?? 0,
             ringColor: pressureColor,
             value: String(format: "%2d%%", Int((snapshot?.memoryUsedFraction ?? 0) * 100)),
-            line1: "U: \(ByteFormat.string(memUsed)) · F: \(ByteFormat.string(memFree))",
-            line2: "Swap \(ByteFormat.string(snapshot?.swapUsedBytes ?? 0))\(pressureStr)",
+            line1: DashboardFormatting.memoryLine1(mode: mode, usedBytes: memUsed, freeBytes: memFree),
+            line2: DashboardFormatting.memoryLine2(mode: mode, swapUsedBytes: snapshot?.swapUsedBytes ?? 0, pressureSuffix: pressureStr) ?? "",
             history: model.memoryHistory,
             cardTooltip: breakdownTooltip,
             legend: legend,
@@ -266,6 +287,7 @@ struct DashboardView: View {
     private var thermalCard: some View {
         let sensors = model.snapshot?.sensors ?? SensorReadings()
         let hottest = [sensors.cpuTempC, sensors.gpuTempC].compactMap { $0 }.max()
+        let mode = DisplayModeManager.shared.current
 
         guard let hottest else {
             // No SMC on this machine (or access denied): fall back to the
@@ -284,7 +306,7 @@ struct DashboardView: View {
                 ringColor: color,
                 value: label,
                 line1: "thermal state",
-                line2: "no SMC sensors found",
+                line2: DashboardFormatting.thermalFallbackLine2(mode: mode),
                 history: model.loadHistory,
                 historyScale: 10
             )
@@ -293,12 +315,7 @@ struct DashboardView: View {
         // Ring maps 20–110 °C; color thresholds follow Apple Silicon
         // norms (sustained >90 °C is throttling territory).
         let color: Color = hottest < 70 ? Halo.volt : (hottest < 90 ? Halo.amber : Halo.flare)
-        let line1 = [
-            sensors.cpuTempC.map { String(format: "CPU %2.0f°", $0) },
-            sensors.gpuTempC.map { String(format: "GPU %2.0f°", $0) },
-        ]
-        .compactMap { $0 }
-        .joined(separator: " · ")
+        let line1 = DashboardFormatting.thermalLine1(mode: mode, cpuTempC: sensors.cpuTempC, gpuTempC: sensors.gpuTempC)
 
         var parts: [String] = []
         if let battery = sensors.batteryTempC {
@@ -321,18 +338,22 @@ struct DashboardView: View {
 
         // Footer chips: degrees of headroom before throttling (~90 °C on Apple
         // Silicon) and whether temps are climbing — context a bare number lacks.
-        let headroom = max(0, 90 - hottest)
-        var thermalStats: [VitalCard.Stat] = [
-            .init(
-                label: "HEADROOM", value: String(format: "%.0f°", headroom),
-                color: headroom < 10 ? Halo.flare : (headroom < 25 ? Halo.amber : nil))
-        ]
-        if model.tempHistory.count >= 6 {
-            let recent = model.tempHistory.suffix(6)
-            let delta = (recent.last ?? 0) - (recent.first ?? 0)
-            let trend = delta > 2 ? "rising" : (delta < -2 ? "falling" : "steady")
-            thermalStats.append(
-                .init(label: "TREND", value: trend, color: delta > 2 ? Halo.amber : nil))
+        var thermalStats: [VitalCard.Stat]? = nil
+        if DashboardFormatting.showsThermalStats(mode: mode) {
+            let headroom = max(0, 90 - hottest)
+            var stats: [VitalCard.Stat] = [
+                .init(
+                    label: "HEADROOM", value: String(format: "%.0f°", headroom),
+                    color: headroom < 10 ? Halo.flare : (headroom < 25 ? Halo.amber : nil))
+            ]
+            if model.tempHistory.count >= 6 {
+                let recent = model.tempHistory.suffix(6)
+                let delta = (recent.last ?? 0) - (recent.first ?? 0)
+                let trend = delta > 2 ? "rising" : (delta < -2 ? "falling" : "steady")
+                stats.append(
+                    .init(label: "TREND", value: trend, color: delta > 2 ? Halo.amber : nil))
+            }
+            thermalStats = stats
         }
 
         return VitalCard(
@@ -341,7 +362,7 @@ struct DashboardView: View {
             ringColor: color,
             value: String(format: "%2.0f°", hottest),
             line1: line1,
-            line2: parts.joined(separator: " · "),
+            line2: DashboardFormatting.thermalLine2(mode: mode, parts: parts) ?? "",
             history: model.tempHistory,
             historyScale: 110,
             cardTooltip: thermalTooltip,

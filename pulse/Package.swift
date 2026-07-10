@@ -35,5 +35,9 @@ let package = Package(
             .process("Resources")
         ]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
+        // Unit tests for pure app-layer logic (display-mode gating, sidebar
+        // visibility, label formatting) — no UI, so testable directly
+        // against the executable target.
+        .testTarget(name: "PulseTests", dependencies: ["Pulse"]),
     ]
 )
