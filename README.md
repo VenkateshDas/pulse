@@ -18,27 +18,32 @@
 > [!WARNING]
 > **Work in progress.** Pulse is under active development — expect rough edges, bugs, and breaking changes. Things may be glitchy. Feedback welcome.
 
-> **Beta note:** Pulse is ad-hoc signed. On first launch right-click → **Open** to bypass the Gatekeeper warning.
+> **Beta note:** Pulse is ad-hoc signed, no notarization or signing secrets configured yet. Releases are unsigned DMGs — Gatekeeper blocks them on other Macs (see Install below).
 
 ---
 
 ## Features
 
+- **Simple / Pro display mode** — Simple leads with plain-language verdicts and gates jargon (load average, per-core splits, process tables) behind an explicit "show details" tap; Pro shows the full instrument panel. Switch anytime in Settings; a sensible default is picked based on whether you've already been through onboarding.
 - **Diagnosis verdict** — one line telling you what's wrong and who's to blame ("Chrome high CPU"), with a tap-through to the culprit process. Shown on the Dashboard, in the menu-bar HUD, and logged to history.
 - **Health score** — a single 0–100 score (CPU, memory, disk, thermal) with a per-factor "what's costing you" breakdown.
-- **Menu bar HUD** — live score + verdict, plus CPU/memory/disk/battery vitals at a glance.
+- **Menu bar HUD** — live score + verdict, CPU/memory/disk/battery vitals at a glance, and a brief action-icon flash (e.g. trash, sync, sun) when a hotkey or popover button fires — feedback even when the popover is closed.
+- **Global keyboard shortcuts** — 5 hotkeys dispatch straight to the same actions the popover buttons use: run Optimize, empty Trash (with confirmation), toggle brightness sync, toggle Keep Awake, toggle the menu-bar chevron/auto-hide. Configurable in Settings.
 - **Dashboard** — real-time charts, per-core CPU heatmap, top processes by CPU/memory.
+- **Theme presets** — four built-in palettes (Precision, Midnight, Contrast, Slate) applied app-wide across the Command Center and popover, picked in Settings.
 - **Disk** — one unified view with sub-tabs:
   - **Map** — treemap of disk usage.
   - **Hidden Space** — surfaces big, easy-to-forget locations (iOS backups, Xcode DerivedData/simulators, Docker/OrbStack, dev caches, Downloads >90 days), flagged 👀 real-data vs cleanable.
   - **Reclaim** — safety-graded scan for reclaimable space (caches, venvs, `node_modules`).
+  - **Growth** — per-folder daily disk growth, no baseline snapshot required — shows where your free space actually went.
+  - **"Can I delete this?"** — evidence-based verdict on a file or folder before you remove it: checks whether anything currently has it open or references it, so it stops flagging live data as safe to delete.
   - **Trash** — review and empty.
   - **Optimize** — safe maintenance tasks (QuickLook/DNS/Launch Services), admin tasks via a macOS password prompt (`purge`, network flush, Spotlight reindex), and a "we refuse these 5 risky ops" trust panel.
 - **App Uninstaller** — drag an app (or pick from the list); Pulse finds leftover files, grades every match by confidence (exact bundle-ID = safe, vendor/name = careful, weak name = review-only), trashes the app, and shows a receipt. **Orphan scan** finds debris from apps already deleted — including launch agents/daemons that load a now-missing binary.
 - **Process watch** — alerts only when a process stays hot for a sustained window (no momentary-spike false alarms), with a searchable anomaly history.
-- **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies.
+- **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies, with daily disk growth attributed to the folders that caused it.
 - **Dev Mode** — process-level sampler with µs-resolution CPU accounting.
-- **Reversible by default** — every removal (Smart Clean, Reclaim, Optimize, Uninstall, orphans) goes to the Trash, not `rm`, and is logged to a 30-day **Undo history** you can restore from one tap. The journal lives in `~/Library/Application Support/Pulse/`.
+- **Reversible by default** — every removal (Smart Clean, Reclaim, Optimize, Uninstall, orphans, Empty Trash hotkey) goes to the Trash, not `rm`, and is logged to a 30-day **Undo history** you can restore from one tap. The journal lives in `~/Library/Application Support/Pulse/`.
 - **Low overhead** — ~0.1% CPU while sampling every 2 s; one shared loop feeds every view, so opening more panes adds no samplers. RSS sits around ~110–120 MB — the SwiftUI/AppKit/Charts framework baseline, not Pulse's own data (a few hundred KB of capped ring buffers).
 
 ## Install
@@ -77,7 +82,7 @@ xcode-select --install          # if not already installed
 
 git clone https://github.com/VenkateshDas/pulse
 cd pulse/pulse
-make bundle                     # → dist/Pulse.app
+make bundle                     # → pulse/dist/Pulse.app
 open dist/Pulse.app
 ```
 
@@ -118,9 +123,9 @@ dropping SwiftUI Charts.
 make build      # debug build
 make test       # run test suite
 make run        # run from terminal
-make bundle     # → dist/Pulse.app (ad-hoc signed)
+make bundle     # → pulse/dist/Pulse.app (ad-hoc signed)
 make dev-cert   # one-time: stable local signing so TCC grants survive rebuilds
-make dmg        # → dist/Pulse-x.y.z.dmg
+make dmg        # → pulse/dist/Pulse-x.y.z.dmg
 ```
 
 > **Testing permission-gated features locally (App Uninstaller).** `make bundle`
