@@ -3,35 +3,41 @@ import SwiftUI
 /// HALO design tokens — Precision Instrument Aesthetic
 /// Dynamic Light/Dark mode support.
 enum Halo {
-    /// A light/dark grayscale token. Matching on `bestMatch` (not
+    /// A light/dark RGB token. Matching on `bestMatch` (not
     /// `name == .darkAqua`) is what makes the menu-bar popover follow the
     /// system: its window renders with a *vibrant* appearance
     /// (`.vibrantDark`/`.vibrantLight`), which `== .darkAqua` never matched —
     /// so every token fell through to its light value.
-    private static func dynamicWhite(light: CGFloat, dark: CGFloat, name: NSColor.Name) -> Color {
+    private static func dynamicColor(_ pair: ColorPair, name: NSColor.Name) -> Color {
         Color(nsColor: NSColor(name: name, dynamicProvider: { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            return NSColor(calibratedWhite: isDark ? dark : light, alpha: 1.0)
+            let c = isDark ? pair.dark : pair.light
+            return NSColor(calibratedRed: c.r, green: c.g, blue: c.b, alpha: 1.0)
         }))
     }
 
     // MARK: - Surfaces
-    static let void = dynamicWhite(light: 0.965, dark: 0.065, name: "Canvas")
-    static let surface1 = dynamicWhite(light: 1.0, dark: 0.10, name: "Surface1")
-    static let surface2 = dynamicWhite(light: 0.94, dark: 0.16, name: "Surface2")
-    static let border = dynamicWhite(light: 0.88, dark: 0.20, name: "Border")
-    static let borderSubtle = dynamicWhite(light: 0.92, dark: 0.14, name: "BorderSubtle")
+    // `static var` (not `let`) so every read reflects the currently selected
+    // `ThemeManager.shared` preset. The `name:` argument keys the underlying
+    // `NSColor` dynamic provider — kept stable across theme switches.
+    private static var palette: Palette { ThemeManager.currentPalette }
+
+    static var void: Color { dynamicColor(palette.void, name: "Canvas") }
+    static var surface1: Color { dynamicColor(palette.surface1, name: "Surface1") }
+    static var surface2: Color { dynamicColor(palette.surface2, name: "Surface2") }
+    static var border: Color { dynamicColor(palette.border, name: "Border") }
+    static var borderSubtle: Color { dynamicColor(palette.borderSubtle, name: "BorderSubtle") }
 
     // MARK: - Text
-    static let textPrimary = dynamicWhite(light: 0.07, dark: 0.96, name: "TextPrimary")
-    static let textSecondary = dynamicWhite(light: 0.30, dark: 0.75, name: "TextSecondary")
-    static let textDim = dynamicWhite(light: 0.50, dark: 0.55, name: "TextDim")
+    static var textPrimary: Color { dynamicColor(palette.textPrimary, name: "TextPrimary") }
+    static var textSecondary: Color { dynamicColor(palette.textSecondary, name: "TextSecondary") }
+    static var textDim: Color { dynamicColor(palette.textDim, name: "TextDim") }
 
     // MARK: - Semantic Data Colors
-    static let nominal = Color(hex: 0x30D158)   // Vibrant Green
-    static let warning = Color(hex: 0xFF9F0A)   // Apple Orange
-    static let critical = Color(hex: 0xFF453A)  // Apple Red
-    static let interactive = Color(hex: 0x0A84FF) // System Blue
+    static var nominal: Color { Color(hex: palette.nominal) }
+    static var warning: Color { Color(hex: palette.warning) }
+    static var critical: Color { Color(hex: palette.critical) }
+    static var interactive: Color { Color(hex: palette.interactive) }
 
     // MARK: - Brand Teal (landing page accent)
     static let teal = Color(hex: 0x10B981)
@@ -41,11 +47,11 @@ enum Halo {
     static let tealGlow = Color(hex: 0x10B981).opacity(0.4)
 
     // Legacy names
-    static let ion = interactive
+    static var ion: Color { interactive }
     static let volt = Color(hex: 0x5E5CE6) // Indigo
-    static let pulseGreen = nominal
-    static let amber = warning
-    static let flare = critical
+    static var pulseGreen: Color { nominal }
+    static var amber: Color { warning }
+    static var flare: Color { critical }
 
     /// Status color for a 0–1 load fraction: nominal → warning → critical.
     static func statusColor(_ fraction: Double) -> Color {

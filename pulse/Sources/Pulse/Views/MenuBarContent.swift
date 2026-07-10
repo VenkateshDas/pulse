@@ -23,6 +23,10 @@ struct MenuBarContent: View {
     private static let sparkSamples = 15
 
     var body: some View {
+        // Registers an Observation dependency on the current theme so the
+        // popover re-renders (picking up fresh `Halo.*` values) when the
+        // user switches presets in Settings.
+        let _ = ThemeManager.shared.selected
         VStack(alignment: .leading, spacing: 12) {
             // HUD Card
                 hud

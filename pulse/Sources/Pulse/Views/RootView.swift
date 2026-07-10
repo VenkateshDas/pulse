@@ -18,6 +18,10 @@ struct RootView: View {
     @State private var showOnboarding = PermissionsGate.shouldPromptOnLaunch()
 
     var body: some View {
+        // Registers an Observation dependency on the current theme so the
+        // whole subtree re-renders (picking up fresh `Halo.*` values) when
+        // the user switches presets in Settings.
+        let _ = ThemeManager.shared.selected
         HStack(spacing: 0) {
             SidebarView(selection: $selection)
             Group {

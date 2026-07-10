@@ -57,6 +57,11 @@ struct PulseApp: App {
                 .environment(cleanModel)
                 .environment(storageModel)
                 .environment(Updater.shared)
+                // `.window`-style popovers don't reliably propagate
+                // `@Observable` changes across window boundaries — force a
+                // full rebuild on theme change so the popover always shows
+                // the current preset immediately.
+                .id(ThemeManager.shared.selected)
         } label: {
             menuBarLabel
         }
