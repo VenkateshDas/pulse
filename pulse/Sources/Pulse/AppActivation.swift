@@ -120,6 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // (FSEvents writes + sparse open-handle samples) feeding the storage
         // verdict card. Must run from launch — its value IS the watching time.
         UsageObserver.shared.start()
+
+        // Global keyboard shortcuts (Settings ▸ Keyboard Shortcuts).
+        KeybindingActions.registerHandlers()
     }
 
     /// Closing the Command Center must not quit Pulse — it returns to the menu
