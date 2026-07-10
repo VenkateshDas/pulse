@@ -67,6 +67,7 @@ public final class MediaKeyManager: @unchecked Sendable, MediaKeyTapDelegate {
         accessibilityPollTimer = timer
     }
 
+    @MainActor
     public func stop() {
         tap?.stop()
         tap = nil

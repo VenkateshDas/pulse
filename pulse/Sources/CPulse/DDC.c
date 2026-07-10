@@ -38,8 +38,8 @@ bool IsLidClosed(void)
     if (clamShellStateRef == NULL) {
         if (rootDomain) {
             IOObjectRelease(rootDomain);
-            return false;
         }
+        return false;
     }
 
     if (CFBooleanGetValue((CFBooleanRef)(clamShellStateRef)) == true) {
@@ -89,6 +89,11 @@ static CFDataRef EDIDCreateFromFramebuffer(io_service_t framebuffer)
 
         os_log_debug(logger, "Getting info dict for display %d", serv);
         CFDictionaryRef info = IODisplayCreateInfoDictionary(displayPort, kIODisplayOnlyPreferredName);
+        if (info == NULL) {
+            os_log_debug(logger, "No info dict for display %d", serv);
+            CFRelease(serviceClass);
+            continue;
+        }
         if (CFDictionaryGetValueIfPresent(info, CFSTR(kIODisplayEDIDKey), (const void**)&edidData)) {
             CFRetain(edidData);
             CFRelease(ioDisplayConnect);
@@ -152,7 +157,6 @@ io_service_t IOFramebufferPortFromCGDisplayID(CGDirectDisplayID displayID, CFMut
 
     if (err != KERN_SUCCESS) {
         CFRelease(displayUUID);
-        IOObjectRelease(iter);
         return 0;
     }
 
@@ -254,23 +258,32 @@ io_service_t IOFramebufferPortFromCGDisplayID(CGDirectDisplayID displayID, CFMut
 dispatch_semaphore_t I2CRequestQueue(io_service_t i2c_device_id)
 {
     static UInt64 queueCount = 0;
+    static UInt64 queueCapacity = 0;
     static struct ReqQueue {
         uint32_t id;
         dispatch_semaphore_t queue;
     }* queues = NULL;
     dispatch_semaphore_t queue = NULL;
-    if (!queues)
-        queues = calloc(100, sizeof(*queues)); // FIXME: specify
+    if (!queues) {
+        queueCapacity = 16;
+        queues = calloc(queueCapacity, sizeof(*queues));
+    }
     UInt64 i = 0;
     while (i < queueCount)
         if (queues[i].id == i2c_device_id)
             break;
         else
             i++;
-    if (queues[i].id == i2c_device_id)
+    if (i < queueCount) {
         queue = queues[i].queue;
-    else
-        queues[queueCount++] = (struct ReqQueue) { i2c_device_id, (queue = dispatch_semaphore_create(1)) };
+    } else {
+        if (queueCount >= queueCapacity) {
+            queueCapacity *= 2;
+            queues = realloc(queues, queueCapacity * sizeof(*queues));
+        }
+        queue = dispatch_semaphore_create(1);
+        queues[queueCount++] = (struct ReqQueue) { i2c_device_id, queue };
+    }
     return queue;
 }
 

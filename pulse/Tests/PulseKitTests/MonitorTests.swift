@@ -98,3 +98,24 @@ struct MonitorEngineTests {
         #expect(first == again)
     }
 }
+
+@Suite("ProcessSampler")
+struct ProcessSamplerTests {
+    // proc_listallpids returns bytes written, not a pid count. Regression
+    // guard: the sampler must convert correctly and never overrun its own
+    // fixed pid buffer when slicing the result.
+    @Test func sampleIncludesOwnProcessAndRespectsLimit() {
+        let sampler = ProcessSampler()
+        let rows = sampler.sample(limit: 20)
+        #expect(rows.count <= 20)
+        #expect(rows.contains { $0.pid == getpid() })
+        #expect(rows.allSatisfy { $0.pid > 0 })
+    }
+
+    @Test func secondSampleComputesNonNegativeCPUPercent() {
+        let sampler = ProcessSampler()
+        _ = sampler.sample(limit: 200)
+        let second = sampler.sample(limit: 200)
+        #expect(second.allSatisfy { $0.cpuPercent >= 0 })
+    }
+}

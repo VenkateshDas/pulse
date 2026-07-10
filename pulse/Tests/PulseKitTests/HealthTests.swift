@@ -218,6 +218,23 @@ struct BatteryHistoryStoreTests {
         #expect(reloaded.entries.count == 1)
         #expect(reloaded.entries[0].timeOnBattery == 7200)
     }
+
+    @Test func splitsDurationSpanningMidnightAcrossBothDays() {
+        let store = BatteryHistoryStore(fileURL: nil)
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let day0 = Calendar.current.startOfDay(for: base)
+        let day1 = Calendar.current.date(byAdding: .day, value: 1, to: day0)!
+        // A 2-hour tick ending at day1 01:00 started at day0 23:00 — one
+        // hour belongs to each day.
+        let sessionEnd = day1.addingTimeInterval(3600)
+        store.addTimeOnBattery(2 * 3600, at: sessionEnd)
+
+        #expect(store.entries.count == 2)
+        let e0 = store.entries.first { $0.date == day0 }
+        let e1 = store.entries.first { $0.date == day1 }
+        #expect(e0?.timeOnBattery == 3600)
+        #expect(e1?.timeOnBattery == 3600)
+    }
 }
 
 @Suite("Benchmark")
