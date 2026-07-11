@@ -41,6 +41,7 @@
   - **Optimize** — safe maintenance tasks (QuickLook/DNS/Launch Services), admin tasks via a macOS password prompt (`purge`, network flush, Spotlight reindex), and a "we refuse these 5 risky ops" trust panel.
 - **App Uninstaller** — drag an app (or pick from the list); Pulse finds leftover files, grades every match by confidence (exact bundle-ID = safe, vendor/name = careful, weak name = review-only), trashes the app, and shows a receipt. **Orphan scan** finds debris from apps already deleted — including launch agents/daemons that load a now-missing binary.
 - **Process watch** — alerts only when a process stays hot for a sustained window (no momentary-spike false alarms), with a searchable anomaly history.
+- **Network Health** — Real-time Wi-Fi insights (SSID, channel, band, signal quality score) and automated network speed tests to instantly diagnose slow connections.
 - **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies, with daily disk growth attributed to the folders that caused it.
 - **Dev Mode** — process-level sampler with µs-resolution CPU accounting.
 - **Reversible by default** — every removal (Smart Clean, Reclaim, Optimize, Uninstall, orphans, Empty Trash hotkey) goes to the Trash, not `rm`, and is logged to a 30-day **Undo history** you can restore from one tap. The journal lives in `~/Library/Application Support/Pulse/`.

@@ -14,6 +14,7 @@ public actor PulseEngine {
     private let diskHistory = DiskHistoryStore()
     private let health = HealthSampler()
     private let gpu = GPUSampler()
+    private let wifi = WiFiSampler()
     // lazy: key-space enumeration takes a beat; runs on first sample
     // (actor context, off the main thread), not at app init.
     private lazy var smc = SMCSensors()
@@ -38,6 +39,8 @@ public actor PulseEngine {
         let top = includeProcesses ? processes.sample(limit: topProcessLimit) : []
         let batteryHealth = await health.sampleBattery()
         let gpuUsage = await gpu.sample()
+        let connectionType = ConnectionTypeMonitor.shared.current
+        let wifiInfo = connectionType == .wifi ? await wifi.sample() : nil
 
         let diskUsed = diskTotal > diskFree ? diskTotal - diskFree : 0
         diskHistory.record(usedBytes: diskUsed)
@@ -64,6 +67,8 @@ public actor PulseEngine {
             diskWeeklyGrowthBytes: diskHistory.weeklyGrowth(currentUsedBytes: diskUsed),
             networkBytesInPerSecond: netIn,
             networkBytesOutPerSecond: netOut,
+            connectionType: connectionType,
+            wifiInfo: wifiInfo,
             thermal: ThermalLevel(rawValue: ProcessInfo.processInfo.thermalState.rawValue)
                 ?? .nominal,
             sensors: smc?.sample() ?? SensorReadings(),

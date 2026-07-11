@@ -10,6 +10,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case optimize = "Optimize"
     case uninstall = "Uninstall"
     case monitor = "Monitor"
+    case network = "Network"
     case displays = "Displays"
     case health = "Health"
     case settings = "Settings"
@@ -25,6 +26,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .optimize: "sparkles"
         case .uninstall: "trash.slash.fill"
         case .monitor: "waveform.path.ecg"
+        case .network: "wifi"
         case .displays: "display"
         case .health: "stethoscope"
         case .settings: "gearshape.fill"
@@ -50,7 +52,7 @@ enum SidebarSection: String, CaseIterable {
         switch self {
         case .overview: [.dashboard]
         case .insights: [.storage, .timeline]
-        case .system: [.monitor, .displays, .health]
+        case .system: [.monitor, .network, .displays, .health]
         case .tools: [.optimize, .uninstall, .settings, .diagnostics]
         }
     }

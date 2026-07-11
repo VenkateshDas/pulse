@@ -5,6 +5,7 @@ import SwiftUI
 /// vitals row, CPU chart and top processes.
 struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
+    @Environment(NetworkModel.self) private var networkModel
     /// Gates the charts/heatmap/process-table wall behind a tap in Simple
     /// mode, so a non-technical user's first view is verdict + vitals, not
     /// an instrument panel. Pro mode starts expanded — nothing changes for
@@ -135,7 +136,94 @@ struct DashboardView: View {
             memoryCard
             diskCard
             thermalCard
+            networkCard
         }
+    }
+
+    private var networkCard: some View {
+        let snapshot = model.snapshot
+        let connectionType = snapshot?.connectionType ?? .none
+        let wifi = snapshot?.wifiInfo
+
+        // Quality, 0–1: real Wi-Fi signal quality, or a flat "fine"/"off"
+        // state for other connection types. Deliberately NOT run through
+        // Halo.statusColor — that treats a high fraction as *bad* (it's
+        // built for CPU/memory load), which made full signal show red.
+        let quality: Double =
+            switch connectionType {
+            case .wifi: wifi?.signalQualityFraction ?? 0
+            case .ethernet, .cellular, .other: 1.0
+            case .none: 0
+            }
+        let ringColor: Color =
+            connectionType == .none
+                ? Halo.textDim
+                : (quality < 0.35 ? Halo.flare : (quality < 0.65 ? Halo.amber : Halo.pulseGreen))
+
+        let value: String =
+            switch connectionType {
+            case .wifi: "\(wifi?.signalQualityPercent ?? 0)%"
+            case .ethernet: "Wired"
+            case .cellular: "Cell"
+            case .other: "On"
+            case .none: "Off"
+            }
+
+        let line1: String =
+            switch connectionType {
+            case .wifi: wifi?.ssid ?? "Wi-Fi Network"
+            case .ethernet: "Ethernet"
+            case .cellular: "Cellular"
+            case .other: "Connected"
+            case .none: "Not connected"
+            }
+
+        // Cached speed-test result answers "how fast is my internet" right on
+        // the dashboard; falls back to the signal verdict before the first run.
+        let line2: String =
+            if connectionType == .none {
+                "No network"
+            } else if let result = networkModel.lastResult {
+                String(format: "%.0f ↓ · %.0f ↑ Mbps", result.downloadMbps, result.uploadMbps)
+            } else {
+                switch connectionType {
+                case .wifi: wifi.map { "\($0.signalQualityLabel) signal" } ?? "Signal unknown"
+                case .ethernet: "Stable connection"
+                default: "Connected"
+                }
+            }
+
+        let down = ByteFormat.string(snapshot?.networkBytesInPerSecond ?? 0) + "/s"
+        let up = ByteFormat.string(snapshot?.networkBytesOutPerSecond ?? 0) + "/s"
+
+        var networkStats: [VitalCard.Stat] = [.init(label: "↓", value: down), .init(label: "↑", value: up)]
+        if connectionType == .wifi, let channel = wifi?.channel, let band = wifi?.channelBand {
+            networkStats.append(.init(label: "CH", value: "\(channel) · \(band)"))
+        }
+
+        let tooltip: String? =
+            if let wifi, connectionType == .wifi {
+                [
+                    wifi.security.map { "Security: \($0)" },
+                    wifi.rssi.map { "Signal: \($0) dBm" },
+                    wifi.txRateMbps.map { String(format: "Link rate: %.0f Mbps", $0) },
+                ].compactMap { $0 }.joined(separator: "\n")
+            } else {
+                nil
+            }
+
+        return VitalCard(
+            title: "NETWORK",
+            fraction: quality,
+            ringColor: ringColor,
+            value: value,
+            line1: line1,
+            line2: line2,
+            history: model.networkInHistory,
+            historyScale: max(model.networkInHistory.max() ?? 1024, 1024) * 1.2,
+            cardTooltip: tooltip,
+            stats: networkStats
+        )
     }
 
     private var cpuCard: some View {

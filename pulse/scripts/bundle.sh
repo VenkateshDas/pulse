@@ -86,6 +86,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
          bundles to the Trash via Apple Events. -->
     <key>NSAppleEventsUsageDescription</key><string>Pulse asks Finder to move an app you’re uninstalling to the Trash.</string>
     <key>NSBluetoothAlwaysUsageDescription</key><string>Pulse reads battery levels from connected Bluetooth peripherals.</string>
+    <!-- Network page: CoreWLAN only returns Wi-Fi SSID/BSSID when the app
+         holds Location authorization. Requested on first Network page visit. -->
+    <key>NSLocationUsageDescription</key><string>Pulse reads your Wi-Fi network name to show it on the Network page.</string>
     <!-- Sparkle auto-update (P0-8): disabled until a real appcast is hosted.
          Before enabling, host appcast.xml (e.g. via GitHub Releases/Pages),
          set SUFeedURL + SUPublicEDKey, flip SUEnableAutomaticChecks to true,

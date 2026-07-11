@@ -15,6 +15,7 @@ struct PulseApp: App {
     @State private var timelineModel = TimelineModel()
     @State private var optimizeModel = OptimizeModel()
     @State private var insightsModel = InsightsModel()
+    @State private var networkModel = NetworkModel()
 
     // Activation policy is no longer pinned to `.regular` here. Pulse is a
     // menu-bar app: `AppActivation` promotes it to `.regular` (Dock + Cmd-Tab)
@@ -33,10 +34,13 @@ struct PulseApp: App {
                 .environment(timelineModel)
                 .environment(optimizeModel)
                 .environment(insightsModel)
+                .environment(networkModel)
                 .environment(Updater.shared)
                 .onAppear {
                     model.start()
                     cleanModel.start()
+                    networkModel.start()
+                    KeybindingActions.networkModel = networkModel
                     model.viewAppeared()
                     Self.scheduleWeeklyReport()
                     // Promote to a Dock-visible, focusable app while open and
@@ -57,6 +61,7 @@ struct PulseApp: App {
                 .environment(model)
                 .environment(cleanModel)
                 .environment(storageModel)
+                .environment(networkModel)
                 .environment(Updater.shared)
                 // `.window`-style popovers don't reliably propagate
                 // `@Observable` changes across window boundaries — force a

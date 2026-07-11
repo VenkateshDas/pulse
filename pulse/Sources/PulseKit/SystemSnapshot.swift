@@ -89,6 +89,8 @@ public struct SystemSnapshot: Sendable, Equatable {
     
     public let networkBytesInPerSecond: UInt64
     public let networkBytesOutPerSecond: UInt64
+    public let connectionType: ConnectionType
+    public let wifiInfo: WiFiInfo?
 
     public let thermal: ThermalLevel
     /// SMC sensor readings; fields are nil where this Mac lacks the key.
@@ -116,6 +118,7 @@ public struct SystemSnapshot: Sendable, Equatable {
             diskTotalBytes: diskTotalBytes, diskWeeklyGrowthBytes: diskWeeklyGrowthBytes,
             networkBytesInPerSecond: networkBytesInPerSecond,
             networkBytesOutPerSecond: networkBytesOutPerSecond,
+            connectionType: connectionType, wifiInfo: wifiInfo,
             thermal: thermal, sensors: sensors, sleepAssertions: sleepAssertions,
             topProcesses: processes, uptime: uptime, battery: battery, gpuUsage: gpuUsage)
     }
@@ -143,6 +146,8 @@ public struct SystemSnapshot: Sendable, Equatable {
         diskWeeklyGrowthBytes: Int64?,
         networkBytesInPerSecond: UInt64,
         networkBytesOutPerSecond: UInt64,
+        connectionType: ConnectionType = .none,
+        wifiInfo: WiFiInfo? = nil,
         thermal: ThermalLevel,
         sensors: SensorReadings = SensorReadings(),
         sleepAssertions: [SleepAssertion],
@@ -169,6 +174,8 @@ public struct SystemSnapshot: Sendable, Equatable {
         self.diskWeeklyGrowthBytes = diskWeeklyGrowthBytes
         self.networkBytesInPerSecond = networkBytesInPerSecond
         self.networkBytesOutPerSecond = networkBytesOutPerSecond
+        self.connectionType = connectionType
+        self.wifiInfo = wifiInfo
         self.thermal = thermal
         self.sensors = sensors
         self.sleepAssertions = sleepAssertions
