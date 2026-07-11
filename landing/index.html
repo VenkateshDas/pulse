@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pulse: 8 Mac Tools, One Download. Open Source.</title>
-  <meta name="description" content="Performance monitor, storage cleaner, app uninstaller, menu bar tidier, brightness control, and keep-awake for every display. Pulse tells you which files are actually safe to delete, and which ones aren't. Eight Mac tools in one native app. No subscriptions, no telemetry.">
-  <meta property="og:title" content="Eight Mac apps, one download. No subscriptions.">
-  <meta property="og:description" content="Performance monitor, storage cleaner, app uninstaller, menu bar tidier, and brightness control for every display. Pulse checks whether a file is still in use before it lets you trash it. Built in native Swift. No subscriptions, no telemetry.">
+  <title>Pulse: 8 Mac Tools, One App. Join the Beta Waitlist.</title>
+  <meta name="description" content="Performance monitor, storage cleaner, app uninstaller, menu bar tidier, brightness control, and keep-awake for every display. Pulse tells you which files are actually safe to delete, and which ones aren't. Eight Mac tools in one native app. Join the waitlist for early beta access.">
+  <meta property="og:title" content="Eight Mac apps, one app. Join the waitlist.">
+  <meta property="og:description" content="Performance monitor, storage cleaner, app uninstaller, menu bar tidier, and brightness control for every display. Pulse checks whether a file is still in use before it lets you trash it. Built in native Swift. Join the beta waitlist for early access.">
   <meta property="og:type" content="website">
   <!-- Favicon: the logo's glowing teal dot, distilled — the wordmark doesn't read at 16px -->
   <link rel="icon" type="image/png" href="assets/favicon.png">
@@ -278,6 +278,58 @@
       border-color: rgba(255,255,255,0.2);
     }
     .hero-micro { font-size: 13px; color: var(--ink-s); margin-top: 20px; }
+    .hero-micro a { color: var(--teal-light); }
+
+    /* ===== WAITLIST FORM ===== */
+    .waitlist-form { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .waitlist-input {
+      flex: 1 1 240px;
+      min-width: 0;
+      height: 52px;
+      padding: 0 20px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: normal;
+      -webkit-appearance: none;
+      appearance: none;
+      box-sizing: border-box;
+    }
+    .waitlist-input::placeholder { color: var(--ink-s); }
+    .waitlist-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
+    .waitlist-form .btn-primary { height: 52px; flex-shrink: 0; white-space: nowrap; }
+    .waitlist-form button[disabled] { opacity: 0.6; cursor: default; }
+    .waitlist-status { font-size: 14px; margin-top: 10px; min-height: 20px; }
+    .waitlist-status.ok { color: var(--teal-light); }
+    .waitlist-status.err { color: var(--red-text); }
+    .waitlist-form-full { flex-direction: column; align-items: stretch; max-width: 520px; margin: 0 auto; gap: 20px; }
+    .waitlist-row { display: flex; align-items: center; gap: 12px; }
+    .waitlist-fieldset {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      text-align: left;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 20px;
+    }
+    .waitlist-fieldset legend { font-size: 13px; color: var(--ink-m); padding: 0 6px 4px; grid-column: 1 / -1; }
+    .waitlist-fieldset legend span { color: var(--ink-s); }
+    .waitlist-check { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-m); cursor: pointer; line-height: 1.3; }
+    .waitlist-check input {
+      accent-color: var(--teal);
+      width: 16px; height: 16px;
+      flex-shrink: 0;
+      margin: 0;
+    }
+    @media (max-width: 640px) {
+      .waitlist-row { flex-direction: column; align-items: stretch; }
+      .waitlist-row .btn-primary { justify-content: center; }
+      .waitlist-fieldset { grid-template-columns: 1fr; }
+    }
 
     /* Hero visual - health ring + vitals */
     .hero-viz {
@@ -918,7 +970,7 @@
         <li><a href="#pricing">Pricing</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
-      <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="nav-cta">Download</a>
+      <a href="#waitlist" class="nav-cta">Join waitlist</a>
     </div>
   </nav>
 
@@ -927,14 +979,15 @@
     <div class="hero-bg" aria-hidden="true"></div>
     <div class="hero-inner">
       <div class="hero-text reveal">
-        <span class="hero-badge"><b>8</b> Mac apps <span class="arrow">→</span> <b>1</b> download</span>
+        <span class="hero-badge"><b>8</b> Mac apps <span class="arrow">→</span> <b>1</b> app</span>
         <h1>Your whole Mac,<br><span>in one window.</span></h1>
         <p>See what's slowing it down, reclaim the space it's hiding, and know what's actually safe to delete before you delete it. One native app. No subscriptions. No guessing.</p>
-        <div class="hero-ctas">
-          <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
-          <a href="#features" class="btn-secondary">See how it works</a>
-        </div>
-        <p class="hero-micro">No account needed. macOS 14+. Open source.</p>
+        <form class="waitlist-form" id="heroWaitlistForm" novalidate>
+          <input type="email" name="email" class="waitlist-input" placeholder="you@example.com" required aria-label="Email address">
+          <button type="submit" class="btn-primary">Join the waitlist</button>
+        </form>
+        <p class="waitlist-status" id="heroWaitlistStatus" role="status" aria-live="polite"></p>
+        <p class="hero-micro">Pulse isn't Apple-notarized yet, so it's beta access by waitlist first. macOS 14+. Open source. <a href="#features">See how it works ↓</a></p>
       </div>
 
       <div class="hero-viz reveal">
@@ -1192,7 +1245,7 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></svg>
             </div>
             <h3>Replace eight apps with one</h3>
-            <p>System monitor + disk analyzer + app uninstaller + cache cleaner + maintenance toolkit + menu bar manager + brightness control + keep-awake. One download. One price. No stack of subscriptions.</p>
+            <p>System monitor + disk analyzer + app uninstaller + cache cleaner + maintenance toolkit + menu bar manager + brightness control + keep-awake. One app. One price. No stack of subscriptions.</p>
           </div>
           <div class="mini-bars" id="bars">
             <div class="mini-bar">
@@ -1697,8 +1750,8 @@
 
   <!-- PRICING -->
   <section class="section section-tight" id="pricing">
-    <h2 class="reveal">Free while it's in beta.</h2>
-    <p class="lead reveal">Every feature is unlocked today, no card, no trial timer. When Pulse leaves beta, early users keep the free tier for good.</p>
+    <h2 class="reveal">Free for waitlist members, in beta.</h2>
+    <p class="lead reveal">Every feature unlocked, no card, no trial timer, for everyone who joins the waitlist before launch. When Pulse leaves beta, early users keep the free tier for good.</p>
 
     <div class="price-solo reveal">
       <div class="price-card featured price-hero">
@@ -1722,19 +1775,33 @@
           <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Priority support<span class="price-from">Family</span></li>
           <li class="full"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>No subscription, no telemetry, lifetime updates included</li>
         </ul>
-        <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="price-btn solid">Download free</a>
+        <a href="#waitlist" class="price-btn solid">Join the waitlist</a>
       </div>
     </div>
-    <p class="price-note">Pulse is in beta and free to use right now. When paid tiers arrive at v1.0, early users are grandfathered in, you keep everything, free.</p>
+    <p class="price-note">Pulse is in beta, gated by waitlist while Apple notarization is pending. When paid tiers arrive at v1.0, early users are grandfathered in, you keep everything, free.</p>
   </section>
 
-  <!-- CTA -->
-  <section class="cta-section" id="download">
+  <!-- CTA / WAITLIST -->
+  <section class="cta-section" id="waitlist">
     <div class="cta-inner reveal">
       <h2>Stop Googling "why is my Mac slow."</h2>
-      <p>See your Mac clearly for the first time. Free to try. One price to keep.</p>
-      <a href="https://github.com/VenkateshDas/pulse/releases" data-download class="btn-primary">Download free</a>
-      <p class="hero-micro">macOS 14+. Apple Silicon and Intel. Open source.</p>
+      <p>Pulse is in private beta, not yet on the App Store. Tell us how you'd use it and we'll send you a build the moment your Mac fits the cohort we're testing.</p>
+      <form class="waitlist-form waitlist-form-full" id="waitlistForm" novalidate>
+        <div class="waitlist-row">
+          <input type="email" name="email" class="waitlist-input" placeholder="you@example.com" required aria-label="Email address">
+          <button type="submit" class="btn-primary">Join the waitlist</button>
+        </div>
+        <fieldset class="waitlist-fieldset">
+          <legend>What's your biggest Mac headache? <span>(pick any)</span></legend>
+          <label class="waitlist-check"><input type="checkbox" name="use_case" value="storage"> Disk always "almost full"</label>
+          <label class="waitlist-check"><input type="checkbox" name="use_case" value="uninstall"> Apps that never fully uninstall</label>
+          <label class="waitlist-check"><input type="checkbox" name="use_case" value="slowdown"> Random slowdowns, no idea why</label>
+          <label class="waitlist-check"><input type="checkbox" name="use_case" value="menubar"> Menu bar / brightness / keep-awake clutter</label>
+          <label class="waitlist-check"><input type="checkbox" name="use_case" value="subscriptions"> Tired of paying for 5 separate utility apps</label>
+        </fieldset>
+        <p class="waitlist-status" id="waitlistStatus" role="status" aria-live="polite"></p>
+      </form>
+      <p class="hero-micro">One email when it's ready. No spam, unsubscribe anytime. macOS 14+, Apple Silicon and Intel. Open source.</p>
     </div>
   </section>
 
@@ -2141,24 +2208,50 @@
       io.observe(stage);
     })();
 
-    // Resolve latest release DMG from GitHub API
-    fetch('https://api.github.com/repos/VenkateshDas/pulse/releases')
-      .then(function(r) { return r.json(); })
-      .then(function(releases) {
-        if (!releases.length) return;
-        var dmg;
-        for (var i = 0; i < releases.length; i++) {
-          var assets = releases[i].assets || [];
-          for (var j = 0; j < assets.length; j++) {
-            if (assets[j].name.endsWith('.dmg')) { dmg = assets[j].browser_download_url; break; }
+    // Waitlist signup -> Formspree (swap YOUR_FORM_ID for your real form endpoint)
+    (function() {
+      var ENDPOINT = 'https://formspree.io/f/YOUR_FORM_ID';
+
+      function wireForm(formEl, statusEl) {
+        if (!formEl) return;
+        formEl.addEventListener('submit', function(e) {
+          e.preventDefault();
+          var emailInput = formEl.querySelector('input[type="email"]');
+          var submitBtn = formEl.querySelector('button[type="submit"]');
+          if (!emailInput.value || !emailInput.checkValidity()) {
+            statusEl.textContent = 'Enter a valid email.';
+            statusEl.className = 'waitlist-status err';
+            return;
           }
-          if (dmg) break;
-        }
-        if (!dmg) return;
-        document.querySelectorAll('[data-download]').forEach(function(a) {
-          a.href = dmg;
+          var data = new FormData(formEl);
+          submitBtn.disabled = true;
+          var prevLabel = submitBtn.textContent;
+          submitBtn.textContent = 'Joining…';
+          fetch(ENDPOINT, {
+            method: 'POST',
+            body: data,
+            headers: { 'Accept': 'application/json' }
+          }).then(function(r) {
+            if (r.ok) {
+              statusEl.textContent = "You're on the list. We'll email you when your beta build is ready.";
+              statusEl.className = 'waitlist-status ok';
+              formEl.reset();
+            } else {
+              throw new Error('bad response');
+            }
+          }).catch(function() {
+            statusEl.textContent = "Couldn't submit right now, try again in a bit.";
+            statusEl.className = 'waitlist-status err';
+          }).finally(function() {
+            submitBtn.disabled = false;
+            submitBtn.textContent = prevLabel;
+          });
         });
-      });
+      }
+
+      wireForm(document.getElementById('heroWaitlistForm'), document.getElementById('heroWaitlistStatus'));
+      wireForm(document.getElementById('waitlistForm'), document.getElementById('waitlistStatus'));
+    })();
   </script>
 </body>
 </html>
