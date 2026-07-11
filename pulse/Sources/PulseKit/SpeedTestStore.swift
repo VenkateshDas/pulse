@@ -30,10 +30,13 @@ public final class SpeedTestStore {
 
     private func persist() {
         guard let fileURL else { return }
-        try? FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let data = try? JSONEncoder().encode(results) {
-            try? data.write(to: fileURL, options: .atomic)
+        let currentResults = results
+        Task.detached {
+            try? FileManager.default.createDirectory(
+                at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if let data = try? JSONEncoder().encode(currentResults) {
+                try? data.write(to: fileURL, options: .atomic)
+            }
         }
     }
 

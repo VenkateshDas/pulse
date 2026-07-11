@@ -1,6 +1,7 @@
 import CoreWLAN
 import Foundation
 import Network
+import os
 
 /// How the Mac is currently reaching the network. Backed by `NWPathMonitor`,
 /// which is event-driven (kernel notifies on change) — no polling cost.
@@ -71,7 +72,7 @@ public actor WiFiSampler {
 
     public func sample() -> WiFiInfo? {
         guard let interface = CWWiFiClient.shared().interface(),
-            interface.powerOn(), interface.ssid() != nil || interface.rssiValue() != 0
+            interface.powerOn(), interface.ssid() != nil || interface.bssid() != nil
         else {
             return nil
         }
@@ -125,13 +126,11 @@ public final class ConnectionTypeMonitor: @unchecked Sendable {
     public static let shared = ConnectionTypeMonitor()
 
     private let monitor = NWPathMonitor()
-    private let lock = NSLock()
+    private let lock = OSAllocatedUnfairLock()
     private var currentType: ConnectionType = .none
 
     public var current: ConnectionType {
-        lock.lock()
-        defer { lock.unlock() }
-        return currentType
+        lock.withLock { currentType }
     }
 
     private init() {
@@ -149,9 +148,9 @@ public final class ConnectionTypeMonitor: @unchecked Sendable {
                 } else {
                     .other
                 }
-            self.lock.lock()
-            self.currentType = type
-            self.lock.unlock()
+            self.lock.withLock {
+                self.currentType = type
+            }
         }
         monitor.start(queue: DispatchQueue(label: "com.pulse.network-path-monitor"))
     }
