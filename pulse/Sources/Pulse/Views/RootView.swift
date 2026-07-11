@@ -31,6 +31,7 @@ struct RootView: View {
                 case .optimize: OptimizeView()
                 case .uninstall: UninstallView()
                 case .monitor: MonitorView()
+                case .network: NetworkView()
                 case .displays: DisplaysView()
                 case .health: HealthView()
                 case .settings: SettingsView(selection: $selection)

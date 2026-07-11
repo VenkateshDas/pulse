@@ -28,3 +28,8 @@
 
 ## [2026-06-21] Lesson | CGEvent taps cannot intercept brightness keys on Apple Silicon
 - Documented that brightness keys are processed at IOKit HID layer, below CGEvents. Only IOHIDManager (MediaKeyTap with `observeBuiltIn: true`) reliably intercepts them. Raw CGEvent.tapCreate at any level creates a valid tap but callback never fires for brightness events.
+
+## [2026-07-11] Feature | Network Health Card
+- Added `NetworkModel` and `NetworkView` for monitoring network health.
+- Added `SpeedTestRunner` and `WiFiSampler` to support network diagnostics and metrics.
+- Integrated Network Health Card into `DashboardView` and `MenuBarContent`.

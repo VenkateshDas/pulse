@@ -29,6 +29,9 @@ let package = Package(
         .target(name: "PulseKit", dependencies: [
             "CPulse",
             .product(name: "MediaKeyTap", package: "MediaKeyTap")
+        ], linkerSettings: [
+            .linkedFramework("CoreWLAN"),
+            .linkedFramework("CoreLocation"),
         ]),
         // SwiftUI app: menu bar extra + dashboard window.
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [

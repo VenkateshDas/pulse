@@ -1,6 +1,6 @@
 import Carbon.HIToolbox
 
-/// The 5 bindable global-hotkey actions, surfaced in Settings ▸ Keyboard
+/// The 6 bindable global-hotkey actions, surfaced in Settings ▸ Keyboard
 /// Shortcuts. Default combos share a `⌃⌥⌘` prefix to minimize collisions
 /// with other apps and macOS system shortcuts.
 public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
@@ -9,6 +9,7 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
     case syncBrightness
     case toggleKeepAwake
     case toggleMenuBarChevron
+    case runSpeedTest
 
     public var id: String { rawValue }
 
@@ -19,6 +20,7 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
         case .syncBrightness: "Sync Brightness"
         case .toggleKeepAwake: "Toggle Keep Awake"
         case .toggleMenuBarChevron: "Toggle Menu Bar Chevron"
+        case .runSpeedTest: "Run Speed Test"
         }
     }
 
@@ -29,6 +31,7 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
         case .syncBrightness: "Toggles adaptive brightness sync across displays."
         case .toggleKeepAwake: "Turns Keep Awake on or off."
         case .toggleMenuBarChevron: "Collapses or expands hidden menu-bar icons."
+        case .runSpeedTest: "Measures internet speed (~20 s) and notifies with the result."
         }
     }
 
@@ -39,6 +42,7 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
         case .syncBrightness: "sun.max.fill"
         case .toggleKeepAwake: "cup.and.saucer.fill"
         case .toggleMenuBarChevron: "menubar.rectangle"
+        case .runSpeedTest: "gauge.with.needle"
         }
     }
 
@@ -50,6 +54,7 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
         case .syncBrightness: return KeyCombo(keyCode: UInt32(kVK_ANSI_B), carbonModifiers: prefix)
         case .toggleKeepAwake: return KeyCombo(keyCode: UInt32(kVK_ANSI_K), carbonModifiers: prefix)
         case .toggleMenuBarChevron: return KeyCombo(keyCode: UInt32(kVK_ANSI_M), carbonModifiers: prefix)
+        case .runSpeedTest: return KeyCombo(keyCode: UInt32(kVK_ANSI_S), carbonModifiers: prefix)
         }
     }
 
@@ -61,6 +66,7 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
         case .syncBrightness: 3
         case .toggleKeepAwake: 4
         case .toggleMenuBarChevron: 6
+        case .runSpeedTest: 7
         }
     }
 }

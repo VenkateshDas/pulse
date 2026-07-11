@@ -9,6 +9,7 @@ struct MenuBarContent: View {
     @Environment(DashboardModel.self) private var model
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
+    @Environment(NetworkModel.self) private var network
     @Environment(Updater.self) private var updater
     @Environment(\.openWindow) private var openWindow
 
@@ -51,6 +52,8 @@ struct MenuBarContent: View {
                         if let battery = snapshot.battery {
                             batteryRow(battery)
                         }
+                        networkRow(snapshot)
+                        speedRow
                     } else {
                         Text("Sampling…")
                             .font(.system(size: 12, design: .monospaced))
@@ -87,6 +90,9 @@ struct MenuBarContent: View {
         .onAppear {
             model.viewAppeared()
             storage.refreshTrashInfo()
+            // Hotkey handlers are static; make sure the speed-test binding
+            // reaches this NetworkModel even if the main window never opened.
+            KeybindingActions.networkModel = network
             updater.checkForUpdates()  // throttled background check
         }
         .onDisappear { model.viewDisappeared() }
@@ -278,6 +284,72 @@ struct MenuBarContent: View {
             "Battery",
             "\(battery.currentChargePercent)% · \(state)",
             color: Halo.textPrimary)
+    }
+
+    /// Connection medium + Wi-Fi signal verdict, same polarity as the
+    /// dashboard card (high quality = green, offline = neutral gray).
+    private func networkRow(_ snapshot: SystemSnapshot) -> some View {
+        let wifi = snapshot.wifiInfo
+        let (value, color): (String, Color) =
+            switch snapshot.connectionType {
+            case .wifi:
+                ("\(wifi?.ssid ?? "Wi-Fi") · \(wifi?.signalQualityPercent ?? 0)%",
+                 (wifi?.signalQualityFraction ?? 0) < 0.35
+                     ? Halo.flare
+                     : ((wifi?.signalQualityFraction ?? 0) < 0.65 ? Halo.amber : Halo.pulseGreen))
+            case .ethernet: ("Wired", Halo.pulseGreen)
+            case .cellular: ("Cellular", Halo.textPrimary)
+            case .other: ("Connected", Halo.textPrimary)
+            case .none: ("Offline", Halo.textDim)
+            }
+        return infoRow("Network", value, color: color)
+    }
+
+    /// Cached speed-test result (auto-refreshed every 30 min by NetworkModel)
+    /// with an inline re-run trigger: a tiny gauge icon that swaps to a
+    /// spinner while the ~20 s test runs. Before the first result the whole
+    /// value slot becomes a "Run test" link.
+    private var speedRow: some View {
+        let running = network.speedTestState == .running
+        return HStack {
+            Text("Speed")
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textDim)
+            Spacer()
+            if running {
+                Text("Testing…")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
+                ProgressView()
+                    .controlSize(.mini)
+            } else if let result = network.lastResult {
+                Text(String(format: "%.0f ↓ · %.0f ↑ Mbps", result.downloadMbps, result.uploadMbps))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Halo.textPrimary)
+                    .help("Tested \(result.date.formatted(date: .omitted, time: .shortened)) · auto every 30 min")
+                speedTestButton
+            } else {
+                Button("Run test") { network.runSpeedTest() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Halo.ion)
+                    .help("Measure internet speed now — takes about 20 seconds")
+            }
+        }
+    }
+
+    private var speedTestButton: some View {
+        Button {
+            network.runSpeedTest()
+        } label: {
+            Image(systemName: "gauge.with.needle")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Halo.ion)
+                .frame(width: 18, height: 18)
+                .background(Halo.ion.opacity(0.12), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Re-test internet speed now — takes about 20 seconds")
     }
 
     /// Compact label/value row (no bar/sparkline) for the secondary metrics.

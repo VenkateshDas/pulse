@@ -8,6 +8,11 @@ import UserNotifications
 /// trigger and feedback (system notification instead of inline text) differ.
 @MainActor
 enum KeybindingActions {
+    /// Set once at launch (PulseApp) — hotkeys are static handlers, but the
+    /// speed test must run through the app's single NetworkModel so the
+    /// popover, dashboard card, and Network page all see the result.
+    static weak var networkModel: NetworkModel?
+
     static func registerHandlers() {
         let hk = HotKeyManager.shared
         hk.setHandler(runOptimize, for: .optimize)
@@ -15,6 +20,7 @@ enum KeybindingActions {
         hk.setHandler(syncBrightness, for: .syncBrightness)
         hk.setHandler(toggleKeepAwake, for: .toggleKeepAwake)
         hk.setHandler({ MenuBarManager.shared.toggle() }, for: .toggleMenuBarChevron)
+        hk.setHandler(runSpeedTest, for: .runSpeedTest)
         hk.reregisterAll()
     }
 
@@ -54,6 +60,32 @@ enum KeybindingActions {
         postNotification(
             title: "Sync Brightness",
             body: engine.isAdaptiveModeEnabled ? "Adaptive sync turned on." : "Adaptive sync turned off.")
+    }
+
+    /// Flash the gauge in the menu bar while the ~20 s test runs, then
+    /// notify with the numbers. The long flash acts as the "in progress"
+    /// indicator; the completion flash restarts the timer so the icon
+    /// reverts a couple of seconds after the result lands.
+    private static func runSpeedTest() {
+        guard let network = networkModel else { return }
+        guard network.speedTestState != .running else {
+            postNotification(title: "Speed Test", body: "A speed test is already running.")
+            return
+        }
+        MenuBarFlash.shared.flash(PulseAction.runSpeedTest.symbolName, for: 40)
+        Task {
+            if let result = await network.runSpeedTestAwaiting() {
+                var parts = [
+                    String(format: "%.0f ↓ / %.0f ↑ Mbps", result.downloadMbps, result.uploadMbps)
+                ]
+                if let rtt = result.baseRTTMillis { parts.append(String(format: "%.0f ms latency", rtt)) }
+                if let rpm = result.responsivenessRPM { parts.append("\(rpm) RPM") }
+                postNotification(title: "Speed Test", body: parts.joined(separator: " · "))
+            } else {
+                postNotification(title: "Speed Test", body: "Speed test failed — check your connection.")
+            }
+            MenuBarFlash.shared.flash(PulseAction.runSpeedTest.symbolName, for: 2)
+        }
     }
 
     private static func toggleKeepAwake() {
