@@ -33,3 +33,4 @@
 - Added `NetworkModel` and `NetworkView` for monitoring network health.
 - Added `SpeedTestRunner` and `WiFiSampler` to support network diagnostics and metrics.
 - Integrated Network Health Card into `DashboardView` and `MenuBarContent`.
+## [2026-07-11] Network Feature | Implemented Network Health Card with real-time Wi-Fi metrics, connection type monitoring, and automated speed tests cached in SpeedTestStore.
