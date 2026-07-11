@@ -148,6 +148,8 @@ struct NetworkView: View {
                 fact("SECURITY", wifi?.security ?? "—", Halo.textPrimary)
                 fact("LINK RATE", wifi?.txRateMbps.map { String(format: "%.0f Mbps", $0) } ?? "—", Halo.textPrimary)
             }
+            fact("PUBLIC IP", model.ipLocation?.ip ?? "—", Halo.textPrimary)
+            fact("LOCATION", model.ipLocation.map { "\($0.city), \($0.country)" } ?? "—", Halo.textPrimary)
         }
     }
 
