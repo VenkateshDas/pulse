@@ -17,11 +17,18 @@ final class NetworkModel: NSObject {
         case failed(String)
     }
 
+struct IPLocation: Decodable, Equatable {
+    let ip: String
+    let city: String
+    let country: String
+}
+
     private(set) var speedTestState: SpeedTestState = .idle
     private(set) var lastResult: SpeedTestResult?
     /// Most recent runs first, capped by `SpeedTestStore.maxCount`.
     private(set) var history: [SpeedTestResult] = []
     private(set) var locationAuthorized = false
+    private(set) var ipLocation: IPLocation?
 
     /// How often the background test re-runs. Real bandwidth is consumed
     /// each run, so this stays coarse — not a live-polled metric.
@@ -51,6 +58,7 @@ final class NetworkModel: NSObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 if ConnectionTypeMonitor.shared.current != .none {
+                    await self.fetchIPLocation()
                     await self.performTest()
                 }
                 try? await Task.sleep(for: Self.autoInterval)
@@ -76,7 +84,10 @@ final class NetworkModel: NSObject {
     /// Manual "Run Test" — same path as the auto-run, just user-triggered.
     func runSpeedTest() {
         guard speedTestState != .running else { return }
-        Task { await performTest() }
+        Task { 
+            await fetchIPLocation()
+            await performTest() 
+        }
     }
 
     /// Hotkey variant: runs the same test but hands the result back so the
@@ -84,6 +95,7 @@ final class NetworkModel: NSObject {
     /// is already in flight.
     func runSpeedTestAwaiting() async -> SpeedTestResult? {
         guard speedTestState != .running else { return nil }
+        await fetchIPLocation()
         await performTest()
         guard speedTestState == .idle else { return nil }
         return lastResult
@@ -107,6 +119,14 @@ final class NetworkModel: NSObject {
         } catch {
             speedTestState = .failed("Speed test failed — check your connection")
         }
+    }
+
+    private func fetchIPLocation() async {
+        guard let url = URL(string: "https://ipwho.is/") else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            ipLocation = try? JSONDecoder().decode(IPLocation.self, from: data)
+        } catch {}
     }
 }
 

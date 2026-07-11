@@ -53,6 +53,7 @@ struct MenuBarContent: View {
                             batteryRow(battery)
                         }
                         networkRow(snapshot)
+                        ipRow
                         speedRow
                     } else {
                         Text("Sampling…")
@@ -303,6 +304,14 @@ struct MenuBarContent: View {
             case .none: ("Offline", Halo.textDim)
             }
         return infoRow("Network", value, color: color)
+    }
+
+    private var ipRow: some View {
+        if let loc = network.ipLocation {
+            return infoRow("Public IP", "\(loc.ip) · \(loc.city)", color: Halo.textPrimary)
+        } else {
+            return infoRow("Public IP", "Fetching…", color: Halo.textDim)
+        }
     }
 
     /// Cached speed-test result (auto-refreshed every 30 min by NetworkModel)
