@@ -113,6 +113,8 @@ final class DashboardModel {
         value: 100, band: .excellent, breakdown: [:])
     /// Windowed CPU-anomaly detector (replaces the instant cpu-hog alert).
     @ObservationIgnored private var processWatcher = ProcessWatcher()
+    /// Sustained-RSS-growth detector ("X leaking memory, restart it").
+    @ObservationIgnored private var leakWatcher = LeakWatcher()
     @ObservationIgnored private let anomalyStore = AnomalyStore()
     @ObservationIgnored private let attentionEngine = AttentionEngine()
     @ObservationIgnored private var latestAttentionItems: [AttentionItem] = []
@@ -249,8 +251,19 @@ final class DashboardModel {
                     processName: anomaly.name, pid: anomaly.pid, cpuPercent: anomaly.cpuPercent,
                     date: snapshot.timestamp, sustainedSeconds: anomaly.sustainedSeconds))
             }
+            let leaks = leakWatcher.ingest(
+                snapshot.topProcesses.filter { $0.pid != getpid() }, now: snapshot.timestamp)
+            if let leak = leaks.first {
+                evaluated.insert(Self.memoryLeakAlert(leak), at: 0)
+            }
+            for leak in leaks where leak.isNewlySustained {
+                anomalyStore.record(AnomalyRecord(
+                    processName: leak.name, pid: leak.pid, cpuPercent: 0,
+                    date: snapshot.timestamp, sustainedSeconds: leak.windowSeconds,
+                    kind: .memoryLeak, growthBytes: leak.growthBytes))
+            }
             latestAlerts = evaluated
-            latestDiagnosis = DiagnosisEngine.evaluate(snapshot)
+            latestDiagnosis = DiagnosisEngine.evaluate(snapshot, leak: leaks.first)
             latestHealth = HealthScore.evaluate(snapshot)
             latestAttentionItems = await attentionEngine.currentItems(
                 diagnosis: latestDiagnosis, alerts: latestAlerts)
@@ -461,6 +474,18 @@ final class DashboardModel {
             title: "\(hog.name) has held \(Int(hog.cpuPercent))% CPU for \(duration)",
             subtitle: "pid \(hog.pid) · sustained, not a momentary spike",
             actions: [.quitProcess(pid: hog.pid, name: hog.name)])
+    }
+
+    /// Builds the memory-leak alert card from a leak verdict.
+    static func memoryLeakAlert(_ leak: LeakAlert) -> PulseAlert {
+        let growth = ByteFormat.string(UInt64(max(leak.growthBytes, 0)))
+        return PulseAlert(
+            id: "memory-leak",
+            severity: .warning,
+            symbol: "memorychip",
+            title: "\(leak.name) grew \(growth) in \(Int(leak.windowSeconds / 60)) min",
+            subtitle: "pid \(leak.pid) · steady growth, possible leak",
+            actions: [.quitProcess(pid: leak.pid, name: leak.name)])
     }
 
     private func append(_ value: Double, to buffer: inout [Double]) {

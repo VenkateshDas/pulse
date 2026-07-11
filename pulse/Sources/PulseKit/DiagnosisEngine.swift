@@ -33,18 +33,24 @@ public enum DiagnosisEngine {
         name.count <= max ? name : String(name.prefix(max - 1)) + "…"
     }
 
-    static func leadingCPUProcess(_ procs: [ProcessSample]) -> ProcessSample? {
-        procs.max(by: { $0.cpuPercent < $1.cpuPercent }).flatMap {
+    /// Blame is attributed to app groups, not lone helpers — five 12% Chrome
+    /// helpers read as "Chrome (5)" and their sum trips the floor.
+    static func leadingCPUProcess(_ procs: [ProcessSample]) -> ProcessGroup? {
+        ProcessGrouper.group(procs).first.flatMap {
             $0.cpuPercent >= leadingCPUFloor ? $0 : nil
         }
     }
 
-    public static func evaluate(_ s: SystemSnapshot) -> Diagnosis {
+    static func blame(_ g: ProcessGroup) -> String {
+        g.count > 1 ? "\(shorten(g.name)) (\(g.count))" : shorten(g.name)
+    }
+
+    public static func evaluate(_ s: SystemSnapshot, leak: LeakAlert? = nil) -> Diagnosis {
         // 1 · CPU
         if s.cpuTotalPercent > HealthFactor.cpu.high {
             if let p = leadingCPUProcess(s.topProcesses) {
-                return Diagnosis(line: "\(shorten(p.name)) high CPU",
-                                 severity: .critical, culpritPID: p.pid, factor: .cpu)
+                return Diagnosis(line: "\(blame(p)) high CPU",
+                                 severity: .critical, culpritPID: p.topPID, factor: .cpu)
             }
             return Diagnosis(line: "CPU load high", severity: .critical,
                              culpritPID: nil, factor: .cpu)
@@ -55,13 +61,19 @@ public enum DiagnosisEngine {
         case .critical, .warning:
             let sev: Diagnosis.Severity = s.memoryPressure == .critical ? .critical : .warn
             if let p = leadingMemoryProcess(s.topProcesses) {
-                return Diagnosis(line: "\(shorten(p.name)) memory pressure",
-                                 severity: sev, culpritPID: p.pid, factor: .memory)
+                return Diagnosis(line: "\(blame(p)) memory pressure",
+                                 severity: sev, culpritPID: p.topPID, factor: .memory)
             }
             return Diagnosis(line: "Memory pressure", severity: sev,
                              culpritPID: nil, factor: .memory)
         case .normal:
             break
+        }
+
+        // 2b · Confirmed memory leak — outranks a full disk, not active pressure.
+        if let leak {
+            return Diagnosis(line: "\(shorten(leak.name)) leaking memory",
+                             severity: .warn, culpritPID: leak.pid, factor: .memory)
         }
 
         // 3 · Disk
@@ -86,8 +98,8 @@ public enum DiagnosisEngine {
         // 6 · Soft warnings (above normal but below high)
         if s.cpuTotalPercent > HealthFactor.cpu.normal,
            let p = leadingCPUProcess(s.topProcesses) {
-            return Diagnosis(line: "\(shorten(p.name)) busy", severity: .info,
-                             culpritPID: p.pid, factor: .cpu)
+            return Diagnosis(line: "\(blame(p)) busy", severity: .info,
+                             culpritPID: p.topPID, factor: .cpu)
         }
         if diskPct > HealthFactor.disk.normal {
             return Diagnosis(line: "Disk filling up", severity: .info,
@@ -97,8 +109,8 @@ public enum DiagnosisEngine {
         return Diagnosis(line: "All clear", severity: .clear, culpritPID: nil, factor: nil)
     }
 
-    /// Largest-resident process, used to attribute memory pressure.
-    static func leadingMemoryProcess(_ procs: [ProcessSample]) -> ProcessSample? {
-        procs.max(by: { $0.residentBytes < $1.residentBytes })
+    /// Largest-resident group, used to attribute memory pressure.
+    static func leadingMemoryProcess(_ procs: [ProcessSample]) -> ProcessGroup? {
+        ProcessGrouper.group(procs).max(by: { $0.residentBytes < $1.residentBytes })
     }
 }

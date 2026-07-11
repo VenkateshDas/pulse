@@ -394,6 +394,39 @@ struct DiagnosisEngineTests {
             topProcesses: [ProcessSample(pid: 1, name: "ReallyLongProcessNameHere", cpuPercent: 99, residentBytes: 0)])
         #expect(DiagnosisEngine.evaluate(snap).line.count <= "ReallyLongProcessNa high CPU".count)
     }
+
+    @Test func leakVerdictAppearsWhenQuiet() {
+        let leak = LeakAlert(pid: 77, name: "WhatsApp", startBytes: 1 << 30,
+                             currentBytes: 5 << 30, windowSeconds: 1800, isNewlySustained: true)
+        let d = DiagnosisEngine.evaluate(makeSnapshot(), leak: leak)
+        #expect(d.line == "WhatsApp leaking memory")
+        #expect(d.severity == .warn)
+        #expect(d.culpritPID == 77)
+        #expect(d.factor == .memory)
+    }
+
+    @Test func highCPUOutranksLeak() {
+        let leak = LeakAlert(pid: 77, name: "WhatsApp", startBytes: 0,
+                             currentBytes: 2 << 30, windowSeconds: 1800, isNewlySustained: true)
+        let snap = makeSnapshot(
+            cpuTotalPercent: 92,
+            topProcesses: [ProcessSample(pid: 501, name: "Chrome", cpuPercent: 88, residentBytes: 0)])
+        #expect(DiagnosisEngine.evaluate(snap, leak: leak).line == "Chrome high CPU")
+    }
+
+    @Test func groupedBlameNamesAppWithCount() {
+        // No single helper crosses the 50% floor, but the app group's sum does.
+        let snap = makeSnapshot(
+            cpuTotalPercent: 92,
+            topProcesses: [
+                ProcessSample(pid: 1, name: "Chrome Helper", cpuPercent: 20, residentBytes: 0, appName: "Chrome"),
+                ProcessSample(pid: 2, name: "Chrome Helper (GPU)", cpuPercent: 35, residentBytes: 0, appName: "Chrome"),
+                ProcessSample(pid: 3, name: "Chrome", cpuPercent: 25, residentBytes: 0, appName: "Chrome"),
+            ])
+        let d = DiagnosisEngine.evaluate(snap)
+        #expect(d.line == "Chrome (3) high CPU")
+        #expect(d.culpritPID == 2)   // hottest member for tap-through
+    }
 }
 
 // MARK: - HealthScore (F1)
@@ -631,5 +664,182 @@ struct AnomalyStoreTests {
             date: now, sustainedSeconds: 60))
         #expect(store.records.contains { $0.processName == "new" })
         #expect(!store.records.contains { $0.processName == "old" })
+    }
+
+    @Test func legacyRecordsWithoutKindDecode() throws {
+        // A pre-kind anomalies.json must load untouched (kind/growthBytes nil).
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("legacy-anomalies-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let legacy = """
+        [{"id":"\(UUID().uuidString)","processName":"OldProc","pid":42,
+          "cpuPercent":91,"date":\(Date().timeIntervalSinceReferenceDate),
+          "sustainedSeconds":120}]
+        """
+        try legacy.data(using: .utf8)!.write(to: url)
+        let store = AnomalyStore(fileURL: url)
+        #expect(store.records.count == 1)
+        #expect(store.records.first?.kind == nil)
+        #expect(store.records.first?.growthBytes == nil)
+    }
+
+    @Test func leakRecordRoundTrips() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("leak-anomalies-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = AnomalyStore(fileURL: url)
+        store.record(AnomalyRecord(processName: "Leaky", pid: 9, cpuPercent: 0,
+            sustainedSeconds: 1800, kind: .memoryLeak, growthBytes: 2 << 30))
+        let reloaded = AnomalyStore(fileURL: url)
+        #expect(reloaded.records.first?.kind == .memoryLeak)
+        #expect(reloaded.records.first?.growthBytes == 2 << 30)
+    }
+}
+
+// MARK: - LeakWatcher
+
+@Suite("LeakWatcher")
+struct LeakWatcherTests {
+    private let gib = UInt64(1) << 30
+    private let mib = UInt64(1) << 20
+
+    private func proc(_ pid: Int32, _ name: String, rss: UInt64) -> ProcessSample {
+        ProcessSample(pid: pid, name: name, cpuPercent: 0, residentBytes: rss)
+    }
+
+    /// Drives one pid through `minutes` one-minute ingests, RSS from `bytes`.
+    private func run(_ w: inout LeakWatcher, minutes: Int, from t0: Date,
+                     bytes: (Int) -> UInt64) -> [[LeakAlert]] {
+        (0...minutes).map { m in
+            w.ingest([proc(1, "Leaky", rss: bytes(m))], now: t0.addingTimeInterval(Double(m) * 60))
+        }
+    }
+
+    @Test func steadyGrowthPastWindowFiresOnce() {
+        var w = LeakWatcher()
+        let t0 = Date()
+        // +40 MiB/min → +1.2 GiB over 31 min, strictly monotonic.
+        let results = run(&w, minutes: 31, from: t0) { self.gib + UInt64($0) * 40 * self.mib }
+        let firstFire = results.firstIndex { !$0.isEmpty }
+        #expect(firstFire != nil)
+        #expect(results[firstFire!].first?.isNewlySustained == true)
+        #expect(results[firstFire!].first?.growthBytes ?? 0 >= 1 << 30)
+        // Later ticks still report the leak, but not as new.
+        #expect(results.last?.first?.isNewlySustained == false)
+    }
+
+    @Test func growthBelowThresholdStaysQuiet() {
+        var w = LeakWatcher()
+        // +16 MiB/min → ~+0.5 GiB over 32 min: under the 1 GiB floor.
+        let results = run(&w, minutes: 32, from: Date()) { self.gib + UInt64($0) * 16 * self.mib }
+        #expect(results.allSatisfy { $0.isEmpty })
+    }
+
+    @Test func sawtoothIsNotALeak() {
+        var w = LeakWatcher()
+        // Grows +2 GiB overall, but drops every 7th minute: ≥4 negative deltas
+        // in any 30-minute window → ≤86.7% monotonic, below the 90% bar.
+        let results = run(&w, minutes: 32, from: Date()) { m in
+            let base = self.gib + UInt64(m) * 64 * self.mib
+            return m % 7 == 6 ? base - 200 * self.mib : base
+        }
+        #expect(results.allSatisfy { $0.isEmpty })
+    }
+
+    @Test func shortWindowStaysQuiet() {
+        var w = LeakWatcher()
+        // +2 GiB in 10 min — huge, but window not yet covered.
+        let results = run(&w, minutes: 10, from: Date()) { self.gib + UInt64($0) * 205 * self.mib }
+        #expect(results.allSatisfy { $0.isEmpty })
+    }
+
+    @Test func briefDropoutKeepsTrack() {
+        var w = LeakWatcher()
+        let t0 = Date()
+        var fired = false
+        for m in 0...31 where m != 15 {   // absent for one minute mid-window
+            let alerts = w.ingest(
+                [proc(1, "Leaky", rss: gib + UInt64(m) * 40 * mib)],
+                now: t0.addingTimeInterval(Double(m) * 60))
+            fired = fired || !alerts.isEmpty
+        }
+        #expect(fired)
+    }
+
+    @Test func staleTrackIsDropped() {
+        var w = LeakWatcher()
+        let t0 = Date()
+        _ = w.ingest([proc(1, "Leaky", rss: gib)], now: t0)
+        // Reappears 20 min later, 29 min of growth after that: old track was
+        // evicted (>5 min unseen), so the window isn't covered yet.
+        var fired = false
+        for m in 20...49 {
+            let alerts = w.ingest(
+                [proc(1, "Leaky", rss: gib + UInt64(m) * 40 * mib)],
+                now: t0.addingTimeInterval(Double(m) * 60))
+            fired = fired || !alerts.isEmpty
+        }
+        #expect(!fired)
+    }
+
+    @Test func subMinuteIngestsDontFloodPoints() {
+        var w = LeakWatcher()
+        let t0 = Date()
+        // 10 minutes of 3-second ingests: growth huge, window uncovered, and
+        // (implicitly) point storage stays one-per-minute — no early fire.
+        for tick in 0...200 {
+            let alerts = w.ingest(
+                [proc(1, "Leaky", rss: gib + UInt64(tick) * 20 * mib)],
+                now: t0.addingTimeInterval(Double(tick) * 3))
+            #expect(alerts.isEmpty)
+        }
+    }
+}
+
+// MARK: - ProcessGrouper
+
+@Suite("ProcessGrouper")
+struct ProcessGrouperTests {
+    @Test func appNameFromHelperPath() {
+        #expect(ProcessGrouper.appName(fromPath:
+            "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Versions/1/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)")
+            == "Google Chrome")
+        #expect(ProcessGrouper.appName(fromPath: "/Applications/Safari.app/Contents/MacOS/Safari")
+            == "Safari")
+        #expect(ProcessGrouper.appName(fromPath: "/usr/libexec/trustd") == nil)
+        #expect(ProcessGrouper.appName(fromPath: "") == nil)
+    }
+
+    @Test func groupSumsAndCounts() {
+        let procs = [
+            ProcessSample(pid: 1, name: "Chrome", cpuPercent: 10, residentBytes: 100, appName: "Chrome"),
+            ProcessSample(pid: 2, name: "Chrome Helper", cpuPercent: 30, residentBytes: 200, appName: "Chrome"),
+            ProcessSample(pid: 3, name: "Chrome Helper (GPU)", cpuPercent: 20, residentBytes: 300, appName: "Chrome"),
+        ]
+        let groups = ProcessGrouper.group(procs)
+        #expect(groups.count == 1)
+        #expect(groups.first?.count == 3)
+        #expect(groups.first?.cpuPercent == 60)
+        #expect(groups.first?.residentBytes == 600)
+        #expect(groups.first?.topPID == 2)   // hottest member
+    }
+
+    @Test func ungroupedFallsBackToOwnName() {
+        let procs = [
+            ProcessSample(pid: 1, name: "trustd", cpuPercent: 5, residentBytes: 10),
+            ProcessSample(pid: 2, name: "mds", cpuPercent: 3, residentBytes: 10),
+        ]
+        let groups = ProcessGrouper.group(procs)
+        #expect(groups.count == 2)
+        #expect(groups.map(\.name).sorted() == ["mds", "trustd"])
+        #expect(groups.allSatisfy { $0.count == 1 })
+    }
+
+    @Test func sortedByCPUThenRSS() {
+        let procs = [
+            ProcessSample(pid: 1, name: "idle-big", cpuPercent: 0, residentBytes: 9_000),
+            ProcessSample(pid: 2, name: "hot-small", cpuPercent: 50, residentBytes: 10),
+        ]
+        #expect(ProcessGrouper.group(procs).first?.name == "hot-small")
     }
 }

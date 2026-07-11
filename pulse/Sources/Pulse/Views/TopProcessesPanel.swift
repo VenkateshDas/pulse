@@ -24,11 +24,12 @@ struct TopProcessesPanel: View {
                     .foregroundStyle(Halo.textDim)
             }
 
-            let maxCPU = max(processes.map(\.cpuPercent).max() ?? 1, 1)
+            let groups = ProcessGrouper.group(processes)
+            let maxCPU = max(groups.map(\.cpuPercent).max() ?? 1, 1)
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(processes) { process in
-                        row(process, maxCPU: maxCPU)
+                    ForEach(groups) { group in
+                        row(group, maxCPU: maxCPU)
                     }
                 }
             }
@@ -38,13 +39,13 @@ struct TopProcessesPanel: View {
         .premiumCard(cornerRadius: Halo.Radius.large)
     }
 
-    private func row(_ process: ProcessSample, maxCPU: Double) -> some View {
-        let isHover = hoveredPID == process.pid
+    private func row(_ process: ProcessGroup, maxCPU: Double) -> some View {
+        let isHover = hoveredPID == process.topPID
         return HStack(spacing: 10) {
-            Image(nsImage: ProcessIconCache.icon(for: process.pid))
+            Image(nsImage: ProcessIconCache.icon(for: process.topPID))
                 .resizable()
                 .frame(width: 14, height: 14)
-            Text(process.name)
+            Text(process.count > 1 ? "\(process.name) (\(process.count))" : process.name)
                 .font(.system(size: 12))
                 .foregroundStyle(Halo.textPrimary)
                 .lineLimit(1)
@@ -76,7 +77,7 @@ struct TopProcessesPanel: View {
         .padding(.vertical, 2)
         .padding(.horizontal, 4)
         .background(isHover ? Halo.surface2.opacity(0.5) : .clear, in: RoundedRectangle(cornerRadius: Halo.Radius.small))
-        .onHover { hoveredPID = $0 ? process.pid : nil }
+        .onHover { hoveredPID = $0 ? process.topPID : nil }
     }
 
     private func barGradient(_ cpuPercent: Double) -> LinearGradient {
