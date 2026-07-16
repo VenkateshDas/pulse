@@ -11,6 +11,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(Updater.self) private var updater
+    @Environment(DashboardModel.self) private var dashboard
     @Binding var selection: SidebarItem
 
     @State private var recordingAction: PulseAction?
@@ -177,7 +178,7 @@ struct SettingsView: View {
     private var launchAtLoginBinding: Binding<Bool> {
         Binding(
             get: { AppActivation.shared.launchAtLogin },
-            set: { AppActivation.shared.launchAtLogin = $0 }
+            set: { AppActivation.shared.setLaunchAtLogin($0) }
         )
     }
 
@@ -193,6 +194,20 @@ struct SettingsView: View {
                 Toggle("", isOn: menuBarEnabledBinding)
                     .toggleStyle(.switch)
                     .labelsHidden()
+            }
+            rowDivider
+            settingsRow(
+                title: "Menu Bar Stat",
+                detail: "Which value appears next to the Pulse icon in the menu bar."
+            ) {
+                Picker("", selection: menuBarStatBinding) {
+                    ForEach(MenuBarStat.allCases) { stat in
+                        Text(stat.label).tag(stat)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 300)
             }
             rowDivider
             settingsRow(
@@ -217,6 +232,13 @@ struct SettingsView: View {
         Binding(
             get: { MenuBarManager.shared.isEnabled },
             set: { MenuBarManager.shared.isEnabled = $0 }
+        )
+    }
+
+    private var menuBarStatBinding: Binding<MenuBarStat> {
+        Binding(
+            get: { dashboard.menuBarStat },
+            set: { dashboard.menuBarStat = $0 }
         )
     }
 

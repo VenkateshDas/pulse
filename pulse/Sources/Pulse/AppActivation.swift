@@ -12,6 +12,7 @@ import PulseKit
 /// Policy is always *computed* from current state, never toggled blindly, so the
 /// window-open signal and the preference compose without drift.
 @MainActor
+@Observable
 final class AppActivation {
     static let shared = AppActivation()
 
@@ -28,21 +29,35 @@ final class AppActivation {
     }
 
     /// Whether Pulse registers itself as a login item via `SMAppService`.
-    /// Read/write hits the launchd registry directly — there's nothing to
-    /// cache, `.status` is already a fast local check.
-    var launchAtLogin: Bool {
-        get { SMAppService.mainApp.status == .enabled }
-        set {
+    /// Cached: `SMAppService.status` validates the app's code signature via
+    /// the Security framework, and the runtime faults when that runs on the
+    /// main thread. Reads return the cache; writes apply optimistically and
+    /// reconcile off-main.
+    private(set) var launchAtLogin = false
+
+    /// Re-reads `SMAppService.status` off the main thread into the cache.
+    func refreshLaunchAtLogin() {
+        Task.detached(priority: .utility) {
+            let enabled = SMAppService.mainApp.status == .enabled
+            await MainActor.run { AppActivation.shared.launchAtLogin = enabled }
+        }
+    }
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        launchAtLogin = enabled  // optimistic; reconciled below
+        Task.detached(priority: .utility) {
             do {
-                if newValue {
+                if enabled {
                     try SMAppService.mainApp.register()
                 } else {
-                    try SMAppService.mainApp.unregister()
+                    try await SMAppService.mainApp.unregister()
                 }
             } catch {
                 // Best-effort: SMAppService has no user-facing recovery path
                 // here beyond retrying, so the toggle simply won't have moved.
             }
+            let actual = SMAppService.mainApp.status == .enabled
+            await MainActor.run { AppActivation.shared.launchAtLogin = actual }
         }
     }
 
@@ -63,6 +78,7 @@ final class AppActivation {
 
     private init() {
         showDockIcon = UserDefaults.standard.bool(forKey: Self.dockKey)
+        refreshLaunchAtLogin()
     }
 
     /// Applies the launch-time policy. Call once after the app finishes

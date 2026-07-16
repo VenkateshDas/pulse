@@ -57,10 +57,23 @@ final class DashboardModel {
     /// On-battery sessions (newest last): time on battery, charge drop, and
     /// per-app energy share. Published for the Health page.
     private(set) var batterySessions: [BatterySession] = []
-    /// Rounded CPU for the menu bar label. Separate property so the status
+    /// Which stat the menu-bar label shows; persisted across launches.
+    var menuBarStat: MenuBarStat =
+        MenuBarStat(rawValue: UserDefaults.standard.string(forKey: menuBarStatKey) ?? "") ?? .cpu
+    {
+        didSet {
+            guard menuBarStat != oldValue else { return }
+            UserDefaults.standard.set(menuBarStat.rawValue, forKey: Self.menuBarStatKey)
+            // Reflect the switch immediately instead of waiting for the next tick.
+            if let latest { menuBarValue = menuBarStat.value(from: latest) }
+        }
+    }
+    private static let menuBarStatKey = "PulseMenuBarStat"
+    /// Rounded value for the menu bar label. Separate property so the status
     /// item only re-renders when the displayed integer actually changes —
-    /// re-rendering it every sample costs measurable CPU.
-    private(set) var menuBarCPUPercent: Int = 0
+    /// re-rendering it every sample costs measurable CPU. nil = source
+    /// unavailable (rendered "--").
+    private(set) var menuBarValue: Int? = 0
     /// Feedback from the last alert action ("Sent Quit to Chrome Helper").
     var actionFeedback: String?
 
@@ -360,9 +373,9 @@ final class DashboardModel {
         lastIngestUptime = snapshot.uptime
         lastIngestDate = snapshot.timestamp
 
-        let rounded = Int(snapshot.cpuTotalPercent.rounded())
-        if rounded != menuBarCPUPercent {
-            menuBarCPUPercent = rounded
+        let value = menuBarStat.value(from: snapshot)
+        if value != menuBarValue {
+            menuBarValue = value
         }
         if visibleViews > 0 && !screenLocked {
             publishLatest()

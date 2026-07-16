@@ -288,3 +288,57 @@ public final class BatterySessionStore {
             .appendingPathComponent("Pulse/battery-sessions.json")
     }
 }
+
+// MARK: - Cross-session drain attribution
+
+/// One app's aggregated battery cost over a window of sessions.
+public struct BatteryAttribution: Sendable, Equatable, Identifiable {
+    public let name: String
+    /// Percentage points of battery charge attributed to this app
+    /// (each session's charge drop split by its per-app CPU shares).
+    public let chargePoints: Double
+    /// This app's share (0–1) of all attributed drain in the window.
+    public let fraction: Double
+    public var id: String { name }
+
+    public init(name: String, chargePoints: Double, fraction: Double) {
+        self.name = name
+        self.chargePoints = chargePoints
+        self.fraction = fraction
+    }
+}
+
+/// Pure rollup: sessions in, ranked consumers out. Weights each session's
+/// per-app CPU share by that session's charge drop, so an app dominating a
+/// 30%-drop session counts 3× the same share of a 10% one. Backfilled
+/// sessions carry no app data and contribute nothing.
+public enum BatteryAttributionEngine {
+    public static func topConsumers(
+        sessions: [BatterySession], since: Date, now: Date = .now, limit: Int = 6
+    ) -> [BatteryAttribution] {
+        var points: [String: Double] = [:]
+        for session in sessions where (session.endedAt ?? now) >= since {
+            let drop = Double(session.chargeDrop)
+            guard drop > 0 else { continue }
+            for (app, fraction) in session.shares {
+                points[app.name, default: 0] += fraction * drop
+            }
+        }
+        // Per-session "Other" buckets merge here and always rank last.
+        let otherPoints = points.removeValue(forKey: BatterySessionStore.otherBucketName) ?? 0
+        let total = points.values.reduce(0, +) + otherPoints
+        guard total > 0 else { return [] }
+        let ranked = points.sorted { $0.value > $1.value }
+        var kept = ranked.prefix(limit).map {
+            BatteryAttribution(name: $0.key, chargePoints: $0.value, fraction: $0.value / total)
+        }
+        let folded = ranked.dropFirst(limit).reduce(otherPoints) { $0 + $1.value }
+        if folded > 0 {
+            kept.append(
+                BatteryAttribution(
+                    name: BatterySessionStore.otherBucketName,
+                    chargePoints: folded, fraction: folded / total))
+        }
+        return kept
+    }
+}
