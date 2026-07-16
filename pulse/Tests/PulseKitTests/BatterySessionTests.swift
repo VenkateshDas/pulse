@@ -184,4 +184,53 @@ struct BatterySessionStoreTests {
         }
         #expect(s.sessions.count == BatterySessionStore.maxSessions)
     }
+
+    // MARK: Cross-session drain attribution
+
+    private func session(
+        start: Date, hours: Double, drop: Int, apps: [(String, Double)]
+    ) -> BatterySession {
+        let end = start.addingTimeInterval(hours * 3600)
+        return BatterySession(
+            startedAt: start, endedAt: end, startCharge: 100, endCharge: 100 - drop,
+            apps: apps.map {
+                AppEnergyShare(name: $0.0, cpuTimeSeconds: $0.1, firstSeen: start, lastSeen: end)
+            })
+    }
+
+    @Test func attributionWeighsByChargeDrop() {
+        // Chrome owns a 30%-drop session, Xcode owns a 10% one — Chrome must
+        // rank first with 3× the points despite identical CPU shares.
+        let sessions = [
+            session(start: t0, hours: 2, drop: 30, apps: [("Chrome", 100)]),
+            session(start: t0.addingTimeInterval(3 * 3600), hours: 2, drop: 10, apps: [("Xcode", 100)]),
+        ]
+        let top = BatteryAttributionEngine.topConsumers(
+            sessions: sessions, since: t0.addingTimeInterval(-1), now: t0.addingTimeInterval(6 * 3600))
+        #expect(top.map(\.name) == ["Chrome", "Xcode"])
+        #expect(abs(top[0].chargePoints - 30) < 0.001)
+        #expect(abs(top[0].fraction - 0.75) < 0.001)
+    }
+
+    @Test func attributionSkipsSessionsOutsideWindowAndFoldsOther() {
+        let old = session(start: t0.addingTimeInterval(-10 * 24 * 3600), hours: 2, drop: 50, apps: [("Old", 100)])
+        let apps: [(String, Double)] = (1...8).map { ("App\($0)", Double(9 - $0) * 10) }
+        let recent = session(start: t0, hours: 2, drop: 20, apps: apps)
+        let top = BatteryAttributionEngine.topConsumers(
+            sessions: [old, recent], since: t0.addingTimeInterval(-7 * 24 * 3600),
+            now: t0.addingTimeInterval(3 * 3600), limit: 3)
+        #expect(!top.contains { $0.name == "Old" })
+        // Top 3 kept, rest folded into a trailing "Other".
+        #expect(top.count == 4)
+        #expect(top.last?.name == "Other")
+        #expect(abs(top.reduce(0) { $0 + $1.fraction } - 1) < 0.001)
+    }
+
+    @Test func attributionEmptyWithoutAppData() {
+        let backfill = BatterySession(
+            startedAt: t0, endedAt: t0.addingTimeInterval(3600),
+            startCharge: 90, endCharge: 70, apps: [], source: .backfill)
+        #expect(BatteryAttributionEngine.topConsumers(
+            sessions: [backfill], since: t0.addingTimeInterval(-1)).isEmpty)
+    }
 }

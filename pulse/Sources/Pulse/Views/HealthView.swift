@@ -31,6 +31,10 @@ struct HealthView: View {
                     }
                     .frame(height: 175)
 
+                    // Which apps cost the most battery this week — rollup of
+                    // the per-session shares below.
+                    BatteryDrainCard()
+
                     // Per-session detail (unplug window, charge drop, app energy).
                     BatterySessionsCard()
                 }
@@ -609,6 +613,77 @@ private struct BatteryConsumptionCard: View {
     }
 }
 
+// MARK: - Battery Drain Card (7-day cross-session app attribution)
+
+private struct BatteryDrainCard: View {
+    @Environment(DashboardModel.self) private var dashboardModel
+
+    private var consumers: [BatteryAttribution] {
+        BatteryAttributionEngine.topConsumers(
+            sessions: dashboardModel.batterySessions,
+            since: Date.now.addingTimeInterval(-7 * 24 * 3600))
+    }
+
+    var body: some View {
+        let items = consumers
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("TOP ENERGY CONSUMERS · 7 DAYS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Halo.textDim)
+                Spacer()
+                Text("share of tracked on-battery drain · approx")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim.opacity(0.7))
+            }
+
+            if items.isEmpty {
+                Text("No on-battery app data in the last 7 days. Unplug and use the Mac to populate this.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Halo.textDim)
+                    .padding(.vertical, 8)
+            } else {
+                let maxFraction = items.map(\.fraction).max() ?? 1
+                VStack(spacing: 8) {
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                        row(item, index: index, maxFraction: maxFraction)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+    }
+
+    private func row(_ item: BatteryAttribution, index: Int, maxFraction: Double) -> some View {
+        let isOther = item.name == "Other"
+        let color =
+            isOther
+            ? Halo.textDim.opacity(0.5)
+            : BatterySessionsCard.palette[index % BatterySessionsCard.palette.count]
+        return HStack(spacing: 10) {
+            Text(item.name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isOther ? Halo.textDim : Halo.textPrimary)
+                .lineLimit(1)
+                .frame(width: 170, alignment: .leading)
+            GeometryReader { geo in
+                Capsule()
+                    .fill(color)
+                    .frame(width: max(3, geo.size.width * item.fraction / maxFraction))
+                    .frame(maxHeight: .infinity, alignment: .center)
+            }
+            .frame(height: 6)
+            Text(String(format: "%.0f%% of drain", item.fraction * 100))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
+                .frame(width: 90, alignment: .trailing)
+        }
+    }
+}
+
 // MARK: - Battery Sessions Card (per-session charge drop + per-app energy share)
 
 private struct BatterySessionsCard: View {
@@ -621,7 +696,8 @@ private struct BatterySessionsCard: View {
     private static let sessionLimit = 10
 
     /// Segment colors for the stacked share bar; "Other" always renders dim.
-    private static let palette: [Color] = [
+    /// Shared with BatteryDrainCard so the same rank gets the same hue.
+    static let palette: [Color] = [
         Halo.ion, Halo.volt, Halo.tealLight, Halo.amber,
         Halo.pulseGreen, Halo.flare, Halo.teal, Halo.tealDeep,
     ]

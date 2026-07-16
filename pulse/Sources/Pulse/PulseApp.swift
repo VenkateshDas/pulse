@@ -92,14 +92,15 @@ struct PulseApp: App {
 
     private var menuBarLabel: some View {
         // Static-width label: menu bar items must not jiggle as values change.
-        // Reads only the gated integer property, so it re-renders only when
-        // the displayed value actually changes, not on every sample.
-        HStack(spacing: 6) {
-            // Action feedback: MenuBarFlash briefly swaps the icon to the
-            // triggered action's symbol (hotkey or UI), then reverts.
-            Image(systemName: MenuBarFlash.shared.symbol ?? "waveform.path.ecg")
-            Text(String(format: "%3ld%%", model.menuBarCPUPercent))
-                .font(.system(size: 12, design: .monospaced))
-        }
+        // Reads only the gated values dictionary, so it re-renders only when
+        // a displayed value actually changes, not on every sample.
+        //
+        // Drawn into ONE template NSImage (see MenuBarLabelRenderer):
+        // MenuBarExtra flattens its label, so this is the only way to get
+        // native-looking multi-stat rendering in a single button.
+        Image(nsImage: MenuBarLabelRenderer.image(
+            stats: model.menuBarStats,
+            values: model.menuBarValues,
+            flashSymbol: MenuBarFlash.shared.symbol))
     }
 }

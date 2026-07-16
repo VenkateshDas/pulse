@@ -57,10 +57,48 @@ final class DashboardModel {
     /// On-battery sessions (newest last): time on battery, charge drop, and
     /// per-app energy share. Published for the Health page.
     private(set) var batterySessions: [BatterySession] = []
-    /// Rounded CPU for the menu bar label. Separate property so the status
-    /// item only re-renders when the displayed integer actually changes —
-    /// re-rendering it every sample costs measurable CPU.
-    private(set) var menuBarCPUPercent: Int = 0
+    /// Which stats the menu-bar label shows, in canonical (allCases) order.
+    /// Never empty; persisted across launches.
+    var menuBarStats: [MenuBarStat] = loadMenuBarStats() {
+        didSet {
+            guard menuBarStats != oldValue else { return }
+            UserDefaults.standard.set(
+                menuBarStats.map(\.rawValue), forKey: Self.menuBarStatsKey)
+            // Reflect the switch immediately instead of waiting for the next tick.
+            if let latest { menuBarValues = Self.menuBarValues(menuBarStats, from: latest) }
+        }
+    }
+    private static let menuBarStatsKey = "PulseMenuBarStats"
+    /// Rounded values for the menu bar label, keyed by stat. Separate property
+    /// so the status item only re-renders when a displayed integer actually
+    /// changes — re-rendering it every sample costs measurable CPU. A missing
+    /// key means the source is unavailable (rendered "--").
+    private(set) var menuBarValues: [MenuBarStat: Int] = [:]
+
+    private static func loadMenuBarStats() -> [MenuBarStat] {
+        let defaults = UserDefaults.standard
+        if let raw = defaults.stringArray(forKey: menuBarStatsKey) {
+            let stats = MenuBarStat.allCases.filter { raw.contains($0.rawValue) }
+            if !stats.isEmpty { return stats }
+        }
+        // Migrate the single-stat key from the previous build.
+        if let old = defaults.string(forKey: "PulseMenuBarStat"),
+            let stat = MenuBarStat(rawValue: old)
+        {
+            return [stat]
+        }
+        return [.cpu]
+    }
+
+    private static func menuBarValues(
+        _ stats: [MenuBarStat], from snapshot: SystemSnapshot
+    ) -> [MenuBarStat: Int] {
+        var values: [MenuBarStat: Int] = [:]
+        for stat in stats {
+            if let value = stat.value(from: snapshot) { values[stat] = value }
+        }
+        return values
+    }
     /// Feedback from the last alert action ("Sent Quit to Chrome Helper").
     var actionFeedback: String?
 
@@ -360,9 +398,9 @@ final class DashboardModel {
         lastIngestUptime = snapshot.uptime
         lastIngestDate = snapshot.timestamp
 
-        let rounded = Int(snapshot.cpuTotalPercent.rounded())
-        if rounded != menuBarCPUPercent {
-            menuBarCPUPercent = rounded
+        let values = Self.menuBarValues(menuBarStats, from: snapshot)
+        if values != menuBarValues {
+            menuBarValues = values
         }
         if visibleViews > 0 && !screenLocked {
             publishLatest()

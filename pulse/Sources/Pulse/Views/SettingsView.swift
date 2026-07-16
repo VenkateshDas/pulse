@@ -11,6 +11,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(Updater.self) private var updater
+    @Environment(DashboardModel.self) private var dashboard
     @Binding var selection: SidebarItem
 
     @State private var recordingAction: PulseAction?
@@ -177,7 +178,7 @@ struct SettingsView: View {
     private var launchAtLoginBinding: Binding<Bool> {
         Binding(
             get: { AppActivation.shared.launchAtLogin },
-            set: { AppActivation.shared.launchAtLogin = $0 }
+            set: { AppActivation.shared.setLaunchAtLogin($0) }
         )
     }
 
@@ -193,6 +194,17 @@ struct SettingsView: View {
                 Toggle("", isOn: menuBarEnabledBinding)
                     .toggleStyle(.switch)
                     .labelsHidden()
+            }
+            rowDivider
+            settingsRow(
+                title: "Menu Bar Stats",
+                detail: "Values shown in the menu bar. Pick any combination; at least one stays on."
+            ) {
+                HStack(spacing: 6) {
+                    ForEach(MenuBarStat.allCases) { stat in
+                        menuBarStatChip(stat)
+                    }
+                }
             }
             rowDivider
             settingsRow(
@@ -218,6 +230,39 @@ struct SettingsView: View {
             get: { MenuBarManager.shared.isEnabled },
             set: { MenuBarManager.shared.isEnabled = $0 }
         )
+    }
+
+    /// Toggleable chip for one menu-bar stat. Deselecting the last remaining
+    /// stat is a no-op — the label must always show something.
+    private func menuBarStatChip(_ stat: MenuBarStat) -> some View {
+        let selected = dashboard.menuBarStats.contains(stat)
+        return Button {
+            var stats = dashboard.menuBarStats
+            if selected {
+                stats.removeAll { $0 == stat }
+            } else {
+                stats.append(stat)
+            }
+            guard !stats.isEmpty else { return }
+            // Canonical order regardless of click order.
+            dashboard.menuBarStats = MenuBarStat.allCases.filter(stats.contains)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: stat.symbol)
+                    .font(.system(size: 9))
+                Text(stat.label)
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .foregroundStyle(selected ? Halo.textPrimary : Halo.textDim)
+            .background(
+                Capsule().fill(selected ? Halo.ion.opacity(0.22) : .clear))
+            .overlay(
+                Capsule().strokeBorder(
+                    selected ? Halo.ion.opacity(0.7) : Halo.borderSubtle, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private var autoHideDelayBinding: Binding<TimeInterval> {
