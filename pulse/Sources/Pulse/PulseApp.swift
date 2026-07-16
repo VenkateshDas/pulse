@@ -95,20 +95,12 @@ struct PulseApp: App {
         // Reads only the gated values dictionary, so it re-renders only when
         // a displayed value actually changes, not on every sample.
         //
-        // Everything is concatenated into ONE Text: MenuBarExtra flattens its
-        // label to a single image + string, so an HStack of several Images
-        // silently drops all but the first stat. SF Symbols interpolate into
-        // Text as attachments, which survives the flattening — the item stays
-        // one button and simply grows horizontally with the selection.
-        var label = Text("")
-        for (index, stat) in model.menuBarStats.enumerated() {
-            // Action feedback: MenuBarFlash briefly swaps the leading icon
-            // to the triggered action's symbol (hotkey or UI), then reverts.
-            let symbol = index == 0 ? (MenuBarFlash.shared.symbol ?? stat.symbol) : stat.symbol
-            if index > 0 { label = label + Text("  ") }
-            label = label + Text(Image(systemName: symbol))
-                + Text(" ") + Text(stat.text(for: model.menuBarValues[stat]))
-        }
-        return label.font(.system(size: 12, design: .monospaced))
+        // Drawn into ONE template NSImage (see MenuBarLabelRenderer):
+        // MenuBarExtra flattens its label, so this is the only way to get
+        // native-looking multi-stat rendering in a single button.
+        Image(nsImage: MenuBarLabelRenderer.image(
+            stats: model.menuBarStats,
+            values: model.menuBarValues,
+            flashSymbol: MenuBarFlash.shared.symbol))
     }
 }
