@@ -62,8 +62,7 @@ public class BrightnessEngine: ObservableObject {
         if let savedMap = UserDefaults.standard.dictionary(forKey: "PulseBrightnessMap") as? [String: Double] {
             brightnessMap = Dictionary(uniqueKeysWithValues: savedMap.compactMap { key, value in
                 guard let id = CGDirectDisplayID(key) else { return nil }
-                // Migrate values persisted by the old -1...1 sub-zero range.
-                return (id, max(0.0, min(1.0, value)))
+                return (id, max(-1.0, min(1.0, value)))
             })
         }
     }
@@ -115,12 +114,13 @@ public class BrightnessEngine: ObservableObject {
             let canReadHardware = DisplayServicesCanChangeBrightness(monitor.id) != 0
             
             if let saved = brightnessMap[monitor.id] {
-                if canReadHardware && hwBrightness > 0.0 && abs(hwBrightness - saved) > 0.05 {
+                let isHardwareSubZeroEcho = saved < 0.0 && hwBrightness <= 0.05
+                if canReadHardware && hwBrightness > 0.0 && !isHardwareSubZeroEcho && abs(hwBrightness - saved) > 0.05 {
                     // Hardware was changed externally (e.g., Apple Control Center)
                     brightnessMap[monitor.id] = hwBrightness
                 } else {
                     // For external monitors, we trust our saved map over the fake 1.0 hardware value
-                    // For internal monitors, if the change was negligible, we just keep the saved map to prevent rounding jitter
+                    // For internal monitors, if the change was negligible or it's a sub-zero echo, we keep the saved map
                 }
             } else {
                 // Initial launch with no saved value
@@ -148,22 +148,34 @@ public class BrightnessEngine: ObservableObject {
 
     public func setBrightness(for monitor: Monitor, to value: Double, showOSD: Bool = true) {
         guard monitors.contains(where: { $0.id == monitor.id }) else { return }
-        // Plain 0...1 range. The old -1...0 "sub-zero" software-dimming zone
-        // is gone: it doubled every mapping in the app and made 50% on the
-        // slider mean 100% hardware.
-        let clampedValue = max(0.0, min(1.0, value))
+        let clampedValue = max(-1.0, min(1.0, value))
+        
+        // Prevent the built-in screen from completely turning off (0.0) when entering the 
+        // sub-zero range, otherwise the software overlay just dims a black screen.
+        let hwValue: Double
+        if monitor.isBuiltIn {
+            if clampedValue <= -1.0 {
+                hwValue = 0.0 // Fully off only at absolute bottom
+            } else if clampedValue < 0.01 {
+                hwValue = 0.01 // Keep backlight minimally alive for sub-zero overlay
+            } else {
+                hwValue = clampedValue
+            }
+        } else {
+            hwValue = max(0.0, clampedValue)
+        }
 
         if DisplayServicesCanChangeBrightness(monitor.id) != 0 {
-            _ = DisplayServicesSetBrightness(monitor.id, Float(clampedValue))
+            _ = DisplayServicesSetBrightness(monitor.id, Float(hwValue))
             // User scale and linear scale are different curves — writing the
             // same number to both corrupts brightness (0.78 user + 0.78
             // linear lands at 0.91 user; measured). They only agree at 1.0,
             // which is the single case Lunar writes linear too.
-            if clampedValue == 1.0 {
-                _ = DisplayServicesSetLinearBrightness(monitor.id, Float(clampedValue))
+            if hwValue == 1.0 {
+                _ = DisplayServicesSetLinearBrightness(monitor.id, Float(hwValue))
             }
         } else if monitor.isBuiltIn {
-            CoreDisplay_Display_SetUserBrightness(monitor.id, clampedValue)
+            CoreDisplay_Display_SetUserBrightness(monitor.id, hwValue)
         }
         // Non-DisplayServices externals are DDC-only below — CoreDisplay user
         // brightness on them is gamma dimming that would stack on top of the
@@ -182,18 +194,18 @@ public class BrightnessEngine: ObservableObject {
             // this). Serialize and coalesce writes off the main thread
             // instead; only the latest value survives if several pile up
             // before the in-flight write finishes.
-            scheduleDDCWrite(for: monitor, controlValue: UInt16((clampedValue * 100).rounded()))
+            scheduleDDCWrite(for: monitor, controlValue: UInt16((hwValue * 100).rounded()))
         }
 
         let isDDCDead = !monitor.isBuiltIn && (ddcFailures[monitor.id] ?? 0) >= 3
 
         if isDDCDead {
             // Hardware control is unreachable — the overlay stands in for the
-            // whole 0...1 range so the slider still does something.
-            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: clampedValue)
+            // whole 0...1 range so the slider still does something. (And ignores sub-zero negatives)
+            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: max(0.0, clampedValue))
         } else {
-            // Hardware dimming works — ensure software dimming is off.
-            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: 1.0)
+            // Hardware dimming works — handle software dimming below 0
+            SoftwareDimmer.shared.setBrightness(for: monitor.id, brightness: clampedValue < 0.0 ? 1.0 + clampedValue : 1.0)
         }
 
         if showOSD {
@@ -263,6 +275,7 @@ public class BrightnessEngine: ObservableObject {
     func hardwareBrightnessDidChange(id: CGDirectDisplayID, value: Double) {
         if let t = lastAppSet[id], Date().timeIntervalSince(t) < 0.5 { return }
         let clamped = max(0.0, min(1.0, value))
+        if clamped <= 0.05, let current = brightnessMap[id], current < 0.0 { return }
         guard abs((brightnessMap[id] ?? -1) - clamped) > 0.005 else { return }
         brightnessMap[id] = clamped
         saveBrightnessMap()
@@ -278,7 +291,7 @@ public class BrightnessEngine: ObservableObject {
             isAdaptiveModeEnabled = false
         }
         let current = brightnessMap[monitor.id] ?? getBrightness(for: monitor)
-        let newBrightness = max(0.0, min(1.0, current + delta))
+        let newBrightness = max(-1.0, min(1.0, current + delta))
         setBrightness(for: monitor, to: newBrightness)
         saveBrightnessMap()
     }
