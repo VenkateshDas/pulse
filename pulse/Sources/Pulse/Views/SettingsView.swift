@@ -197,17 +197,14 @@ struct SettingsView: View {
             }
             rowDivider
             settingsRow(
-                title: "Menu Bar Stat",
-                detail: "Which value appears next to the Pulse icon in the menu bar."
+                title: "Menu Bar Stats",
+                detail: "Values shown in the menu bar. Pick any combination; at least one stays on."
             ) {
-                Picker("", selection: menuBarStatBinding) {
+                HStack(spacing: 6) {
                     ForEach(MenuBarStat.allCases) { stat in
-                        Text(stat.label).tag(stat)
+                        menuBarStatChip(stat)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 300)
             }
             rowDivider
             settingsRow(
@@ -235,11 +232,37 @@ struct SettingsView: View {
         )
     }
 
-    private var menuBarStatBinding: Binding<MenuBarStat> {
-        Binding(
-            get: { dashboard.menuBarStat },
-            set: { dashboard.menuBarStat = $0 }
-        )
+    /// Toggleable chip for one menu-bar stat. Deselecting the last remaining
+    /// stat is a no-op — the label must always show something.
+    private func menuBarStatChip(_ stat: MenuBarStat) -> some View {
+        let selected = dashboard.menuBarStats.contains(stat)
+        return Button {
+            var stats = dashboard.menuBarStats
+            if selected {
+                stats.removeAll { $0 == stat }
+            } else {
+                stats.append(stat)
+            }
+            guard !stats.isEmpty else { return }
+            // Canonical order regardless of click order.
+            dashboard.menuBarStats = MenuBarStat.allCases.filter(stats.contains)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: stat.symbol)
+                    .font(.system(size: 9))
+                Text(stat.label)
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .foregroundStyle(selected ? Halo.textPrimary : Halo.textDim)
+            .background(
+                Capsule().fill(selected ? Halo.ion.opacity(0.22) : .clear))
+            .overlay(
+                Capsule().strokeBorder(
+                    selected ? Halo.ion.opacity(0.7) : Halo.borderSubtle, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private var autoHideDelayBinding: Binding<TimeInterval> {

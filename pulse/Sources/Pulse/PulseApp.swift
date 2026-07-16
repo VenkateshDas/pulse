@@ -95,11 +95,13 @@ struct PulseApp: App {
         // Reads only the gated integer property, so it re-renders only when
         // the displayed value actually changes, not on every sample.
         HStack(spacing: 6) {
-            // Action feedback: MenuBarFlash briefly swaps the icon to the
-            // triggered action's symbol (hotkey or UI), then reverts.
-            Image(systemName: MenuBarFlash.shared.symbol ?? model.menuBarStat.symbol)
-            Text(model.menuBarStat.text(for: model.menuBarValue))
-                .font(.system(size: 12, design: .monospaced))
+            ForEach(Array(model.menuBarStats.enumerated()), id: \.element) { index, stat in
+                // Action feedback: MenuBarFlash briefly swaps the leading icon
+                // to the triggered action's symbol (hotkey or UI), then reverts.
+                Image(systemName: index == 0 ? (MenuBarFlash.shared.symbol ?? stat.symbol) : stat.symbol)
+                Text(stat.text(for: model.menuBarValues[stat]))
+                    .font(.system(size: 12, design: .monospaced))
+            }
         }
     }
 }
