@@ -1,6 +1,9 @@
 import AppKit
 import PulseKit
 import SwiftUI
+import os
+
+private let log = Logger(subsystem: "com.pulse.app", category: "Storage")
 
 @MainActor
 @Observable
@@ -407,7 +410,9 @@ final class StorageModel {
                     do {
                         try FileManager.default.removeItem(at: url)
                         count += 1
-                    } catch {}
+                    } catch {
+                        log.error("empty Trash: couldn't remove \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
+                    }
                 }
                 return (count > 0 ? "Emptied \(count) items from Trash" : "Failed to empty Trash", count)
             }.value

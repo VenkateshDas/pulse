@@ -1,4 +1,7 @@
 import Foundation
+import os
+
+private let log = Logger(subsystem: "com.pulse.app", category: "Battery")
 
 /// Persists one battery-capacity reading per day so the Health page can
 /// chart the 60-day degradation trend across launches. JSON file in
@@ -167,7 +170,9 @@ func backfillBatteryHistoryFromSystemLog() async -> [Date: TimeInterval] {
             if let data = data, let logContent = String(data: data, encoding: .utf8) {
                 return parseLogContent(logContent)
             }
-        } catch {}
+        } catch {
+            log.error("pmset history backfill failed: \(error, privacy: .public)")
+        }
         return [:]
     }.value
 }
@@ -369,7 +374,9 @@ public func backfillBatterySessionsFromSystemLog() async -> [BatterySession] {
             if let data, let logContent = String(data: data, encoding: .utf8) {
                 return parseBatterySessions(logContent)
             }
-        } catch {}
+        } catch {
+            log.error("pmset session backfill failed: \(error, privacy: .public)")
+        }
         return []
     }.value
 }

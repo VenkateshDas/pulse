@@ -2,6 +2,9 @@ import CoreLocation
 import Foundation
 import Observation
 import PulseKit
+import os
+
+private let log = Logger(subsystem: "com.pulse.app", category: "Network")
 
 /// Owns the Network page's speed test — auto-run on an interval and cached
 /// to disk so the page always has a recent result to show, plus a manual
@@ -126,7 +129,10 @@ struct IPLocation: Decodable, Equatable {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             ipLocation = try? JSONDecoder().decode(IPLocation.self, from: data)
-        } catch {}
+        } catch {
+            // Expected when offline — debug, not error.
+            log.debug("IP location fetch failed: \(error, privacy: .public)")
+        }
     }
 }
 

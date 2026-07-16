@@ -137,6 +137,12 @@ public class BrightnessEngine: ObservableObject {
             }
         }
         
+        // CoreDisplay user brightness only exists for the built-in panel.
+        // Calling it for a non-DisplayServices external fails a mach port
+        // lookup inside CoreDisplay and logs an error with a full backtrace
+        // on the main thread — every popover open, every display change
+        // (156 hits in a week of logs). Externals are DDC-only; report full.
+        guard monitor.isBuiltIn else { return 1.0 }
         return CoreDisplay_Display_GetUserBrightness(monitor.id)
     }
 
