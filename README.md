@@ -44,6 +44,7 @@
 - **App Uninstaller** — drag an app (or pick from the list); Pulse finds leftover files, grades every match by confidence (exact bundle-ID = safe, vendor/name = careful, weak name = review-only), trashes the app, and shows a receipt. **Orphan scan** finds debris from apps already deleted — including launch agents/daemons that load a now-missing binary.
 - **Process watch** — alerts only when a process stays hot for a sustained window (no momentary-spike false alarms), with a searchable anomaly history.
 - **Network Health** — Real-time Wi-Fi insights (SSID, channel, band, signal quality score) and automated network speed tests to instantly diagnose slow connections.
+- **Displays (Brightness)** — Control built-in and external monitors from one place. Physical brightness keys are routed through Pulse to control whatever screen your cursor is on. If a monitor won't go dark enough, the sub-zero dimming feature picks up where the hardware stops.
 - **Timeline** — daily health journal: disk growth, battery sessions, and sustained-CPU anomalies, with daily disk growth attributed to the folders that caused it.
 - **Dev Mode** — process-level sampler with µs-resolution CPU accounting.
 - **Reversible by default** — every removal (Smart Clean, Reclaim, Optimize, Uninstall, orphans, Empty Trash hotkey) goes to the Trash, not `rm`, and is logged to a 30-day **Undo history** you can restore from one tap. The journal lives in `~/Library/Application Support/Pulse/`.
