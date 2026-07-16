@@ -28,6 +28,8 @@
 - **Diagnosis verdict** — one line telling you what's wrong and who's to blame ("Chrome high CPU"), with a tap-through to the culprit process. Shown on the Dashboard, in the menu-bar HUD, and logged to history.
 - **Health score** — a single 0–100 score (CPU, memory, disk, thermal) with a per-factor "what's costing you" breakdown.
 - **Menu bar HUD** — live score + verdict, CPU/memory/disk/battery vitals at a glance, and a brief action-icon flash (e.g. trash, sync, sun) when a hotkey or popover button fires — feedback even when the popover is closed.
+- **Configurable menu-bar stats** — pick any combination of CPU %, memory %, CPU temperature, and battery % to show next to the Pulse icon (Settings → Menu Bar). Rendered as a single native template image, so it stays one crisp button that adapts to light/dark menu bars and never jiggles as values change.
+- **Battery drain attribution** — a 7-day "Top Energy Consumers" rollup on the Health page showing which apps actually ate your battery, weighted by each unplugged session's charge drop — plus per-session app energy shares underneath.
 - **Global keyboard shortcuts** — 5 hotkeys dispatch straight to the same actions the popover buttons use: run Optimize, empty Trash (with confirmation), toggle brightness sync, toggle Keep Awake, toggle the menu-bar chevron/auto-hide. Configurable in Settings.
 - **Dashboard** — real-time charts, per-core CPU heatmap, top processes by CPU/memory.
 - **Theme presets** — four built-in palettes (Precision, Midnight, Contrast, Slate) applied app-wide across the Command Center and popover, picked in Settings.
