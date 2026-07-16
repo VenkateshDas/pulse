@@ -98,7 +98,7 @@ struct PulseApp: App {
             // Action feedback: MenuBarFlash briefly swaps the icon to the
             // triggered action's symbol (hotkey or UI), then reverts.
             Image(systemName: MenuBarFlash.shared.symbol ?? "waveform.path.ecg")
-            Text(String(format: "%3d%%", model.menuBarCPUPercent))
+            Text(String(format: "%3ld%%", model.menuBarCPUPercent))
                 .font(.system(size: 12, design: .monospaced))
         }
     }

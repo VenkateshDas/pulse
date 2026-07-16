@@ -249,7 +249,7 @@ struct DashboardView: View {
         return VitalCard(
             title: "CPU",
             fraction: total / 100,
-            value: String(format: "%2d%%", Int(total)),
+            value: String(format: "%2ld%%", Int(total)),
             line1: DashboardFormatting.cpuLine1(
                 mode: mode,
                 efficiencyPercent: snapshot?.cpuEfficiencyPercent.map { Int($0) },
@@ -312,7 +312,7 @@ struct DashboardView: View {
             title: "MEMORY",
             fraction: snapshot?.memoryUsedFraction ?? 0,
             ringColor: pressureColor,
-            value: String(format: "%2d%%", Int((snapshot?.memoryUsedFraction ?? 0) * 100)),
+            value: String(format: "%2ld%%", Int((snapshot?.memoryUsedFraction ?? 0) * 100)),
             line1: DashboardFormatting.memoryLine1(mode: mode, usedBytes: memUsed, freeBytes: memFree),
             line2: DashboardFormatting.memoryLine2(mode: mode, swapUsedBytes: snapshot?.swapUsedBytes ?? 0, pressureSuffix: pressureStr) ?? "",
             history: model.memoryHistory,
@@ -357,7 +357,7 @@ struct DashboardView: View {
         return VitalCard(
             title: "DISK",
             fraction: snapshot?.diskUsedFraction ?? 0,
-            value: String(format: "%2d%%", Int((snapshot?.diskUsedFraction ?? 0) * 100)),
+            value: String(format: "%2ld%%", Int((snapshot?.diskUsedFraction ?? 0) * 100)),
             line1: "\(ByteFormat.string(used)) / \(ByteFormat.string(total))",
             line2: growth,
             cardTooltip: diskTooltip,

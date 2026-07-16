@@ -15,7 +15,7 @@ enum DashboardFormatting {
         case .pro:
             let split: String
             if let e = efficiencyPercent, let p = performancePercent {
-                split = String(format: "E %2d%% · P %2d%%", e, p)
+                split = String(format: "E %2ld%% · P %2ld%%", e, p)
             } else {
                 split = "\(coreCount) cores"
             }
