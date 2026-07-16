@@ -18,15 +18,22 @@ struct DisplaySliderView: View {
                 Spacer()
                 // .rounded() to match the OSD label and the DDC write — plain
                 // Int() truncates and reads 1% lower (93 vs 94 for 0.935).
-                Text("\(Int((currentBrightness * 100).rounded()))%")
-                    .font(.system(size: 11, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Halo.textDim)
+                if currentBrightness < 0.0 {
+                    Text("Sub-zero brightness")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Halo.textDim)
+                } else {
+                    Text("\(Int((currentBrightness * 100).rounded()))%")
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .foregroundStyle(Halo.textDim)
+                }
             }
             
             // Custom Premium Capsule Slider
             GeometryReader { geometry in
                 let trackWidth = geometry.size.width
-                let fillWidth = max(0, min(trackWidth, trackWidth * CGFloat(currentBrightness)))
+                let normalized = (currentBrightness + 1.0) / 2.0
+                let fillWidth = max(0, min(trackWidth, trackWidth * CGFloat(normalized)))
 
                 ZStack(alignment: .leading) {
                     // Track Background
@@ -36,7 +43,7 @@ struct DisplaySliderView: View {
 
                     // Track Fill
                     Capsule()
-                        .fill(Halo.accentGradient(Halo.ion))
+                        .fill(currentBrightness < 0.0 ? AnyShapeStyle(LinearGradient(colors: [.indigo, .blue], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Halo.accentGradient(Halo.ion)))
                         .frame(width: fillWidth, height: 18)
                 }
                 .clipShape(Capsule())
@@ -50,7 +57,7 @@ struct DisplaySliderView: View {
                                 }
                             }
                             
-                            let newValue = max(0, min(1, value.location.x / trackWidth))
+                            let newValue = max(-1.0, min(1.0, (value.location.x / trackWidth) * 2.0 - 1.0))
 
                             if brightnessEngine.isAdaptiveModeEnabled && !monitor.isBuiltIn {
                                 brightnessEngine.isAdaptiveModeEnabled = false

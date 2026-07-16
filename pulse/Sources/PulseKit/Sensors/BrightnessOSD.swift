@@ -124,7 +124,8 @@ struct BrightnessOSDView: View {
     let fraction: Double
     let displayName: String
 
-    private var clamped: Double { max(0, min(1, fraction)) }
+    private var clampedHW: Double { max(0, min(1, fraction)) }
+    private var normalized: Double { (max(-1.0, min(1.0, fraction)) + 1.0) / 2.0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -133,8 +134,13 @@ struct BrightnessOSDView: View {
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                 Spacer()
-                Text("\(Int((clamped * 100).rounded()))%")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                if fraction < 0.0 {
+                    Text("Sub-zero")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                } else {
+                    Text("\(Int((clampedHW * 100).rounded()))%")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                }
             }
             HStack(spacing: 10) {
                 Image(systemName: "sun.min")
@@ -145,12 +151,12 @@ struct BrightnessOSDView: View {
                         let width = geo.size.width
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color.white)
-                                .frame(width: max(6, width * clamped), height: 6)
+                                .fill(fraction < 0.0 ? AnyShapeStyle(LinearGradient(colors: [.indigo, .blue], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Color.white))
+                                .frame(width: max(6, width * normalized), height: 6)
                             Circle()
                                 .fill(Color.white)
                                 .frame(width: 14, height: 14)
-                                .offset(x: max(0, width * clamped - 7))
+                                .offset(x: max(0, width * normalized - 7))
                         }
                         .frame(height: 14)
                     }
