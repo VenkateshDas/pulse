@@ -99,31 +99,78 @@ struct MenuBarContent: View {
         .onDisappear { model.viewDisappeared() }
         .frame(width: 300)
         .background { GlassLayer(tint: Halo.void.opacity(0.4)) }
-        .confirmationDialog(
-            "Quit \(confirmAttentionQuit?.name ?? "")?",
-            isPresented: Binding(
-                get: { confirmAttentionQuit != nil },
-                set: { if !$0 { confirmAttentionQuit = nil } }
-            )
-        ) {
-            Button("Quit \(confirmAttentionQuit?.name ?? "")", role: .destructive) {
-                if let target = confirmAttentionQuit {
+        .overlay { confirmOverlay }
+    }
+
+    // MARK: Inline confirmation
+
+    // `confirmationDialog` presents an AppKit sheet on the MenuBarExtra
+    // `.window` panel, which is non-activating and can never become key —
+    // the sheet's buttons don't receive clicks, the modal never dismisses,
+    // and the stuck modal session freezes the menu bar. Confirmations in
+    // this popover must stay pure SwiftUI (no sheets/alerts).
+    @ViewBuilder private var confirmOverlay: some View {
+        if confirmEmptyTrash {
+            confirmCard(
+                title: "Empty the Trash?",
+                message:
+                    "Permanently erases \(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))). This can't be undone.",
+                actionLabel: "Empty Trash",
+                onConfirm: {
+                    confirmEmptyTrash = false
+                    storage.emptyTrash()
+                },
+                onCancel: { confirmEmptyTrash = false })
+        } else if let target = confirmAttentionQuit {
+            confirmCard(
+                title: "Quit \(target.name)?",
+                message: "Sends a normal Quit signal. Unsaved work in that app may be lost.",
+                actionLabel: "Quit \(target.name)",
+                onConfirm: {
+                    confirmAttentionQuit = nil
                     model.quitProcess(pid: target.pid, name: target.name)
-                }
+                },
+                onCancel: { confirmAttentionQuit = nil })
+        }
+    }
+
+    private func confirmCard(
+        title: String, message: String, actionLabel: String,
+        onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundStyle(Halo.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(.bordered)
+                    .clipShape(Capsule())
+                Button(actionLabel, role: .destructive, action: onConfirm)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .clipShape(Capsule())
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Sends a normal Quit signal. Unsaved work in that app may be lost.")
         }
-        .confirmationDialog(
-            "Empty the Trash?",
-            isPresented: $confirmEmptyTrash, titleVisibility: .visible
-        ) {
-            Button("Empty Trash", role: .destructive) { storage.emptyTrash() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Permanently erases \(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))). This can't be undone.")
-        }
+        .padding(16)
+        .frame(maxWidth: 250)
+        .background(
+            Halo.surface1,
+            in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
+                .strokeBorder(Halo.borderSubtle)
+        )
+        .shadow(color: .black.opacity(0.4), radius: 18, y: 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Dim + swallow clicks on everything behind the card.
+        .background(Color.black.opacity(0.45).contentShape(Rectangle()).onTapGesture(perform: onCancel))
     }
 
     // MARK: HUD (top attention item + score)
@@ -176,10 +223,7 @@ struct MenuBarContent: View {
             Spacer(minLength: 8)
             switch item.action {
             case .quitProcess(let pid, let name):
-                Button("Quit") {
-                    NSApp.activate(ignoringOtherApps: true)
-                    confirmAttentionQuit = (pid, name)
-                }
+                Button("Quit") { confirmAttentionQuit = (pid, name) }
                     .buttonStyle(.borderedProminent)
                     .tint(Halo.ion.opacity(0.85))
                     .controlSize(.mini)
@@ -554,7 +598,6 @@ struct MenuBarContent: View {
                 .disabled(isOptimizing)
 
                 Button {
-                    NSApp.activate(ignoringOtherApps: true)
                     confirmEmptyTrash = true
                 } label: {
                     Label(trashLabel, systemImage: "trash")
