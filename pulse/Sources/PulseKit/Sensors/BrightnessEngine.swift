@@ -152,18 +152,7 @@ public class BrightnessEngine: ObservableObject {
         
         // Prevent the built-in screen from completely turning off (0.0) when entering the 
         // sub-zero range, otherwise the software overlay just dims a black screen.
-        let hwValue: Double
-        if monitor.isBuiltIn {
-            if clampedValue <= -1.0 {
-                hwValue = 0.0 // Fully off only at absolute bottom
-            } else if clampedValue < 0.01 {
-                hwValue = 0.01 // Keep backlight minimally alive for sub-zero overlay
-            } else {
-                hwValue = clampedValue
-            }
-        } else {
-            hwValue = max(0.0, clampedValue)
-        }
+        let hwValue = !monitor.isBuiltIn ? max(0.0, clampedValue) : (clampedValue <= -1.0 ? 0.0 : max(0.01, clampedValue))
 
         if DisplayServicesCanChangeBrightness(monitor.id) != 0 {
             _ = DisplayServicesSetBrightness(monitor.id, Float(hwValue))
