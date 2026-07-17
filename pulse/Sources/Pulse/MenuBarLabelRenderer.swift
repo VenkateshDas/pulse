@@ -11,10 +11,10 @@ import AppKit
 /// like native menu extras.
 @MainActor
 enum MenuBarLabelRenderer {
-    /// Fully monospaced (not just digits): the value strings are padded to a
-    /// fixed width, and spaces must match digit width or the item jiggles.
-    private static let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
-    private static let iconConfig = NSImage.SymbolConfiguration(pointSize: 10.5, weight: .semibold)
+    /// Native menu-bar look: SF Pro at menu-bar size with tabular digits.
+    /// Value strings pad with figure spaces (digit-width), so no jiggle.
+    private static let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+    private static let iconConfig = NSImage.SymbolConfiguration(pointSize: 11.5, weight: .medium)
     /// Gap between stat groups / between an icon and its value.
     private static let groupGap: CGFloat = 9
     private static let iconGap: CGFloat = 3.5

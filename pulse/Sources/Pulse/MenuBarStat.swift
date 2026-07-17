@@ -40,11 +40,12 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
     }
 
     /// Fixed-width label text — menu bar items must not jiggle as values change.
+    /// Pads with U+2007 figure space (digit-width in tabular-digit fonts).
     func text(for value: Int?) -> String {
-        guard let value else { return "  --" }
-        switch self {
-        case .cpuTemp: return String(format: "%3ld°", value)
-        default: return String(format: "%3ld%%", value)
-        }
+        let figureSpace = "\u{2007}"
+        guard let value else { return figureSpace + figureSpace + "--" }
+        let digits = String(value)
+        let padded = String(repeating: figureSpace, count: max(0, 3 - digits.count)) + digits
+        return padded + (self == .cpuTemp ? "°" : "%")
     }
 }
