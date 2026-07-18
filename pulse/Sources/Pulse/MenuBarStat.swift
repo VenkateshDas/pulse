@@ -44,9 +44,24 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Debug hook to preview colored rendering without draining the battery:
+    /// `defaults write com.pulse.app PulseMenuBarDebugSeverity warning|critical|charging`
+    /// forces every stat's tint. `defaults delete` to clear.
+    private static var debugSeverity: MenuBarSeverity? {
+        switch UserDefaults.standard.string(forKey: "PulseMenuBarDebugSeverity") {
+        case "charging": .charging
+        case "warning": .warning
+        case "critical": .critical
+        default: nil
+        }
+    }
+
     /// Full display state for the menu bar: value plus a state-dependent
     /// symbol and tint. nil when the source is unavailable.
     func reading(from snapshot: SystemSnapshot) -> MenuBarReading? {
+        if let forced = Self.debugSeverity, let value = value(from: snapshot) {
+            return MenuBarReading(value: value, symbol: symbol, severity: forced)
+        }
         guard let value = value(from: snapshot) else { return nil }
         switch self {
         case .cpu:
