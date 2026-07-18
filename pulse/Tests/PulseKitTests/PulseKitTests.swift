@@ -539,7 +539,8 @@ struct PrivilegedOperationTests {
     }
 
     @Test func privilegedTasksCoverThreeOperations() {
-        #expect(OptimizeEngine.privilegedTasks.count == PrivilegedOperation.allCases.count)
+        // clearUpdateDownloads is a Storage action, not an Optimize task.
+        #expect(OptimizeEngine.privilegedTasks.count == 3)
     }
 }
 

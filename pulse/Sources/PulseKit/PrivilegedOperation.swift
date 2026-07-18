@@ -8,12 +8,14 @@ public enum PrivilegedOperation: String, Sendable, CaseIterable {
     case purgeMemory
     case flushNetworkStack
     case rebuildSpotlightIndex
+    case clearUpdateDownloads
 
     public var label: String {
         switch self {
         case .purgeMemory: "Free inactive memory"
         case .flushNetworkStack: "Optimize network stack"
         case .rebuildSpotlightIndex: "Rebuild Spotlight index"
+        case .clearUpdateDownloads: "Delete macOS update downloads"
         }
     }
 
@@ -28,6 +30,12 @@ public enum PrivilegedOperation: String, Sendable, CaseIterable {
                     ("/usr/sbin/arp", ["-a", "-d"])]
         case .rebuildSpotlightIndex:
             return [("/usr/bin/mdutil", ["-E", "/"])]
+        case .clearUpdateDownloads:
+            // Only the download subfolders — index.plist/ProductMetadata.plist
+            // stay so Software Update's bookkeeping remains intact.
+            return [("/usr/bin/find",
+                     ["/Library/Updates", "-mindepth", "1", "-maxdepth", "1",
+                      "-type", "d", "-exec", "/bin/rm", "-rf", "{}", "+"])]
         }
     }
 

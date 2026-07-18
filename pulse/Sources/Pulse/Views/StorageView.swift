@@ -219,8 +219,12 @@ struct StorageView: View {
                 title: "Hidden & system data",
                 subtitle: "Snapshots, purgeable & system files outside these folders",
                 value: "~\(ByteFormat.string(used - listed))",
-                valueColor: Halo.textDim)
+                valueColor: Halo.textDim,
+                delta: storage.hiddenDelta(current: used - listed))
             .help("Folders above sum to \(ByteFormat.string(listed)); used space is \(ByteFormat.string(used)). The difference is APFS snapshots, purgeable space and hidden system data macOS doesn't expose as folders.")
+            if storage.updateDownloadsBytes >= 50_000_000 {
+                updateDownloadsRow
+            }
             // With free space listed too, the column visibly sums to Total.
             pseudoRow(
                 icon: "circle.dashed",
@@ -231,7 +235,32 @@ struct StorageView: View {
         }
     }
 
-    private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color) -> some View {
+    /// Downloaded-but-not-installed macOS/firmware updates (/Library/Updates).
+    /// Apple removed the delete button from System Settings; this restores it.
+    private var updateDownloadsRow: some View {
+        HStack(spacing: 8) {
+            pseudoRow(
+                icon: "arrow.down.circle.dotted",
+                title: "macOS update downloads",
+                subtitle: "Downloaded, not installed — re-downloads on demand",
+                value: ByteFormat.string(storage.updateDownloadsBytes),
+                valueColor: Halo.amber)
+            Button {
+                storage.clearUpdateDownloads()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.flare)
+            }
+            .buttonStyle(.plain)
+            .disabled(storage.isCleaning)
+            .padding(.trailing, 16)
+            .help("Deletes /Library/Updates downloads permanently (admin password required). Software Update re-downloads if you install later.")
+            .accessibilityLabel("Delete macOS update downloads")
+        }
+    }
+
+    private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color, delta: Int64? = nil) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 11))
@@ -243,6 +272,13 @@ struct StorageView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Halo.textDim)
                     Spacer(minLength: 4)
+                    // Same ▲/▼ daily-baseline chip the folder rows show.
+                    if let delta, abs(delta) >= 100_000_000 {
+                        Text("\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(delta >= 0 ? Halo.amber : Halo.pulseGreen)
+                            .help("Changed \(ByteFormat.string(UInt64(abs(delta)))) since the last daily size check")
+                    }
                     Text(value)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(valueColor)

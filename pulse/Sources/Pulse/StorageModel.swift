@@ -39,6 +39,12 @@ final class StorageModel {
     private(set) var rootBaseline: [String: UInt64] = [:]
     private static let rootBaselineKey = "PulseRootFolderBaseline"
     private static let rootBaselineDateKey = "PulseRootFolderBaselineDate"
+    /// Pseudo-path key in the baseline dict for the hidden & system remainder.
+    private static let hiddenBaselineKey = "pulse://hidden"
+
+    /// Size of OS update downloads (subfolders of /Library/Updates) —
+    /// deletable as root; Software Update re-downloads on demand.
+    private(set) var updateDownloadsBytes: UInt64 = 0
 
     // MARK: Growth scan ("where did my free space go")
 
@@ -155,6 +161,13 @@ final class StorageModel {
         return Int64(node.sizeBytes) - Int64(old)
     }
 
+    /// Growth of the hidden & system remainder since the baseline day, given
+    /// its current size (computed by the view from used − listed folders).
+    func hiddenDelta(current: UInt64) -> Int64? {
+        guard let old = rootBaseline[Self.hiddenBaselineKey], old > 0 else { return nil }
+        return Int64(current) - Int64(old)
+    }
+
     /// Once per day, after root sizes finish streaming: persist them so the
     /// next day's Browse can show per-folder growth. In-memory baseline keeps
     /// the earlier day's values for the rest of this session.
@@ -163,9 +176,21 @@ final class StorageModel {
         guard UserDefaults.standard.double(forKey: Self.rootBaselineDateKey) != today,
             let children = navigationPath.first?.children, !children.isEmpty
         else { return }
-        let sizes = Dictionary(
+        var sizes = Dictionary(
             children.filter { $0.sizeBytes > 0 }.map { ($0.path, Int($0.sizeBytes)) },
             uniquingKeysWith: { a, _ in a })
+        // Baseline the hidden remainder too (same math as the view's pseudo
+        // row: used − listed), so its growth chip works like folder chips.
+        let keys: Set<URLResourceKey> = [
+            .volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey,
+        ]
+        if let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys) {
+            let free = UInt64(values.volumeAvailableCapacityForImportantUsage ?? 0)
+            let total = UInt64(values.volumeTotalCapacity ?? 0)
+            let used = total > free ? total - free : 0
+            let listed = children.reduce(UInt64(0)) { $0 + $1.sizeBytes }
+            if used > listed { sizes[Self.hiddenBaselineKey] = Int(used - listed) }
+        }
         UserDefaults.standard.set(sizes, forKey: Self.rootBaselineKey)
         UserDefaults.standard.set(today, forKey: Self.rootBaselineDateKey)
         if rootBaseline.isEmpty { rootBaseline = sizes.mapValues { UInt64($0) } }
@@ -192,6 +217,7 @@ final class StorageModel {
         refreshPurgeable()
         refreshTrashInfo()
         refreshUndoHistory()
+        refreshUpdateDownloads()
         if scanState == .idle { runScan() }
     }
 
@@ -199,7 +225,43 @@ final class StorageModel {
         refreshPurgeable()
         refreshTrashInfo()
         refreshUndoHistory()
+        refreshUpdateDownloads()
         runScan()
+    }
+
+    /// Sums the download subfolders of /Library/Updates (world-readable even
+    /// though root-owned). The two bookkeeping plists there don't count.
+    private func refreshUpdateDownloads() {
+        Task {
+            let bytes = await Task.detached(priority: .background) {
+                let dir = URL(fileURLWithPath: "/Library/Updates")
+                guard let entries = try? FileManager.default.contentsOfDirectory(
+                    at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: [])
+                else { return UInt64(0) }
+                return entries
+                    .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
+                    .reduce(UInt64(0)) { $0 + Self.itemSize($1) }
+            }.value
+            self.updateDownloadsBytes = bytes
+        }
+    }
+
+    /// Deletes the downloaded (not installed) macOS/firmware updates in
+    /// /Library/Updates via an admin prompt. Permanent — root-owned files
+    /// can't go to the Trash — but Software Update re-downloads on demand.
+    func clearUpdateDownloads() {
+        guard !isCleaning else { return }
+        isCleaning = true
+        let freed = updateDownloadsBytes
+        Task {
+            let result = await PrivilegedRunner.run(.clearUpdateDownloads)
+            self.isCleaning = false
+            self.cleanReport = result.success
+                ? "\(ByteFormat.string(freed)) of update downloads deleted"
+                : result.summary
+            self.refreshUpdateDownloads()
+            self.refreshPurgeable()
+        }
     }
 
     func runScan() {
