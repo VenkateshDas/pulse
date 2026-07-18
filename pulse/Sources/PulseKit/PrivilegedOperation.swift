@@ -9,6 +9,7 @@ public enum PrivilegedOperation: String, Sendable, CaseIterable {
     case flushNetworkStack
     case rebuildSpotlightIndex
     case clearUpdateDownloads
+    case thinLocalSnapshots
 
     public var label: String {
         switch self {
@@ -16,6 +17,7 @@ public enum PrivilegedOperation: String, Sendable, CaseIterable {
         case .flushNetworkStack: "Optimize network stack"
         case .rebuildSpotlightIndex: "Rebuild Spotlight index"
         case .clearUpdateDownloads: "Delete macOS update downloads"
+        case .thinLocalSnapshots: "Thin Time Machine snapshots"
         }
     }
 
@@ -36,6 +38,12 @@ public enum PrivilegedOperation: String, Sendable, CaseIterable {
             return [("/usr/bin/find",
                      ["/Library/Updates", "-mindepth", "1", "-maxdepth", "1",
                       "-type", "d", "-exec", "/bin/rm", "-rf", "{}", "+"])]
+        case .thinLocalSnapshots:
+            // Apple's own reclaim path: purge Time Machine local snapshots
+            // down to the requested bytes (huge value = thin them all).
+            // Urgency 4 = most aggressive. os.update snapshots untouched.
+            return [("/usr/bin/tmutil",
+                     ["thinlocalsnapshots", "/", "999999999999999", "4"])]
         }
     }
 

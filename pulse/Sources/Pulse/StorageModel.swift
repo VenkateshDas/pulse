@@ -63,7 +63,9 @@ final class StorageModel {
     /// An os.update APFS snapshot exists — a downloaded macOS update is
     /// staged/prepared, pinning GBs that free themselves after install.
     private(set) var stagedUpdatePinned = false
-    private(set) var localSnapshotCount = 0
+    /// com.apple.TimeMachine snapshots — the one hidden-data slice that IS
+    /// safely reclaimable (tmutil thinlocalsnapshots).
+    private(set) var tmSnapshotCount = 0
 
     // MARK: Growth scan ("where did my free space go")
 
@@ -251,42 +253,54 @@ final class StorageModel {
     }
 
     /// Attributes the hidden remainder: per-volume used bytes of the APFS
-    /// helper volumes (statfs — the same numbers `df` shows) plus APFS
-    /// snapshot state from tmutil. All readable without privileges.
+    /// helper volumes plus APFS snapshot state from tmutil. All readable
+    /// without privileges. Volume sizes come from `df -k` — statfs f_bfree
+    /// is container-wide on APFS, so it can't give per-volume used.
     private func refreshHiddenBreakdown() {
         Task {
-            let comps = await Task.detached(priority: .background) {
-                let volumes: [(path: String, label: String, subtitle: String)] = [
-                    ("/System/Volumes/Preboot", "Boot support (Preboot)",
-                     "Cryptexes, firmware & boot loaders — system-managed"),
-                    ("/System/Volumes/VM", "Swap files (VM)",
-                     "Shrinks after a restart or when memory pressure drops"),
-                    ("/System/Volumes/Update", "Update staging volume",
-                     "Cleared by macOS when updates finish"),
-                ]
-                return volumes.compactMap { vol -> HiddenComponent? in
-                    guard let used = Self.volumeUsedBytes(vol.path), used > 0 else { return nil }
-                    return HiddenComponent(label: vol.label, subtitle: vol.subtitle, bytes: used)
+            let volumes: [(path: String, label: String, subtitle: String)] = [
+                ("/System/Volumes/Preboot", "Boot support (Preboot)",
+                 "Cryptexes, firmware & boot loaders — system-managed"),
+                ("/System/Volumes/VM", "Swap files (VM)",
+                 "Shrinks after a restart or when memory pressure drops"),
+                ("/System/Volumes/Update", "Update staging volume",
+                 "Cleared by macOS when updates finish"),
+            ]
+            var comps: [HiddenComponent] = []
+            if let out = try? await Shell.run("/bin/df", ["-k"] + volumes.map(\.path)), out.ok {
+                // df prints one line per argument, in order, after the header:
+                // "<fs> <1024-blocks> <used> <avail> …"
+                let lines = out.stdout.split(separator: "\n").dropFirst()
+                for (vol, line) in zip(volumes, lines) {
+                    let cols = line.split(separator: " ", omittingEmptySubsequences: true)
+                    guard cols.count > 2, let usedKB = UInt64(cols[2]), usedKB > 0 else { continue }
+                    comps.append(HiddenComponent(
+                        label: vol.label, subtitle: vol.subtitle, bytes: usedKB * 1024))
                 }
-            }.value
+            }
             self.hiddenComponents = comps
             let snap = try? await Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"])
             let names = (snap?.stdout ?? "").split(separator: "\n").filter { $0.hasPrefix("com.apple") }
-            self.localSnapshotCount = names.count
+            self.tmSnapshotCount = names.count { $0.contains("TimeMachine") }
             self.stagedUpdatePinned = names.contains { $0.contains("os.update") }
         }
     }
 
-    /// Per-volume used bytes, `df`-style: statfs f_blocks − f_bfree. Only
-    /// valid when `path` really is that volume's mount point.
-    private nonisolated static func volumeUsedBytes(_ path: String) -> UInt64? {
-        var fs = Darwin.statfs()
-        guard statfs(path, &fs) == 0 else { return nil }
-        let mount = withUnsafeBytes(of: fs.f_mntonname) { raw in
-            String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
+    /// Thins local Time Machine snapshots (Apple's own reclaim command) —
+    /// the safe deletion inside hidden data. os.update snapshots are not
+    /// touched; Time Machine re-creates hourly snapshots while backing up.
+    func thinLocalSnapshots() {
+        guard !isCleaning else { return }
+        isCleaning = true
+        Task {
+            let result = await PrivilegedRunner.run(.thinLocalSnapshots)
+            self.isCleaning = false
+            self.cleanReport = result.success
+                ? "Time Machine snapshots thinned — space returns as purgeable clears"
+                : String(result.summary.split(separator: "\n", maxSplits: 1)[0])
+            self.refreshHiddenBreakdown()
+            self.refreshPurgeable()
         }
-        guard mount == path, fs.f_blocks >= fs.f_bfree else { return nil }
-        return (UInt64(fs.f_blocks) - UInt64(fs.f_bfree)) * UInt64(fs.f_bsize)
     }
 
     /// Sums the download subfolders of /Library/Updates (world-readable even

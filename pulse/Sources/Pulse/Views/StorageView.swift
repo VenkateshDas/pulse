@@ -232,9 +232,6 @@ struct StorageView: View {
             if showHiddenBreakdown {
                 hiddenBreakdownRows
             }
-            if storage.updateDownloadsBytes >= 50_000_000 {
-                updateDownloadsRow
-            }
             // With free space listed too, the column visibly sums to Total.
             pseudoRow(
                 icon: "circle.dashed",
@@ -276,14 +273,38 @@ struct StorageView: View {
                     value: ByteFormat.string(storage.purgeableBytes),
                     valueColor: Halo.amber)
             }
-            if storage.localSnapshotCount > 0 {
-                pseudoRow(
-                    icon: "camera.on.rectangle",
-                    title: "Local APFS snapshots (\(storage.localSnapshotCount))",
-                    subtitle: "Pin recently deleted data — released automatically over time",
-                    value: "—",
-                    valueColor: Halo.textDim)
+            if storage.tmSnapshotCount > 0 {
+                HStack(spacing: 8) {
+                    pseudoRow(
+                        icon: "camera.on.rectangle",
+                        title: "Time Machine snapshots (\(storage.tmSnapshotCount))",
+                        subtitle: "Pin recently deleted data — safe to thin, hourly backups re-create them",
+                        value: "—",
+                        valueColor: Halo.textDim)
+                    Button {
+                        storage.thinLocalSnapshots()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Halo.flare)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(storage.isCleaning)
+                    .padding(.trailing, 16)
+                    .help("Runs Apple's tmutil thinlocalsnapshots (admin password required) — the sanctioned way to purge local Time Machine snapshots. Your actual backups on the backup disk are untouched.")
+                    .accessibilityLabel("Thin Time Machine snapshots")
+                }
             }
+            if storage.updateDownloadsBytes >= 50_000_000 {
+                updateDownloadsRow
+            }
+            // Volumes, snapshots and purgeable overlap each other and the
+            // folder rows — attribution, not arithmetic that sums to the top.
+            Text("Slices overlap — they explain the space, they don't sum to it.")
+                .font(.system(size: 9))
+                .foregroundStyle(Halo.textDim.opacity(0.7))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
         }
         .padding(.leading, 14)
     }
