@@ -1,6 +1,21 @@
 import Foundation
 import PulseKit
 
+/// Tint state for one menu-bar stat. Anything above `.nominal` switches the
+/// label out of template rendering so it can carry color.
+enum MenuBarSeverity: Equatable {
+    case nominal, charging, warning, critical
+}
+
+/// One stat's menu-bar display state: rounded value, state-specific SF
+/// symbol, and tint severity. Equatable so the status item re-renders only
+/// when something visible actually changes.
+struct MenuBarReading: Equatable {
+    let value: Int
+    let symbol: String
+    let severity: MenuBarSeverity
+}
+
 /// Which stat the menu-bar label shows. Raw value persisted in UserDefaults
 /// (key `PulseMenuBarStat`); `.cpu` is the historical default.
 enum MenuBarStat: String, CaseIterable, Identifiable {
@@ -18,7 +33,8 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Menu-bar icon shown next to the value.
+    /// Menu-bar icon shown next to the value; the state-neutral fallback used
+    /// when no reading is available (source missing → "--").
     var symbol: String {
         switch self {
         case .cpu: "waveform.path.ecg"
@@ -26,6 +42,45 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
         case .cpuTemp: "thermometer.medium"
         case .battery: "battery.100percent"
         }
+    }
+
+    /// Full display state for the menu bar: value plus a state-dependent
+    /// symbol and tint. nil when the source is unavailable.
+    func reading(from snapshot: SystemSnapshot) -> MenuBarReading? {
+        guard let value = value(from: snapshot) else { return nil }
+        switch self {
+        case .cpu:
+            return MenuBarReading(
+                value: value, symbol: symbol, severity: Self.loadSeverity(value))
+        case .memory:
+            // No leveled memorychip symbol exists; .fill marks pressure.
+            return MenuBarReading(
+                value: value, symbol: value >= 85 ? "memorychip.fill" : "memorychip",
+                severity: Self.loadSeverity(value))
+        case .cpuTemp:
+            let symbol =
+                value < 60
+                ? "thermometer.low" : value < 80 ? "thermometer.medium" : "thermometer.high"
+            let severity: MenuBarSeverity =
+                value >= 95 ? .critical : value >= 80 ? .warning : .nominal
+            return MenuBarReading(value: value, symbol: symbol, severity: severity)
+        case .battery:
+            if snapshot.battery?.isCharging == true {
+                return MenuBarReading(
+                    value: value, symbol: "battery.100percent.bolt", severity: .charging)
+            }
+            // SF Symbols only ship 0/25/50/75/100 fills; round to nearest.
+            let level = min(100, max(0, (value + 12) / 25 * 25))
+            let severity: MenuBarSeverity =
+                value <= 10 ? .critical : value <= 20 ? .warning : .nominal
+            return MenuBarReading(
+                value: value, symbol: "battery.\(level)percent", severity: severity)
+        }
+    }
+
+    /// Shared load thresholds for CPU % and memory %.
+    private static func loadSeverity(_ percent: Int) -> MenuBarSeverity {
+        percent >= 95 ? .critical : percent >= 85 ? .warning : .nominal
     }
 
     /// Integer for the label; nil when the source is unavailable (no battery

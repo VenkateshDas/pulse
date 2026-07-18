@@ -65,15 +65,16 @@ final class DashboardModel {
             UserDefaults.standard.set(
                 menuBarStats.map(\.rawValue), forKey: Self.menuBarStatsKey)
             // Reflect the switch immediately instead of waiting for the next tick.
-            if let latest { menuBarValues = Self.menuBarValues(menuBarStats, from: latest) }
+            if let latest { menuBarReadings = Self.menuBarReadings(menuBarStats, from: latest) }
         }
     }
     private static let menuBarStatsKey = "PulseMenuBarStats"
-    /// Rounded values for the menu bar label, keyed by stat. Separate property
-    /// so the status item only re-renders when a displayed integer actually
-    /// changes — re-rendering it every sample costs measurable CPU. A missing
-    /// key means the source is unavailable (rendered "--").
-    private(set) var menuBarValues: [MenuBarStat: Int] = [:]
+    /// Display state for the menu bar label, keyed by stat. Separate property
+    /// so the status item only re-renders when something visible (value,
+    /// symbol, tint) actually changes — re-rendering it every sample costs
+    /// measurable CPU. A missing key means the source is unavailable
+    /// (rendered "--").
+    private(set) var menuBarReadings: [MenuBarStat: MenuBarReading] = [:]
 
     private static func loadMenuBarStats() -> [MenuBarStat] {
         let defaults = UserDefaults.standard
@@ -90,14 +91,14 @@ final class DashboardModel {
         return [.cpu]
     }
 
-    private static func menuBarValues(
+    private static func menuBarReadings(
         _ stats: [MenuBarStat], from snapshot: SystemSnapshot
-    ) -> [MenuBarStat: Int] {
-        var values: [MenuBarStat: Int] = [:]
+    ) -> [MenuBarStat: MenuBarReading] {
+        var readings: [MenuBarStat: MenuBarReading] = [:]
         for stat in stats {
-            if let value = stat.value(from: snapshot) { values[stat] = value }
+            if let reading = stat.reading(from: snapshot) { readings[stat] = reading }
         }
-        return values
+        return readings
     }
     /// Feedback from the last alert action ("Sent Quit to Chrome Helper").
     var actionFeedback: String?
@@ -398,9 +399,9 @@ final class DashboardModel {
         lastIngestUptime = snapshot.uptime
         lastIngestDate = snapshot.timestamp
 
-        let values = Self.menuBarValues(menuBarStats, from: snapshot)
-        if values != menuBarValues {
-            menuBarValues = values
+        let readings = Self.menuBarReadings(menuBarStats, from: snapshot)
+        if readings != menuBarReadings {
+            menuBarReadings = readings
         }
         if visibleViews > 0 && !screenLocked {
             publishLatest()

@@ -100,7 +100,7 @@ struct PulseApp: App {
         // native-looking multi-stat rendering in a single button.
         Image(nsImage: MenuBarLabelRenderer.image(
             stats: model.menuBarStats,
-            values: model.menuBarValues,
+            readings: model.menuBarReadings,
             flashSymbol: MenuBarFlash.shared.symbol))
     }
 }
