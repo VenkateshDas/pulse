@@ -212,7 +212,10 @@ struct BatteryHistoryStoreTests {
         let store = BatteryHistoryStore(fileURL: url)
         let old = Date.now.addingTimeInterval(-70 * 24 * 3600)
         store.addTimeOnBattery(3600, at: old)
-        store.addTimeOnBattery(7200, at: .now)
+        // End at 03:00 today so the 2h duration can't span midnight (a
+        // duration ending 00:00–02:00 splits across two day entries).
+        let recent = Calendar.current.startOfDay(for: .now).addingTimeInterval(3 * 3600)
+        store.addTimeOnBattery(7200, at: recent)
 
         let reloaded = BatteryHistoryStore(fileURL: url)
         #expect(reloaded.entries.count == 1)

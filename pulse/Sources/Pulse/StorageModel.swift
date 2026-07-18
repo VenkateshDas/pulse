@@ -39,6 +39,33 @@ final class StorageModel {
     private(set) var rootBaseline: [String: UInt64] = [:]
     private static let rootBaselineKey = "PulseRootFolderBaseline"
     private static let rootBaselineDateKey = "PulseRootFolderBaselineDate"
+    /// Pseudo-path key in the baseline dict for the hidden & system remainder.
+    private static let hiddenBaselineKey = "pulse://hidden"
+
+    /// Size of OS update downloads (subfolders of /Library/Updates) —
+    /// deletable as root; Software Update re-downloads on demand.
+    private(set) var updateDownloadsBytes: UInt64 = 0
+    /// SF_RESTRICTED (SIP) on any download subfolder — deletion is then
+    /// impossible for every process except Apple's softwareupdated, even as
+    /// root, so the UI must not offer a delete that can only fail.
+    private(set) var updateDownloadsRestricted = false
+
+    /// One measurable slice of "Hidden & system data" — a helper volume in
+    /// the APFS container that lives outside every listed root folder.
+    struct HiddenComponent: Identifiable, Equatable, Sendable {
+        var id: String { label }
+        let label: String
+        let subtitle: String
+        let bytes: UInt64
+    }
+
+    private(set) var hiddenComponents: [HiddenComponent] = []
+    /// An os.update APFS snapshot exists — a downloaded macOS update is
+    /// staged/prepared, pinning GBs that free themselves after install.
+    private(set) var stagedUpdatePinned = false
+    /// com.apple.TimeMachine snapshots — the one hidden-data slice that IS
+    /// safely reclaimable (tmutil thinlocalsnapshots).
+    private(set) var tmSnapshotCount = 0
 
     // MARK: Growth scan ("where did my free space go")
 
@@ -155,6 +182,13 @@ final class StorageModel {
         return Int64(node.sizeBytes) - Int64(old)
     }
 
+    /// Growth of the hidden & system remainder since the baseline day, given
+    /// its current size (computed by the view from used − listed folders).
+    func hiddenDelta(current: UInt64) -> Int64? {
+        guard let old = rootBaseline[Self.hiddenBaselineKey], old > 0 else { return nil }
+        return Int64(current) - Int64(old)
+    }
+
     /// Once per day, after root sizes finish streaming: persist them so the
     /// next day's Browse can show per-folder growth. In-memory baseline keeps
     /// the earlier day's values for the rest of this session.
@@ -163,9 +197,21 @@ final class StorageModel {
         guard UserDefaults.standard.double(forKey: Self.rootBaselineDateKey) != today,
             let children = navigationPath.first?.children, !children.isEmpty
         else { return }
-        let sizes = Dictionary(
+        var sizes = Dictionary(
             children.filter { $0.sizeBytes > 0 }.map { ($0.path, Int($0.sizeBytes)) },
             uniquingKeysWith: { a, _ in a })
+        // Baseline the hidden remainder too (same math as the view's pseudo
+        // row: used − listed), so its growth chip works like folder chips.
+        let keys: Set<URLResourceKey> = [
+            .volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey,
+        ]
+        if let values = try? URL(fileURLWithPath: "/").resourceValues(forKeys: keys) {
+            let free = UInt64(values.volumeAvailableCapacityForImportantUsage ?? 0)
+            let total = UInt64(values.volumeTotalCapacity ?? 0)
+            let used = total > free ? total - free : 0
+            let listed = children.reduce(UInt64(0)) { $0 + $1.sizeBytes }
+            if used > listed { sizes[Self.hiddenBaselineKey] = Int(used - listed) }
+        }
         UserDefaults.standard.set(sizes, forKey: Self.rootBaselineKey)
         UserDefaults.standard.set(today, forKey: Self.rootBaselineDateKey)
         if rootBaseline.isEmpty { rootBaseline = sizes.mapValues { UInt64($0) } }
@@ -192,6 +238,8 @@ final class StorageModel {
         refreshPurgeable()
         refreshTrashInfo()
         refreshUndoHistory()
+        refreshUpdateDownloads()
+        refreshHiddenBreakdown()
         if scanState == .idle { runScan() }
     }
 
@@ -199,7 +247,104 @@ final class StorageModel {
         refreshPurgeable()
         refreshTrashInfo()
         refreshUndoHistory()
+        refreshUpdateDownloads()
+        refreshHiddenBreakdown()
         runScan()
+    }
+
+    /// Attributes the hidden remainder: per-volume used bytes of the APFS
+    /// helper volumes plus APFS snapshot state from tmutil. All readable
+    /// without privileges. Volume sizes come from `df -k` — statfs f_bfree
+    /// is container-wide on APFS, so it can't give per-volume used.
+    private func refreshHiddenBreakdown() {
+        Task {
+            let volumes: [(path: String, label: String, subtitle: String)] = [
+                ("/System/Volumes/Preboot", "Boot support (Preboot)",
+                 "Cryptexes, firmware & boot loaders — system-managed"),
+                ("/System/Volumes/VM", "Swap files (VM)",
+                 "Shrinks after a restart or when memory pressure drops"),
+                ("/System/Volumes/Update", "Update staging volume",
+                 "Cleared by macOS when updates finish"),
+            ]
+            var comps: [HiddenComponent] = []
+            if let out = try? await Shell.run("/bin/df", ["-k"] + volumes.map(\.path)), out.ok {
+                // df prints one line per argument, in order, after the header:
+                // "<fs> <1024-blocks> <used> <avail> …"
+                let lines = out.stdout.split(separator: "\n").dropFirst()
+                for (vol, line) in zip(volumes, lines) {
+                    let cols = line.split(separator: " ", omittingEmptySubsequences: true)
+                    guard cols.count > 2, let usedKB = UInt64(cols[2]), usedKB > 0 else { continue }
+                    comps.append(HiddenComponent(
+                        label: vol.label, subtitle: vol.subtitle, bytes: usedKB * 1024))
+                }
+            }
+            self.hiddenComponents = comps
+            let snap = try? await Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"])
+            let names = (snap?.stdout ?? "").split(separator: "\n").filter { $0.hasPrefix("com.apple") }
+            self.tmSnapshotCount = names.count { $0.contains("TimeMachine") }
+            self.stagedUpdatePinned = names.contains { $0.contains("os.update") }
+        }
+    }
+
+    /// Thins local Time Machine snapshots (Apple's own reclaim command) —
+    /// the safe deletion inside hidden data. os.update snapshots are not
+    /// touched; Time Machine re-creates hourly snapshots while backing up.
+    func thinLocalSnapshots() {
+        guard !isCleaning else { return }
+        isCleaning = true
+        Task {
+            let result = await PrivilegedRunner.run(.thinLocalSnapshots)
+            self.isCleaning = false
+            self.cleanReport = result.success
+                ? "Time Machine snapshots thinned — space returns as purgeable clears"
+                : String(result.summary.split(separator: "\n", maxSplits: 1)[0])
+            self.refreshHiddenBreakdown()
+            self.refreshPurgeable()
+        }
+    }
+
+    /// Sums the download subfolders of /Library/Updates (world-readable even
+    /// though root-owned). The two bookkeeping plists there don't count.
+    private func refreshUpdateDownloads() {
+        Task {
+            let (bytes, restricted) = await Task.detached(priority: .background) {
+                let dir = URL(fileURLWithPath: "/Library/Updates")
+                guard let entries = try? FileManager.default.contentsOfDirectory(
+                    at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: [])
+                else { return (UInt64(0), false) }
+                let subdirs = entries.filter {
+                    (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+                }
+                let total = subdirs.reduce(UInt64(0)) { $0 + Self.itemSize($1) }
+                let sipFlagged = subdirs.contains { url in
+                    var st = stat()
+                    return stat(url.path, &st) == 0 && st.st_flags & UInt32(SF_RESTRICTED) != 0
+                }
+                return (total, sipFlagged)
+            }.value
+            self.updateDownloadsBytes = bytes
+            self.updateDownloadsRestricted = restricted
+        }
+    }
+
+    /// Deletes the downloaded (not installed) macOS/firmware updates in
+    /// /Library/Updates via an admin prompt. Permanent — root-owned files
+    /// can't go to the Trash — but Software Update re-downloads on demand.
+    func clearUpdateDownloads() {
+        guard !isCleaning else { return }
+        isCleaning = true
+        let freed = updateDownloadsBytes
+        Task {
+            let result = await PrivilegedRunner.run(.clearUpdateDownloads)
+            self.isCleaning = false
+            // Failure summaries can carry multi-line rm stderr — first line
+            // only; the bottom bar is a status strip, not a log view.
+            self.cleanReport = result.success
+                ? "\(ByteFormat.string(freed)) of update downloads deleted"
+                : String(result.summary.split(separator: "\n", maxSplits: 1)[0])
+            self.refreshUpdateDownloads()
+            self.refreshPurgeable()
+        }
     }
 
     func runScan() {

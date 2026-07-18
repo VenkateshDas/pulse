@@ -18,6 +18,7 @@ struct StorageView: View {
     @State private var previewURL: URL?
     @State private var keyMonitor: Any?
     @State private var usagePathQuery: String = ""
+    @State private var showHiddenBreakdown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -214,13 +215,23 @@ struct StorageView: View {
         let total = model.snapshot?.diskTotalBytes ?? 0
         let used = total > free ? total - free : 0
         if !storage.isStreamingSizes, used > listed, used - listed > 1_000_000_000 {
-            pseudoRow(
-                icon: "eye.slash",
-                title: "Hidden & system data",
-                subtitle: "Snapshots, purgeable & system files outside these folders",
-                value: "~\(ByteFormat.string(used - listed))",
-                valueColor: Halo.textDim)
+            Button {
+                withAnimation(Halo.Motion.snappy) { showHiddenBreakdown.toggle() }
+            } label: {
+                pseudoRow(
+                    icon: showHiddenBreakdown ? "chevron.down" : "eye.slash",
+                    title: "Hidden & system data",
+                    subtitle: "Snapshots, purgeable & system files outside these folders — click for breakdown",
+                    value: "~\(ByteFormat.string(used - listed))",
+                    valueColor: Halo.textDim,
+                    delta: storage.hiddenDelta(current: used - listed))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             .help("Folders above sum to \(ByteFormat.string(listed)); used space is \(ByteFormat.string(used)). The difference is APFS snapshots, purgeable space and hidden system data macOS doesn't expose as folders.")
+            if showHiddenBreakdown {
+                hiddenBreakdownRows
+            }
             // With free space listed too, the column visibly sums to Total.
             pseudoRow(
                 icon: "circle.dashed",
@@ -231,7 +242,107 @@ struct StorageView: View {
         }
     }
 
-    private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color) -> some View {
+    /// What the hidden remainder actually is: helper-volume sizes (df-style
+    /// statfs), staged-update snapshot state and purgeable. Answers "where
+    /// did 20 GB go" without leaving the app.
+    @ViewBuilder
+    private var hiddenBreakdownRows: some View {
+        Group {
+            if storage.stagedUpdatePinned {
+                pseudoRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Staged macOS update",
+                    subtitle: "Prepared & pinned by an os.update snapshot — frees itself after installing (or when macOS discards it)",
+                    value: "pinned",
+                    valueColor: Halo.amber)
+                .help("macOS prepared an update and pinned the pre-update state in APFS snapshots. This can hold 10–25 GB. Installing the update (or letting macOS expire it) releases the space — nothing can delete it manually.")
+            }
+            ForEach(storage.hiddenComponents) { comp in
+                pseudoRow(
+                    icon: "internaldrive",
+                    title: comp.label,
+                    subtitle: comp.subtitle,
+                    value: ByteFormat.string(comp.bytes),
+                    valueColor: Halo.textDim)
+            }
+            if storage.purgeableBytes > 0 {
+                pseudoRow(
+                    icon: "sparkles",
+                    title: "Purgeable space",
+                    subtitle: "Caches & snapshots macOS reclaims automatically when needed",
+                    value: ByteFormat.string(storage.purgeableBytes),
+                    valueColor: Halo.amber)
+            }
+            if storage.tmSnapshotCount > 0 {
+                HStack(spacing: 8) {
+                    pseudoRow(
+                        icon: "camera.on.rectangle",
+                        title: "Time Machine snapshots (\(storage.tmSnapshotCount))",
+                        subtitle: "Pin recently deleted data — safe to thin, hourly backups re-create them",
+                        value: "—",
+                        valueColor: Halo.textDim)
+                    Button {
+                        storage.thinLocalSnapshots()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Halo.flare)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(storage.isCleaning)
+                    .padding(.trailing, 16)
+                    .help("Runs Apple's tmutil thinlocalsnapshots (admin password required) — the sanctioned way to purge local Time Machine snapshots. Your actual backups on the backup disk are untouched.")
+                    .accessibilityLabel("Thin Time Machine snapshots")
+                }
+            }
+            if storage.updateDownloadsBytes >= 50_000_000 {
+                updateDownloadsRow
+            }
+            // Volumes, snapshots and purgeable overlap each other and the
+            // folder rows — attribution, not arithmetic that sums to the top.
+            Text("Slices overlap — they explain the space, they don't sum to it.")
+                .font(.system(size: 9))
+                .foregroundStyle(Halo.textDim.opacity(0.7))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+        }
+        .padding(.leading, 14)
+    }
+
+    /// Downloaded-but-not-installed macOS/firmware updates (/Library/Updates).
+    /// Apple removed the delete button from System Settings; this restores it.
+    private var updateDownloadsRow: some View {
+        HStack(spacing: 8) {
+            pseudoRow(
+                icon: "arrow.down.circle.dotted",
+                title: "macOS update downloads",
+                subtitle: "Downloaded, not installed — re-downloads on demand",
+                value: ByteFormat.string(storage.updateDownloadsBytes),
+                valueColor: Halo.amber)
+            if storage.updateDownloadsRestricted {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Halo.textDim)
+                    .padding(.trailing, 16)
+                    .help("SIP-protected — no app (even with an admin password) can delete these. macOS removes them itself after the update installs or expires.")
+            } else {
+                Button {
+                    storage.clearUpdateDownloads()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.flare)
+                }
+                .buttonStyle(.plain)
+                .disabled(storage.isCleaning)
+                .padding(.trailing, 16)
+                .help("Deletes /Library/Updates downloads permanently (admin password required). Software Update re-downloads if you install later.")
+                .accessibilityLabel("Delete macOS update downloads")
+            }
+        }
+    }
+
+    private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color, delta: Int64? = nil) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 11))
@@ -243,6 +354,13 @@ struct StorageView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Halo.textDim)
                     Spacer(minLength: 4)
+                    // Same ▲/▼ daily-baseline chip the folder rows show.
+                    if let delta, abs(delta) >= 100_000_000 {
+                        Text("\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(delta >= 0 ? Halo.amber : Halo.pulseGreen)
+                            .help("Changed \(ByteFormat.string(UInt64(abs(delta)))) since the last daily size check")
+                    }
                     Text(value)
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(valueColor)
