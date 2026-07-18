@@ -46,13 +46,20 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
 
     /// Debug hook to preview colored rendering without draining the battery:
     /// `defaults write com.pulse.app PulseMenuBarDebugSeverity warning|critical|charging`
-    /// forces every stat's tint. `defaults delete` to clear.
-    private static var debugSeverity: MenuBarSeverity? {
-        switch UserDefaults.standard.string(forKey: "PulseMenuBarDebugSeverity") {
-        case "charging": .charging
-        case "warning": .warning
-        case "critical": .critical
-        default: nil
+    /// forces every stat's tint; prefix with a stat to target one
+    /// (`battery:warning` tints only the battery group, the realistic case).
+    /// `defaults delete` to clear.
+    private func debugSeverity() -> MenuBarSeverity? {
+        guard let raw = UserDefaults.standard.string(forKey: "PulseMenuBarDebugSeverity")
+        else { return nil }
+        let parts = raw.split(separator: ":")
+        let severity = String(parts.last ?? "")
+        if parts.count == 2, parts[0] != Substring(rawValue) { return nil }
+        switch severity {
+        case "charging": return .charging
+        case "warning": return .warning
+        case "critical": return .critical
+        default: return nil
         }
     }
 
@@ -61,7 +68,7 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
     func reading(from snapshot: SystemSnapshot) -> MenuBarReading? {
         guard var reading = liveReading(from: snapshot) else { return nil }
         // Debug tint override colors the label but keeps the live symbol.
-        if let forced = Self.debugSeverity {
+        if let forced = debugSeverity() {
             reading = MenuBarReading(
                 value: reading.value, symbol: reading.symbol, severity: forced)
         }
