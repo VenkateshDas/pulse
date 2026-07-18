@@ -59,9 +59,16 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
     /// Full display state for the menu bar: value plus a state-dependent
     /// symbol and tint. nil when the source is unavailable.
     func reading(from snapshot: SystemSnapshot) -> MenuBarReading? {
-        if let forced = Self.debugSeverity, let value = value(from: snapshot) {
-            return MenuBarReading(value: value, symbol: symbol, severity: forced)
+        guard var reading = liveReading(from: snapshot) else { return nil }
+        // Debug tint override colors the label but keeps the live symbol.
+        if let forced = Self.debugSeverity {
+            reading = MenuBarReading(
+                value: reading.value, symbol: reading.symbol, severity: forced)
         }
+        return reading
+    }
+
+    private func liveReading(from snapshot: SystemSnapshot) -> MenuBarReading? {
         guard let value = value(from: snapshot) else { return nil }
         switch self {
         case .cpu:
