@@ -91,16 +91,30 @@ struct PulseApp: App {
     }
 
     private var menuBarLabel: some View {
-        // Static-width label: menu bar items must not jiggle as values change.
-        // Reads only the gated values dictionary, so it re-renders only when
-        // a displayed value actually changes, not on every sample.
-        //
-        // Drawn into ONE template NSImage (see MenuBarLabelRenderer):
-        // MenuBarExtra flattens its label, so this is the only way to get
-        // native-looking multi-stat rendering in a single button.
+        MenuBarLabel(model: model)
+    }
+}
+
+/// Static-width label: menu bar items must not jiggle as values change.
+/// Reads only the gated readings dictionary, so it re-renders only when
+/// something displayed actually changes, not on every sample.
+///
+/// Drawn into ONE NSImage (see MenuBarLabelRenderer): MenuBarExtra flattens
+/// its label, so this is the only way to get native-looking multi-stat
+/// rendering in a single button.
+private struct MenuBarLabel: View {
+    let model: DashboardModel
+    // Colored (non-template) renders bake labelColor at draw time; template
+    // renders are re-tinted by macOS for free. Depending on colorScheme
+    // forces a rebuild on Light/Dark flips so a colored label can't keep a
+    // stale neutral color.
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
         Image(nsImage: MenuBarLabelRenderer.image(
             stats: model.menuBarStats,
-            values: model.menuBarValues,
+            readings: model.menuBarReadings,
             flashSymbol: MenuBarFlash.shared.symbol))
+            .id(colorScheme)
     }
 }
