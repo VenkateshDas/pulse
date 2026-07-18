@@ -35,11 +35,11 @@ private func makeBattery(charge: Int, isCharging: Bool = false) -> BatteryHealth
 
 @Suite("MenuBar battery reading")
 struct MenuBarBatteryReadingTests {
-    @Test func chargingShowsBoltAndGreen() {
+    @Test func chargingKeepsFillLevelAndTintsGreen() {
         let reading = MenuBarStat.battery.reading(
             from: makeSnapshot(battery: makeBattery(charge: 55, isCharging: true)))
         #expect(reading == MenuBarReading(
-            value: 55, symbol: "battery.100percent.bolt", severity: .charging))
+            value: 55, symbol: "battery.50percent", severity: .charging))
     }
 
     @Test func fillTracksChargeLevel() {
@@ -81,9 +81,11 @@ struct MenuBarTempReadingTests {
         #expect(reading(70) == MenuBarReading(
             value: 70, symbol: "thermometer.medium", severity: .nominal))
         #expect(reading(85) == MenuBarReading(
-            value: 85, symbol: "thermometer.high", severity: .warning))
-        #expect(reading(96) == MenuBarReading(
-            value: 96, symbol: "thermometer.high", severity: .critical))
+            value: 85, symbol: "thermometer.high", severity: .nominal))
+        #expect(reading(92) == MenuBarReading(
+            value: 92, symbol: "thermometer.high", severity: .warning))
+        #expect(reading(101) == MenuBarReading(
+            value: 101, symbol: "thermometer.high", severity: .critical))
         #expect(reading(59.6)?.symbol == "thermometer.medium", "rounds to 60 first")
     }
 

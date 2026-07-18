@@ -44,35 +44,40 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Debug hook to preview colored rendering without draining the battery:
-    /// `defaults write com.pulse.app PulseMenuBarDebugSeverity warning|critical|charging`
-    /// forces every stat's tint; prefix with a stat to target one
-    /// (`battery:warning` tints only the battery group, the realistic case).
-    /// `defaults delete` to clear.
-    private func debugSeverity() -> MenuBarSeverity? {
-        guard let raw = UserDefaults.standard.string(forKey: "PulseMenuBarDebugSeverity")
-        else { return nil }
-        let parts = raw.split(separator: ":")
-        let severity = String(parts.last ?? "")
-        if parts.count == 2, parts[0] != Substring(rawValue) { return nil }
-        switch severity {
-        case "charging": return .charging
-        case "warning": return .warning
-        case "critical": return .critical
-        default: return nil
+    #if DEBUG
+        /// Debug hook to preview colored rendering without draining the battery:
+        /// `defaults write com.pulse.app PulseMenuBarDebugSeverity warning|critical|charging`
+        /// forces every stat's tint; prefix with a stat to target one
+        /// (`battery:warning` tints only the battery group, the realistic case).
+        /// `defaults delete` to clear. Debug builds only.
+        private func debugSeverity() -> MenuBarSeverity? {
+            guard let raw = UserDefaults.standard.string(forKey: "PulseMenuBarDebugSeverity")
+            else { return nil }
+            // Keep empty components so "battery:" and "a:b:warning" are
+            // rejected instead of silently mis-targeting.
+            let parts = raw.split(separator: ":", omittingEmptySubsequences: false)
+            guard parts.count <= 2 else { return nil }
+            if parts.count == 2, parts[0] != Substring(rawValue) { return nil }
+            switch parts.last.map(String.init) {
+            case "charging": return .charging
+            case "warning": return .warning
+            case "critical": return .critical
+            default: return nil
+            }
         }
-    }
+    #endif
 
     /// Full display state for the menu bar: value plus a state-dependent
     /// symbol and tint. nil when the source is unavailable.
     func reading(from snapshot: SystemSnapshot) -> MenuBarReading? {
-        guard var reading = liveReading(from: snapshot) else { return nil }
-        // Debug tint override colors the label but keeps the live symbol.
-        if let forced = debugSeverity() {
-            reading = MenuBarReading(
-                value: reading.value, symbol: reading.symbol, severity: forced)
-        }
-        return reading
+        guard let live = liveReading(from: snapshot) else { return nil }
+        #if DEBUG
+            // Debug tint override colors the label but keeps the live symbol.
+            if let forced = debugSeverity() {
+                return MenuBarReading(value: live.value, symbol: live.symbol, severity: forced)
+            }
+        #endif
+        return live
     }
 
     private func liveReading(from snapshot: SystemSnapshot) -> MenuBarReading? {
@@ -90,24 +95,33 @@ enum MenuBarStat: String, CaseIterable, Identifiable {
             let symbol =
                 value < 60
                 ? "thermometer.low" : value < 80 ? "thermometer.medium" : "thermometer.high"
+            // Apple Silicon die temps sit at 90–105° under ordinary sustained
+            // load; tint only when the SoC is genuinely near its limit.
             let severity: MenuBarSeverity =
-                value >= 95 ? .critical : value >= 80 ? .warning : .nominal
+                value >= 100 ? .critical : value >= 90 ? .warning : .nominal
             return MenuBarReading(value: value, symbol: symbol, severity: severity)
         case .battery:
-            if snapshot.battery?.isCharging == true {
-                return MenuBarReading(
-                    value: value, symbol: "battery.100percent.bolt", severity: .charging)
-            }
             // SF Symbols only ship 0/25/50/75/100 fills; round to nearest.
             let level = min(100, max(0, (value + 12) / 25 * 25))
+            let symbol = "battery.\(level)percent"
+            // Charging: keep the true fill level (no leveled .bolt symbols
+            // exist) and let the green tint carry the "charging" signal. The
+            // colored period is bounded — IOKit reports IsCharging=false once
+            // full or held by Optimized Charging.
+            if snapshot.battery?.isCharging == true {
+                return MenuBarReading(value: value, symbol: symbol, severity: .charging)
+            }
             let severity: MenuBarSeverity =
-                value <= 10 ? .critical : value <= 20 ? .warning : .nominal
-            return MenuBarReading(
-                value: value, symbol: "battery.\(level)percent", severity: severity)
+                value <= AlertsEngine.batteryLowThreshold
+                ? .critical : value <= 20 ? .warning : .nominal
+            return MenuBarReading(value: value, symbol: symbol, severity: severity)
         }
     }
 
-    /// Shared load thresholds for CPU % and memory %.
+    /// Shared tint thresholds for CPU % and memory %. Deliberately quieter
+    /// than the dashboard's `Halo.statusColor` bands (60/85): the menu bar is
+    /// always visible, so it colors only when action is likely needed, while
+    /// the dashboard rings grade continuously.
     private static func loadSeverity(_ percent: Int) -> MenuBarSeverity {
         percent >= 95 ? .critical : percent >= 85 ? .warning : .nominal
     }

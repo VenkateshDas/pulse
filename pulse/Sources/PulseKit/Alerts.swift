@@ -42,8 +42,9 @@ public enum AlertsEngine {
     static let heavySwapThreshold: UInt64 = 4_000_000_000
     /// Apple flags a battery for service below this maximum-capacity ratio.
     static let batteryDegradedThreshold = 80
-    /// Charge level (on battery) that warrants a low-battery nudge.
-    static let batteryLowThreshold = 10
+    /// Charge level (on battery) that warrants a low-battery nudge. Public:
+    /// the menu-bar label's critical tint keys off the same policy.
+    public static let batteryLowThreshold = 10
 
     /// Processes that legitimately hold sleep assertions all day.
     static let sleepAssertionAllowlist: Set<String> = [

@@ -27,6 +27,9 @@ enum MenuBarLabelRenderer {
     private static let iconGap: CGFloat = 3.5
     private static let height: CGFloat = 17
 
+    /// Deliberately system colors, not the themeable `Halo` palette: the menu
+    /// bar sits among native extras (battery red, Time Machine, etc.), so it
+    /// matches the OS vocabulary rather than the in-app theme.
     private static func tint(for severity: MenuBarSeverity) -> NSColor? {
         switch severity {
         case .nominal: nil
@@ -36,43 +39,58 @@ enum MenuBarLabelRenderer {
         }
     }
 
+    /// One stat's drawable parts. Icon is folded in so nothing has to stay
+    /// index-aligned across loops.
+    private struct Group {
+        let icon: NSImage?
+        let text: NSString
+        let textSize: CGSize
+        /// nil = neutral (template black / labelColor in colored mode).
+        let tint: NSColor?
+    }
+
     static func image(
         stats: [MenuBarStat], readings: [MenuBarStat: MenuBarReading], flashSymbol: String?
     ) -> NSImage {
-        var groups:
-            [(symbol: String, label: String, text: NSString, textSize: CGSize, tint: NSColor?)] = []
+        // Pass 1: symbols + tints (tint decides the rendering mode, which
+        // pass 2 needs to build the icons).
         let measureAttrs: [NSAttributedString.Key: Any] = [.font: font]
-        for (index, stat) in stats.enumerated() {
-            let reading = readings[stat]
+        let parts = stats.enumerated().map { index, stat in
             // Action feedback: MenuBarFlash briefly swaps the leading icon to
             // the triggered action's symbol, then reverts.
+            let reading = readings[stat]
             let symbol =
                 index == 0
                 ? (flashSymbol ?? reading?.symbol ?? stat.symbol)
                 : (reading?.symbol ?? stat.symbol)
-            let text = stat.text(for: reading?.value) as NSString
-            groups.append(
-                (symbol, stat.label, text, text.size(withAttributes: measureAttrs),
-                 tint(for: reading?.severity ?? .nominal)))
+            return (
+                symbol: symbol, label: stat.label,
+                text: stat.text(for: reading?.value) as NSString,
+                tint: tint(for: reading?.severity ?? .nominal))
         }
-        let colored = groups.contains { $0.tint != nil }
+        let colored = parts.contains { $0.tint != nil }
 
-        var icons: [NSImage?] = []
-        var width: CGFloat = 0
-        for (index, group) in groups.enumerated() {
+        // Pass 2: build each group's icon in place.
+        let groups = parts.map { part in
             // Colored mode paints glyphs via palette configuration; template
             // mode leaves them black and lets macOS tint the whole image.
             var config = iconConfig
             if colored {
-                config = config.applying(
-                    .init(paletteColors: [group.tint ?? .labelColor]))
+                config = config.applying(.init(paletteColors: [part.tint ?? .labelColor]))
             }
-            let icon = NSImage(
-                systemSymbolName: group.symbol, accessibilityDescription: group.label)?
-                .withSymbolConfiguration(config)
-            icons.append(icon)
+            return Group(
+                icon: NSImage(
+                    systemSymbolName: part.symbol, accessibilityDescription: part.label)?
+                    .withSymbolConfiguration(config),
+                text: part.text,
+                textSize: part.text.size(withAttributes: measureAttrs),
+                tint: part.tint)
+        }
+
+        var width: CGFloat = 0
+        for (index, group) in groups.enumerated() {
             if index > 0 { width += groupGap }
-            if let icon { width += icon.size.width + iconGap }
+            if let icon = group.icon { width += icon.size.width + iconGap }
             width += group.textSize.width
         }
         width = ceil(max(width, 1))
@@ -83,7 +101,7 @@ enum MenuBarLabelRenderer {
             var x: CGFloat = 0
             for (index, group) in groups.enumerated() {
                 if index > 0 { x += groupGap }
-                if let icon = icons[index] {
+                if let icon = group.icon {
                     let iconY = ((height - icon.size.height) / 2).rounded()
                     // Template mode: slightly dimmer than the digits (template
                     // = alpha only). Colored mode: palette color as-is.
