@@ -245,18 +245,26 @@ struct StorageView: View {
                 subtitle: "Downloaded, not installed — re-downloads on demand",
                 value: ByteFormat.string(storage.updateDownloadsBytes),
                 valueColor: Halo.amber)
-            Button {
-                storage.clearUpdateDownloads()
-            } label: {
-                Image(systemName: "trash")
+            if storage.updateDownloadsRestricted {
+                Image(systemName: "lock.fill")
                     .font(.system(size: 10))
-                    .foregroundStyle(Halo.flare)
+                    .foregroundStyle(Halo.textDim)
+                    .padding(.trailing, 16)
+                    .help("SIP-protected — no app (even with an admin password) can delete these. macOS removes them itself after the update installs or expires.")
+            } else {
+                Button {
+                    storage.clearUpdateDownloads()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.flare)
+                }
+                .buttonStyle(.plain)
+                .disabled(storage.isCleaning)
+                .padding(.trailing, 16)
+                .help("Deletes /Library/Updates downloads permanently (admin password required). Software Update re-downloads if you install later.")
+                .accessibilityLabel("Delete macOS update downloads")
             }
-            .buttonStyle(.plain)
-            .disabled(storage.isCleaning)
-            .padding(.trailing, 16)
-            .help("Deletes /Library/Updates downloads permanently (admin password required). Software Update re-downloads if you install later.")
-            .accessibilityLabel("Delete macOS update downloads")
         }
     }
 

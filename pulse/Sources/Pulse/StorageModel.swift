@@ -45,6 +45,10 @@ final class StorageModel {
     /// Size of OS update downloads (subfolders of /Library/Updates) —
     /// deletable as root; Software Update re-downloads on demand.
     private(set) var updateDownloadsBytes: UInt64 = 0
+    /// SF_RESTRICTED (SIP) on any download subfolder — deletion is then
+    /// impossible for every process except Apple's softwareupdated, even as
+    /// root, so the UI must not offer a delete that can only fail.
+    private(set) var updateDownloadsRestricted = false
 
     // MARK: Growth scan ("where did my free space go")
 
@@ -233,16 +237,23 @@ final class StorageModel {
     /// though root-owned). The two bookkeeping plists there don't count.
     private func refreshUpdateDownloads() {
         Task {
-            let bytes = await Task.detached(priority: .background) {
+            let (bytes, restricted) = await Task.detached(priority: .background) {
                 let dir = URL(fileURLWithPath: "/Library/Updates")
                 guard let entries = try? FileManager.default.contentsOfDirectory(
                     at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: [])
-                else { return UInt64(0) }
-                return entries
-                    .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true }
-                    .reduce(UInt64(0)) { $0 + Self.itemSize($1) }
+                else { return (UInt64(0), false) }
+                let subdirs = entries.filter {
+                    (try? $0.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+                }
+                let total = subdirs.reduce(UInt64(0)) { $0 + Self.itemSize($1) }
+                let sipFlagged = subdirs.contains { url in
+                    var st = stat()
+                    return stat(url.path, &st) == 0 && st.st_flags & UInt32(SF_RESTRICTED) != 0
+                }
+                return (total, sipFlagged)
             }.value
             self.updateDownloadsBytes = bytes
+            self.updateDownloadsRestricted = restricted
         }
     }
 
@@ -256,9 +267,11 @@ final class StorageModel {
         Task {
             let result = await PrivilegedRunner.run(.clearUpdateDownloads)
             self.isCleaning = false
+            // Failure summaries can carry multi-line rm stderr — first line
+            // only; the bottom bar is a status strip, not a log view.
             self.cleanReport = result.success
                 ? "\(ByteFormat.string(freed)) of update downloads deleted"
-                : result.summary
+                : String(result.summary.split(separator: "\n", maxSplits: 1)[0])
             self.refreshUpdateDownloads()
             self.refreshPurgeable()
         }
