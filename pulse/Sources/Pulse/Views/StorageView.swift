@@ -18,6 +18,7 @@ struct StorageView: View {
     @State private var previewURL: URL?
     @State private var keyMonitor: Any?
     @State private var usagePathQuery: String = ""
+    @State private var showHiddenBreakdown = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -214,14 +215,23 @@ struct StorageView: View {
         let total = model.snapshot?.diskTotalBytes ?? 0
         let used = total > free ? total - free : 0
         if !storage.isStreamingSizes, used > listed, used - listed > 1_000_000_000 {
-            pseudoRow(
-                icon: "eye.slash",
-                title: "Hidden & system data",
-                subtitle: "Snapshots, purgeable & system files outside these folders",
-                value: "~\(ByteFormat.string(used - listed))",
-                valueColor: Halo.textDim,
-                delta: storage.hiddenDelta(current: used - listed))
+            Button {
+                withAnimation(Halo.Motion.snappy) { showHiddenBreakdown.toggle() }
+            } label: {
+                pseudoRow(
+                    icon: showHiddenBreakdown ? "chevron.down" : "eye.slash",
+                    title: "Hidden & system data",
+                    subtitle: "Snapshots, purgeable & system files outside these folders — click for breakdown",
+                    value: "~\(ByteFormat.string(used - listed))",
+                    valueColor: Halo.textDim,
+                    delta: storage.hiddenDelta(current: used - listed))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             .help("Folders above sum to \(ByteFormat.string(listed)); used space is \(ByteFormat.string(used)). The difference is APFS snapshots, purgeable space and hidden system data macOS doesn't expose as folders.")
+            if showHiddenBreakdown {
+                hiddenBreakdownRows
+            }
             if storage.updateDownloadsBytes >= 50_000_000 {
                 updateDownloadsRow
             }
@@ -233,6 +243,49 @@ struct StorageView: View {
                 value: ByteFormat.string(free),
                 valueColor: Halo.pulseGreen)
         }
+    }
+
+    /// What the hidden remainder actually is: helper-volume sizes (df-style
+    /// statfs), staged-update snapshot state and purgeable. Answers "where
+    /// did 20 GB go" without leaving the app.
+    @ViewBuilder
+    private var hiddenBreakdownRows: some View {
+        Group {
+            if storage.stagedUpdatePinned {
+                pseudoRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "Staged macOS update",
+                    subtitle: "Prepared & pinned by an os.update snapshot — frees itself after installing (or when macOS discards it)",
+                    value: "pinned",
+                    valueColor: Halo.amber)
+                .help("macOS prepared an update and pinned the pre-update state in APFS snapshots. This can hold 10–25 GB. Installing the update (or letting macOS expire it) releases the space — nothing can delete it manually.")
+            }
+            ForEach(storage.hiddenComponents) { comp in
+                pseudoRow(
+                    icon: "internaldrive",
+                    title: comp.label,
+                    subtitle: comp.subtitle,
+                    value: ByteFormat.string(comp.bytes),
+                    valueColor: Halo.textDim)
+            }
+            if storage.purgeableBytes > 0 {
+                pseudoRow(
+                    icon: "sparkles",
+                    title: "Purgeable space",
+                    subtitle: "Caches & snapshots macOS reclaims automatically when needed",
+                    value: ByteFormat.string(storage.purgeableBytes),
+                    valueColor: Halo.amber)
+            }
+            if storage.localSnapshotCount > 0 {
+                pseudoRow(
+                    icon: "camera.on.rectangle",
+                    title: "Local APFS snapshots (\(storage.localSnapshotCount))",
+                    subtitle: "Pin recently deleted data — released automatically over time",
+                    value: "—",
+                    valueColor: Halo.textDim)
+            }
+        }
+        .padding(.leading, 14)
     }
 
     /// Downloaded-but-not-installed macOS/firmware updates (/Library/Updates).

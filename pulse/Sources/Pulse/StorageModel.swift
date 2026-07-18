@@ -50,6 +50,21 @@ final class StorageModel {
     /// root, so the UI must not offer a delete that can only fail.
     private(set) var updateDownloadsRestricted = false
 
+    /// One measurable slice of "Hidden & system data" — a helper volume in
+    /// the APFS container that lives outside every listed root folder.
+    struct HiddenComponent: Identifiable, Equatable, Sendable {
+        var id: String { label }
+        let label: String
+        let subtitle: String
+        let bytes: UInt64
+    }
+
+    private(set) var hiddenComponents: [HiddenComponent] = []
+    /// An os.update APFS snapshot exists — a downloaded macOS update is
+    /// staged/prepared, pinning GBs that free themselves after install.
+    private(set) var stagedUpdatePinned = false
+    private(set) var localSnapshotCount = 0
+
     // MARK: Growth scan ("where did my free space go")
 
     private(set) var growthReport: GrowthReport?
@@ -222,6 +237,7 @@ final class StorageModel {
         refreshTrashInfo()
         refreshUndoHistory()
         refreshUpdateDownloads()
+        refreshHiddenBreakdown()
         if scanState == .idle { runScan() }
     }
 
@@ -230,7 +246,47 @@ final class StorageModel {
         refreshTrashInfo()
         refreshUndoHistory()
         refreshUpdateDownloads()
+        refreshHiddenBreakdown()
         runScan()
+    }
+
+    /// Attributes the hidden remainder: per-volume used bytes of the APFS
+    /// helper volumes (statfs — the same numbers `df` shows) plus APFS
+    /// snapshot state from tmutil. All readable without privileges.
+    private func refreshHiddenBreakdown() {
+        Task {
+            let comps = await Task.detached(priority: .background) {
+                let volumes: [(path: String, label: String, subtitle: String)] = [
+                    ("/System/Volumes/Preboot", "Boot support (Preboot)",
+                     "Cryptexes, firmware & boot loaders — system-managed"),
+                    ("/System/Volumes/VM", "Swap files (VM)",
+                     "Shrinks after a restart or when memory pressure drops"),
+                    ("/System/Volumes/Update", "Update staging volume",
+                     "Cleared by macOS when updates finish"),
+                ]
+                return volumes.compactMap { vol -> HiddenComponent? in
+                    guard let used = Self.volumeUsedBytes(vol.path), used > 0 else { return nil }
+                    return HiddenComponent(label: vol.label, subtitle: vol.subtitle, bytes: used)
+                }
+            }.value
+            self.hiddenComponents = comps
+            let snap = try? await Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"])
+            let names = (snap?.stdout ?? "").split(separator: "\n").filter { $0.hasPrefix("com.apple") }
+            self.localSnapshotCount = names.count
+            self.stagedUpdatePinned = names.contains { $0.contains("os.update") }
+        }
+    }
+
+    /// Per-volume used bytes, `df`-style: statfs f_blocks − f_bfree. Only
+    /// valid when `path` really is that volume's mount point.
+    private nonisolated static func volumeUsedBytes(_ path: String) -> UInt64? {
+        var fs = Darwin.statfs()
+        guard statfs(path, &fs) == 0 else { return nil }
+        let mount = withUnsafeBytes(of: fs.f_mntonname) { raw in
+            String(cString: raw.bindMemory(to: CChar.self).baseAddress!)
+        }
+        guard mount == path, fs.f_blocks >= fs.f_bfree else { return nil }
+        return (UInt64(fs.f_blocks) - UInt64(fs.f_bfree)) * UInt64(fs.f_bsize)
     }
 
     /// Sums the download subfolders of /Library/Updates (world-readable even
