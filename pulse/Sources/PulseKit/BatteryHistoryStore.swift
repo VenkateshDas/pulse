@@ -299,7 +299,30 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
     var lastCharge: Int?
     var lastBatteryDate: Date?
     var lastBatteryCharge: Int?
+    var acStart: Date?
+    var acStartCharge: Int?
+    var lastACDate: Date?
+    var lastACCharge: Int?
     var sessions: [BatterySession] = []
+
+    // A plug-in only counts as a charge session when it actually put charge
+    // back — a top-off blip or a full-battery AC stretch isn't worth a row.
+    func closeCharge(at end: Date, endCharge: Int?) {
+        guard let start = acStart else { return }
+        defer { acStart = nil; acStartCharge = nil }
+        let duration = end.timeIntervalSince(start)
+        guard duration >= minSessionSeconds, duration <= maxSessionSeconds else { return }
+        // Unlike discharge, never fall back to 0 for an unknown start charge —
+        // that fabricates a huge phantom gain from a truncated log.
+        guard let startC = acStartCharge else { return }
+        let endC = endCharge ?? startC
+        guard endC - startC >= 2 else { return }
+        sessions.append(
+            BatterySession(
+                startedAt: start, endedAt: end,
+                startCharge: startC, endCharge: endC,
+                source: .backfill, kind: .charge))
+    }
 
     func close(at end: Date, endCharge: Int?) {
         guard let start = sessionStart else { return }
@@ -339,6 +362,7 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
 
         let lower = line.lowercased()
         if lower.contains("using batt") {
+            closeCharge(at: date, endCharge: lastCharge)
             if sessionStart == nil {
                 sessionStart = date
                 sessionStartCharge = lastCharge
@@ -347,6 +371,12 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
             lastBatteryCharge = lastCharge
         } else if lower.contains("using ac") {
             close(at: date, endCharge: lastCharge)
+            if acStart == nil {
+                acStart = date
+                acStartCharge = lastCharge
+            }
+            lastACDate = date
+            lastACCharge = lastCharge
         }
     }
 
@@ -354,6 +384,11 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
     // sample. A live session, if any, will supersede this on merge.
     if sessionStart != nil {
         close(at: lastBatteryDate ?? Date(), endCharge: lastBatteryCharge)
+    }
+    // Log ends on AC: close the charge span at the last AC sample; a live
+    // charge session, if any, supersedes this on merge.
+    if acStart != nil {
+        closeCharge(at: lastACDate ?? Date(), endCharge: lastACCharge)
     }
     return sessions
 }

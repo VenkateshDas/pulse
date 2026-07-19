@@ -40,6 +40,35 @@ struct BatterySessionStoreTests {
         #expect(BatterySessionStore.sanitized(phantom) == nil)
     }
 
+    @Test func closedChargeSessionWithoutAppsSurvivesSanitation() {
+        // Charge sessions never carry app samples — the no-apps phantom rule
+        // must not eat them.
+        let charge = BatterySession(
+            startedAt: t0, endedAt: t0.addingTimeInterval(2 * 3600),
+            startCharge: 40, endCharge: 95, kind: .charge)
+        #expect(BatterySessionStore.sanitized(charge) != nil)
+    }
+
+    @Test func chargeSessionLifecycle() {
+        let s = store(now: t0)
+        s.beginSession(charge: 40, kind: .charge, at: t0)
+        s.accumulate(processes: [], elapsed: 60, charge: 70, at: t0.addingTimeInterval(1800))
+        s.endSession(charge: 95, at: t0.addingTimeInterval(3600))
+        let session = s.sessions.last!
+        #expect(session.isCharge)
+        #expect(session.chargeGain == 55)
+        #expect(session.chargeDrop == 0)
+        #expect(session.ratePerHour(now: t0.addingTimeInterval(3600)) == 55)
+    }
+
+    @Test func zeroGainChargeSessionIsDiscarded() {
+        // Plugged at 100 with a brief isCharging blip: nothing gained, no row.
+        let s = store(now: t0)
+        s.beginSession(charge: 100, kind: .charge, at: t0)
+        s.endSession(charge: 100, at: t0.addingTimeInterval(600))
+        #expect(s.sessions.isEmpty)
+    }
+
     @Test func backfilledSessionSurvivesSanitation() {
         // Backfill legitimately has no apps — the pmset log has no such data.
         let backfill = BatterySession(

@@ -28,6 +28,10 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
     /// exist). Optional so sessions persisted before this field decode as live.
     public enum Source: String, Codable, Sendable { case live, backfill }
 
+    /// Discharge (unplug→replug) or charge (plug-in→full/unplug). Optional so
+    /// sessions persisted before this field decode as discharge.
+    public enum Kind: String, Codable, Sendable { case discharge, charge }
+
     public let id: UUID
     public var startedAt: Date
     public var endedAt: Date?
@@ -37,6 +41,7 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
     /// the session closes so the stored file stays bounded.
     public var apps: [AppEnergyShare]
     public var source: Source?
+    public var kind: Kind?
     /// Seconds the display was awake during this session (live-captured only).
     public var screenOnSeconds: TimeInterval?
     /// Total tracked seconds (screen-on + screen-off). Derives screenOffSeconds.
@@ -51,7 +56,7 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
     public init(
         id: UUID = UUID(), startedAt: Date, endedAt: Date? = nil,
         startCharge: Int, endCharge: Int, apps: [AppEnergyShare] = [],
-        source: Source = .live,
+        source: Source = .live, kind: Kind = .discharge,
         screenOnSeconds: TimeInterval? = nil, screenTrackedSeconds: TimeInterval? = nil
     ) {
         self.id = id
@@ -61,14 +66,25 @@ public struct BatterySession: Codable, Equatable, Sendable, Identifiable {
         self.endCharge = endCharge
         self.apps = apps
         self.source = source
+        self.kind = kind
         self.screenOnSeconds = screenOnSeconds
         self.screenTrackedSeconds = screenTrackedSeconds
     }
 
     public var isLive: Bool { endedAt == nil }
     public var isBackfilled: Bool { source == .backfill }
+    public var isCharge: Bool { kind == .charge }
     /// % drained over the session (clamped ≥ 0; charge can tick up on noise).
     public var chargeDrop: Int { Swift.max(0, startCharge - endCharge) }
+    /// % gained over a charge session (clamped ≥ 0).
+    public var chargeGain: Int { Swift.max(0, endCharge - startCharge) }
+    /// Signed %/hour over the session: negative while draining, positive while
+    /// charging. nil under 30 min — too short for a stable rate.
+    public func ratePerHour(now: Date = .now) -> Double? {
+        let hours = duration(now: now) / 3600
+        guard hours >= 0.5 else { return nil }
+        return Double(endCharge - startCharge) / hours
+    }
     public func duration(now: Date = .now) -> TimeInterval {
         (endedAt ?? now).timeIntervalSince(startedAt)
     }
@@ -127,12 +143,17 @@ public final class BatterySessionStore {
     static func sanitized(_ session: BatterySession, now: Date = .now) -> BatterySession? {
         var repaired = session
         if repaired.isLive {
+            // A charge session carries no app samples, so there's no last-seen
+            // timestamp to close it at — drop it; the pmset backfill
+            // reconstructs the same window with accurate times.
             guard let lastSeen = repaired.apps.map(\.lastSeen).max() else { return nil }
             repaired.endedAt = lastSeen
             repaired.apps = capApps(repaired.apps)
         }
         guard repaired.duration(now: now) >= minDurationToKeep else { return nil }
-        if !repaired.isBackfilled, repaired.apps.isEmpty, repaired.duration(now: now) > 3600 {
+        if !repaired.isBackfilled, !repaired.isCharge, repaired.apps.isEmpty,
+            repaired.duration(now: now) > 3600
+        {
             return nil
         }
         return repaired
@@ -175,11 +196,12 @@ public final class BatterySessionStore {
         return a.startedAt < bEnd && b.startedAt < aEnd
     }
 
-    /// Opens a session at unplug. No-ops if one is already live.
-    public func beginSession(charge: Int, at date: Date = .now) {
+    /// Opens a session at unplug (discharge) or plug-in (charge). No-ops if
+    /// one is already live — at most one session of either kind is open.
+    public func beginSession(charge: Int, kind: BatterySession.Kind = .discharge, at date: Date = .now) {
         guard liveIndex == nil else { return }
         sessions.append(
-            BatterySession(startedAt: date, startCharge: charge, endCharge: charge))
+            BatterySession(startedAt: date, startCharge: charge, endCharge: charge, kind: kind))
         persist()
     }
 
@@ -231,7 +253,9 @@ public final class BatterySessionStore {
         session.endCharge = charge
         session.endedAt = date
 
-        if session.duration(now: date) < Self.minDurationToKeep {
+        if session.duration(now: date) < Self.minDurationToKeep
+            || (session.isCharge && session.chargeGain == 0)
+        {
             sessions.remove(at: index)
         } else {
             session.apps = Self.capApps(session.apps)
