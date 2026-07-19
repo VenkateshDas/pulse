@@ -312,7 +312,9 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
         defer { acStart = nil; acStartCharge = nil }
         let duration = end.timeIntervalSince(start)
         guard duration >= minSessionSeconds, duration <= maxSessionSeconds else { return }
-        let startC = acStartCharge ?? 0
+        // Unlike discharge, never fall back to 0 for an unknown start charge —
+        // that fabricates a huge phantom gain from a truncated log.
+        guard let startC = acStartCharge else { return }
         let endC = endCharge ?? startC
         guard endC - startC >= 2 else { return }
         sessions.append(

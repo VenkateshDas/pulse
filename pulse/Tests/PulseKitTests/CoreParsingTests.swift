@@ -230,6 +230,16 @@ struct ParseBatterySessionsTests {
         #expect(charges[0].duration() == 3600)
     }
 
+    @Test func unknownStartChargeYieldsNoChargeSession() {
+        // Truncated log: no charge reading before/at plug-in. Must not
+        // fabricate a phantom gain from an assumed 0% start.
+        let log = """
+        2026-06-20 09:00:00 +0000 Using AC
+        2026-06-20 10:00:00 +0000 Using Batt (Charge:80%)
+        """
+        #expect(parseBatterySessions(log).filter(\.isCharge).isEmpty)
+    }
+
     @Test func flatACStretchYieldsNoChargeSession() {
         // Plugged in at 100% for hours: gain < 2 → not a charge session.
         let log = """
