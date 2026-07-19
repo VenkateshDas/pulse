@@ -31,6 +31,11 @@ struct HealthView: View {
                     }
                     .frame(height: 175)
 
+                    // Battery % across the last 24h with charging windows
+                    // shaded — the intraday discharge-rate view.
+                    BatteryLevelCard()
+                        .frame(height: 150)
+
                     // Which apps cost the most battery this week — rollup of
                     // the per-session shares below.
                     BatteryDrainCard()
@@ -684,6 +689,91 @@ private struct BatteryDrainCard: View {
     }
 }
 
+// MARK: - Battery Level Card (24h intraday % curve with charging bands)
+
+private struct BatteryLevelCard: View {
+    @Environment(DashboardModel.self) private var dashboardModel
+
+    var body: some View {
+        let series = dashboardModel.batteryDayHistory
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("BATTERY LEVEL — 24H")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2)
+                    .foregroundStyle(Halo.textDim)
+                Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: "bolt.fill").font(.system(size: 7))
+                    Text("charging")
+                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.pulseGreen.opacity(0.8))
+            }
+
+            if series.contains(where: { $0 != nil }) {
+                ZStack {
+                    chargingBands
+                    HistoryChart(values: series, color: Halo.pulseGreen, maxValue: 100)
+                }
+                HStack {
+                    Text("24h ago")
+                    Spacer()
+                    Text("12h")
+                    Spacer()
+                    Text("now")
+                }
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.textDim.opacity(0.7))
+            } else {
+                Text("Collecting battery levels — the curve fills in as Pulse runs.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Halo.textDim)
+                    .frame(maxHeight: .infinity)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+    }
+
+    /// Green shading behind the curve wherever a charge session overlaps the
+    /// trailing 24h window. Gaps in sampling stay unshaded like the curve.
+    private var chargingBands: some View {
+        GeometryReader { geo in
+            let now = Date.now
+            let windowStart = now.addingTimeInterval(-24 * 3600)
+            let windows = chargeWindows(from: windowStart, to: now)
+            ForEach(windows.indices, id: \.self) { index in
+                let window = windows[index]
+                let x0 = geo.size.width * window.start
+                let x1 = geo.size.width * window.end
+                Rectangle()
+                    .fill(Halo.pulseGreen.opacity(0.12))
+                    .frame(width: max(x1 - x0, 1))
+                    .offset(x: x0)
+            }
+        }
+    }
+
+    /// Charge-session overlaps with the 24h window as 0–1 x-fractions.
+    private func chargeWindows(from windowStart: Date, to now: Date)
+        -> [(start: Double, end: Double)]
+    {
+        let span = now.timeIntervalSince(windowStart)
+        return dashboardModel.batterySessions.compactMap { session in
+            guard session.isCharge else { return nil }
+            let start = max(session.startedAt, windowStart)
+            let end = min(session.endedAt ?? now, now)
+            guard end > start else { return nil }
+            return (
+                start.timeIntervalSince(windowStart) / span,
+                end.timeIntervalSince(windowStart) / span
+            )
+        }
+    }
+}
+
 // MARK: - Battery Sessions Card (per-session charge drop + per-app energy share)
 
 private struct BatterySessionsCard: View {
@@ -776,13 +866,16 @@ private struct BatterySessionsCard: View {
 
     private func dayHeader(_ group: (day: Date, sessions: [BatterySession])) -> some View {
         let drop = group.sessions.reduce(0) { $0 + $1.chargeDrop }
+        let gain = group.sessions.reduce(0) { $0 + $1.chargeGain }
         let count = group.sessions.count
+        let parts = [drop > 0 ? "−\(drop)%" : nil, gain > 0 ? "+\(gain)%" : nil]
+            .compactMap { $0 }.joined(separator: " · ")
         return HStack(alignment: .firstTextBaseline) {
             Text(dayLabel(group.day))
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
             Spacer()
-            Text("−\(drop)% · \(count) session\(count == 1 ? "" : "s")")
+            Text("\(parts)\(parts.isEmpty ? "" : " · ")\(count) session\(count == 1 ? "" : "s")")
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
         }
@@ -812,7 +905,7 @@ private struct BatterySessionsCard: View {
                     shareBar(shares)
                     legend(shares)
                 } else {
-                    Text("Measuring app activity…")
+                    Text(session.isCharge ? "Charging…" : "Measuring app activity…")
                         .font(.system(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
@@ -836,6 +929,11 @@ private struct BatterySessionsCard: View {
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(Halo.textDim)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            }
+            if session.isCharge {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Halo.pulseGreen)
             }
             Text(windowText(session))
                 .font(.system(size: 11, design: .monospaced))
@@ -864,9 +962,20 @@ private struct BatterySessionsCard: View {
                     .truncationMode(.middle)
                     .frame(maxWidth: 140, alignment: .trailing)
             }
-            Text("−\(session.chargeDrop)%")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(dropColor(session.chargeDrop))
+            if let rate = session.ratePerHour() {
+                Text(String(format: "%+.1f%%/h", rate))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim.opacity(0.8))
+            }
+            if session.isCharge {
+                Text("+\(session.chargeGain)%")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Halo.pulseGreen)
+            } else {
+                Text("−\(session.chargeDrop)%")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(dropColor(session.chargeDrop))
+            }
             Text("\(session.startCharge)→\(session.endCharge)")
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
@@ -883,12 +992,22 @@ private struct BatterySessionsCard: View {
             let startFrac = min(max(Double(session.startCharge) / 100, 0), 1)
             ZStack(alignment: .leading) {
                 Capsule().fill(Halo.surface2)
-                Capsule()
-                    .fill(dropColor(session.chargeDrop).opacity(0.25))
-                    .frame(width: w * startFrac)
-                Capsule()
-                    .fill(Halo.ion)
-                    .frame(width: w * endFrac)
+                if session.isCharge {
+                    // Charging: green segment is what the plug put back.
+                    Capsule()
+                        .fill(Halo.pulseGreen)
+                        .frame(width: w * endFrac)
+                    Capsule()
+                        .fill(Halo.ion.opacity(0.5))
+                        .frame(width: w * startFrac)
+                } else {
+                    Capsule()
+                        .fill(dropColor(session.chargeDrop).opacity(0.25))
+                        .frame(width: w * startFrac)
+                    Capsule()
+                        .fill(Halo.ion)
+                        .frame(width: w * endFrac)
+                }
             }
         }
         .frame(height: 4)

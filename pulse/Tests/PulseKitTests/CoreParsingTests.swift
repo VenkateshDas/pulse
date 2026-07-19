@@ -192,9 +192,51 @@ struct ParseBatterySessionsTests {
         2026-06-20 15:00:00 +0000 Using AC (Charge:88%)
         """
         let sessions = parseBatterySessions(log)
-        #expect(sessions.count == 2)
-        #expect(sessions[0].chargeDrop == 5)
-        #expect(sessions[1].chargeDrop == 12)
+        let discharges = sessions.filter { !$0.isCharge }
+        #expect(discharges.count == 2)
+        #expect(discharges[0].chargeDrop == 5)
+        #expect(discharges[1].chargeDrop == 12)
+        // The 09:00→14:00 AC stretch (90→100) is a charge session.
+        let charges = sessions.filter(\.isCharge)
+        #expect(charges.count == 1)
+        #expect(charges[0].chargeGain == 10)
+    }
+
+    @Test func reconstructsChargeSession() {
+        let log = """
+        2026-06-20 09:00:00 +0000 Using AC (Charge:42%)
+        2026-06-20 10:00:00 +0000 Using AC (Charge:88%)
+        2026-06-20 10:30:00 +0000 Using Batt (Charge:100%)
+        """
+        let charges = parseBatterySessions(log).filter(\.isCharge)
+        #expect(charges.count == 1)
+        let s = charges[0]
+        #expect(s.startCharge == 42)
+        #expect(s.endCharge == 100)
+        #expect(s.chargeGain == 58)
+        #expect(s.duration() == 5400)          // 09:00 → 10:30
+        #expect(s.isBackfilled)
+    }
+
+    @Test func chargeSessionClosesAtLogEndOnAC() {
+        // Still plugged in at log's end → closed at the last AC line.
+        let log = """
+        2026-06-20 09:00:00 +0000 Using AC (Charge:42%)
+        2026-06-20 10:00:00 +0000 Using AC (Charge:88%)
+        """
+        let charges = parseBatterySessions(log).filter(\.isCharge)
+        #expect(charges.count == 1)
+        #expect(charges[0].chargeGain == 46)
+        #expect(charges[0].duration() == 3600)
+    }
+
+    @Test func flatACStretchYieldsNoChargeSession() {
+        // Plugged in at 100% for hours: gain < 2 → not a charge session.
+        let log = """
+        2026-06-20 09:00:00 +0000 Using AC (Charge:100%)
+        2026-06-20 15:00:00 +0000 Using Batt (Charge:100%)
+        """
+        #expect(parseBatterySessions(log).filter(\.isCharge).isEmpty)
     }
 
     @Test func closesTrailingOpenSessionAtLastBatterySample() {

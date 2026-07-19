@@ -54,6 +54,9 @@ final class DashboardModel {
     private(set) var networkOutHistory: [Double] = []
     private(set) var powerHistory: [Double] = []
     private(set) var batteryTrend: [BatteryHistoryStore.Entry] = []
+    /// Minute-averaged battery % over the trailing 24h (nil = no data for
+    /// that minute) for the intraday level chart on the Health page.
+    private(set) var batteryDayHistory: [Double?] = []
     /// On-battery sessions (newest last): time on battery, charge drop, and
     /// per-app energy share. Published for the Health page.
     private(set) var batterySessions: [BatterySession] = []
@@ -158,6 +161,9 @@ final class DashboardModel {
     @ObservationIgnored private let attentionEngine = AttentionEngine()
     @ObservationIgnored private var latestAttentionItems: [AttentionItem] = []
     @ObservationIgnored private let batteryHistory = BatteryHistoryStore()
+    /// Battery % once a minute for the 24h intraday level chart.
+    @ObservationIgnored private let batteryDayStore = MinuteHistoryStore(
+        fileURL: MinuteHistoryStore.defaultFileURL(metric: "battery-level"))
     @ObservationIgnored private let batterySessionStore = BatterySessionStore()
     @ObservationIgnored private var lastIngestUptime: TimeInterval?
     /// Timestamp of the last valid on-battery sample, used to end a session at
@@ -340,6 +346,7 @@ final class DashboardModel {
 
         if let battery = snapshot.battery {
             let charge = battery.currentChargePercent
+            batteryDayStore.record(Double(charge), at: snapshot.timestamp)
             let elapsed = lastIngestUptime.map { snapshot.uptime - $0 } ?? 0
             // `uptime` (systemUptime) pauses while the Mac sleeps, so a sleep
             // is invisible in `elapsed` — the wall clock keeps running. A wall
@@ -356,6 +363,11 @@ final class DashboardModel {
                 // live use (within one sampling tick of the slowest cadence).
                 if validDelta {
                     batteryHistory.addTimeOnBattery(elapsed, at: snapshot.timestamp)
+                }
+                // Unplugged mid-charge: close the charge session so the
+                // discharge one can open.
+                if batterySessionStore.liveSession?.isCharge == true {
+                    batterySessionStore.endSession(charge: charge, at: snapshot.timestamp)
                 }
                 if batterySessionStore.liveSession == nil {
                     batterySessionStore.beginSession(charge: charge, at: snapshot.timestamp)
@@ -388,9 +400,29 @@ final class DashboardModel {
                     }
                     lastBatterySampleAt = snapshot.timestamp
                 }
-            } else if batterySessionStore.liveSession != nil {
-                // Plugged back in — close the session.
-                batterySessionStore.endSession(charge: charge, at: snapshot.timestamp)
+            } else {
+                // On AC. Close a live discharge session (plugged back in),
+                // then track the charge as its own session while charging.
+                if let live = batterySessionStore.liveSession, !live.isCharge {
+                    batterySessionStore.endSession(charge: charge, at: snapshot.timestamp)
+                }
+                if battery.isCharging {
+                    if batterySessionStore.liveSession == nil {
+                        batterySessionStore.beginSession(
+                            charge: charge, kind: .charge, at: snapshot.timestamp)
+                    } else if validDelta {
+                        // No app attribution while charging — apps don't cost
+                        // battery on AC; this just advances endCharge and the
+                        // screen-time split.
+                        batterySessionStore.accumulate(
+                            processes: [], elapsed: elapsed, charge: charge,
+                            at: snapshot.timestamp, displayAsleep: displayAsleep)
+                    }
+                } else if batterySessionStore.liveSession?.isCharge == true {
+                    // Stopped charging (full, or smart-charging hold) — the
+                    // charge session is over even though AC stays connected.
+                    batterySessionStore.endSession(charge: charge, at: snapshot.timestamp)
+                }
             }
 
             // One capacity reading per day feeds the 60-day degradation chart.
@@ -499,6 +531,7 @@ final class DashboardModel {
         networkOutHistory = networkOutBuffer
         powerHistory = powerBuffer
         batteryTrend = batteryHistory.entries
+        batteryDayHistory = batteryDayStore.series()
         batterySessions = batterySessionStore.allSessions
     }
 
