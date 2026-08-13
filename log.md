@@ -47,3 +47,11 @@
 ## [2026-08-13] Documentation | Created product & technical spec for BLAKE3 Duplicate File Finder
 - Created `docs/blake3-duplicate-finder-spec.md` detailing the 4-stage progressive filtering pipeline (Size -> 8KB Head/Tail -> Full BLAKE3 -> APFS Inode/Clone check).
 - Designed zero-subprocess C engine integration in `CPulse`, Swift 6 `DuplicateScanner` actor, smart auto-selection heuristics, and `DiskView` sub-tab layout.
+
+## [2026-08-13] Feature | Reclaim Item Protection ("Move to Worth a Look")
+- Added `excludedPaths` to `CleanSchedule` & `CleanScheduler` for persisting protected item paths across app restarts and auto-clean background jobs.
+- Updated `CleanScheduler.runNow()` and `preview()` with path hierarchy matching (`CleanSchedule.isPathExcluded`) to exclude protected items from scheduled auto-cleans.
+- Updated `StorageModel` (`selectAllSafe`, `trashProtectedItem`) to omit protected paths from bulk selections and support single-item manual deletion with `UndoJournal` recording and trash sound.
+- Updated `CleanView` with "Move to Worth a Look" shield action on cleanable item rows and a "PROTECTED ITEMS" sub-section under "WORTH A LOOK" with "Restore to Reclaim", "Trash", and "Reveal in Finder" controls.
+- Added comprehensive unit tests in `CleanTests.swift` validating `excludedPaths` persistence and subpath exclusion behavior.
+

@@ -42,10 +42,12 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
     public var nextRun: Date
     public var autoCleanSafeTier: Bool
     public var notifyOnCompletion: Bool
+    public var excludedPaths: Set<String>
 
     public init(
         frequency: Frequency, timePreference: TimePreference, lastRun: Date? = nil,
-        nextRun: Date, autoCleanSafeTier: Bool, notifyOnCompletion: Bool
+        nextRun: Date, autoCleanSafeTier: Bool, notifyOnCompletion: Bool,
+        excludedPaths: Set<String> = []
     ) {
         self.frequency = frequency
         self.timePreference = timePreference
@@ -53,10 +55,11 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
         self.nextRun = nextRun
         self.autoCleanSafeTier = autoCleanSafeTier
         self.notifyOnCompletion = notifyOnCompletion
+        self.excludedPaths = excludedPaths
     }
 
     private enum CodingKeys: String, CodingKey {
-        case frequency, timePreference, lastRun, nextRun, autoCleanSafeTier, notifyOnCompletion
+        case frequency, timePreference, lastRun, nextRun, autoCleanSafeTier, notifyOnCompletion, excludedPaths
     }
 
     public init(from decoder: Decoder) throws {
@@ -67,6 +70,7 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
         nextRun = try c.decode(Date.self, forKey: .nextRun)
         autoCleanSafeTier = try c.decode(Bool.self, forKey: .autoCleanSafeTier)
         notifyOnCompletion = try c.decode(Bool.self, forKey: .notifyOnCompletion)
+        excludedPaths = try c.decodeIfPresent(Set<String>.self, forKey: .excludedPaths) ?? []
     }
 
     public static func `default`(now: Date = .now) -> CleanSchedule {
@@ -75,8 +79,18 @@ public struct CleanSchedule: Codable, Sendable, Equatable {
             timePreference: .night,
             nextRun: Frequency.weekly.nextRun(after: now, hour: TimePreference.night.runHour),
             autoCleanSafeTier: false,
-            notifyOnCompletion: true
+            notifyOnCompletion: true,
+            excludedPaths: []
         )
+    }
+
+    public static func isPathExcluded(_ path: String, in excludedPaths: Set<String>) -> Bool {
+        guard !excludedPaths.isEmpty else { return false }
+        let standard = (path as NSString).standardizingPath
+        return excludedPaths.contains { excluded in
+            let stdExcluded = (excluded as NSString).standardizingPath
+            return standard == stdExcluded || standard.hasPrefix(stdExcluded + "/")
+        }
     }
 }
 
@@ -138,8 +152,9 @@ public actor CleanScheduler {
 
     @discardableResult
     public func runNow(autoMode: Bool, now: Date = .now) async -> (itemsCleaned: Int, bytesFreed: UInt64) {
+        let excluded = schedule.excludedPaths
         let items = SmartScanner(home: home, now: now).scan()
-            .items.filter { $0.grade == .safe }
+            .items.filter { $0.grade == .safe && !CleanSchedule.isPathExcluded($0.path, in: excluded) }
 
         var itemsCleaned = 0
         var bytesFreed: UInt64 = 0
@@ -177,7 +192,10 @@ public actor CleanScheduler {
     }
 
     public func preview(now: Date = .now) -> [CleanItem] {
-        SmartScanner(home: home, now: now).scan().items.filter { $0.grade == .safe }
+        let excluded = schedule.excludedPaths
+        return SmartScanner(home: home, now: now).scan().items.filter {
+            $0.grade == .safe && !CleanSchedule.isPathExcluded($0.path, in: excluded)
+        }
     }
 
     // MARK: - Persistence

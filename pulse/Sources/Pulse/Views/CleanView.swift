@@ -8,6 +8,7 @@ import SwiftUI
 struct CleanView: View {
     @Environment(StorageModel.self) private var storage
     @Environment(InsightsModel.self) private var insights
+    @Environment(CleanModel.self) private var cleanModel
     @State private var hoveredID: String?
     @State private var collapsedCategories: Set<String> = []
 
@@ -19,22 +20,29 @@ struct CleanView: View {
                     if storage.scanState == .scanning && storage.scan == nil {
                         scanning
                     } else if let scan = storage.scan {
-                        let items = scan.items.filter { $0.grade != .review }
-                        if items.isEmpty {
+                        let allItems = scan.items
+                        let unprotectedItems = allItems.filter {
+                            $0.grade != .review && !CleanSchedule.isPathExcluded($0.path, in: cleanModel.schedule.excludedPaths)
+                        }
+                        let protectedItems = allItems.filter {
+                            CleanSchedule.isPathExcluded($0.path, in: cleanModel.schedule.excludedPaths)
+                        }
+                        if unprotectedItems.isEmpty {
                             Text("No safe or careful items found.")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Halo.textDim)
                                 .padding(.vertical, 16)
                                 .frame(maxWidth: .infinity)
                         } else {
-                            categorySections(items)
+                            categorySections(unprotectedItems)
                         }
+                        hiddenSpaceSection(protectedItems: protectedItems)
                     } else {
                         Text("No scan yet.")
                             .font(.system(size: 12))
                             .foregroundStyle(Halo.textDim)
+                        hiddenSpaceSection(protectedItems: [])
                     }
-                    hiddenSpaceSection
                     AutoCleanCard()
                 }
                 .padding(.bottom, 8)
@@ -65,7 +73,7 @@ struct CleanView: View {
                 insights.scan()
             }
             Button("Select All Safe") {
-                storage.selectAllSafe()
+                storage.selectAllSafe(excludedPaths: cleanModel.schedule.excludedPaths)
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
@@ -131,28 +139,56 @@ struct CleanView: View {
     // MARK: Hidden space (merged from the old Hidden Space tab)
 
     @ViewBuilder
-    private var hiddenSpaceSection: some View {
-        if insights.isScanning && insights.insights.isEmpty {
+    private func hiddenSpaceSection(protectedItems: [CleanItem]) -> some View {
+        let hasInsights = !insights.insights.isEmpty
+        let hasProtected = !protectedItems.isEmpty
+        if insights.isScanning && !hasInsights && !hasProtected {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text("Measuring hidden space…").font(.system(size: 11)).foregroundStyle(Halo.textDim)
             }
-        } else if !insights.insights.isEmpty {
+        } else if hasInsights || hasProtected {
+            let totalBytes = UInt64(max(0, insights.totalBytes)) + protectedItems.reduce(0) { $0 + $1.sizeBytes }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text("WORTH A LOOK")
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(2)
                         .foregroundStyle(Halo.amber)
-                    Text("Big, easy-to-forget locations — real data Pulse never bulk-cleans. Review in Finder.")
+                    Text("Big locations & protected items — real data Pulse never bulk-cleans.")
                         .font(.system(size: 10))
                         .foregroundStyle(Halo.textDim)
                     Spacer()
-                    Text(ByteFormat.string(UInt64(max(0, insights.totalBytes))))
+                    Text(ByteFormat.string(totalBytes))
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                 }
                 .padding(.horizontal, 4)
+
+                if hasProtected {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "shield.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Halo.ion)
+                            Text("PROTECTED ITEMS (\(protectedItems.count))")
+                                .font(.system(size: 9, weight: .semibold))
+                                .tracking(1.5)
+                                .foregroundStyle(Halo.textPrimary)
+                            Text("Exempted from auto-clean & bulk deletion")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Halo.textDim)
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.bottom, 2)
+
+                        ForEach(protectedItems) { item in
+                            row(item, isProtected: true)
+                        }
+                    }
+                    .padding(.bottom, 4)
+                }
+
                 ForEach(insights.insights) { insight in
                     insightRow(insight)
                 }
@@ -211,42 +247,93 @@ struct CleanView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func row(_ item: CleanItem) -> some View {
+    private func row(_ item: CleanItem, isProtected: Bool = false) -> some View {
         let selected = storage.selection.contains(item.id)
-        let selectable = item.grade != .review
+        let selectable = item.grade != .review && !isProtected
         return HStack(spacing: 10) {
-            Button {
-                storage.toggle(item)
-            } label: {
-                Image(systemName: selected ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 13))
-                    .foregroundStyle(
-                        !selectable ? Halo.textDim.opacity(0.4)
-                            : (selected ? Halo.pulseGreen : Halo.textDim))
+            if !isProtected {
+                Button {
+                    storage.toggle(item)
+                } label: {
+                    Image(systemName: selected ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 13))
+                        .foregroundStyle(
+                            !selectable ? Halo.textDim.opacity(0.4)
+                                : (selected ? Halo.pulseGreen : Halo.textDim))
+                }
+                .buttonStyle(.plain)
+                .disabled(!selectable)
             }
-            .buttonStyle(.plain)
-            .disabled(!selectable)
 
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
                 .resizable()
                 .frame(width: 16, height: 16)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(item.label)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Halo.textPrimary)
+                        .lineLimit(1)
+                    if isProtected {
+                        Text("PROTECTED")
+                            .font(.system(size: 8, weight: .bold))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Halo.ion.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Halo.ion)
+                    }
+                }
                 Text(detailLine(item))
                     .font(.system(size: 10))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
             }
             Spacer()
-            GradePill(grade: item.grade)
+            if !isProtected { GradePill(grade: item.grade) }
             Text(ByteFormat.string(item.sizeBytes))
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
+
+            if isProtected {
+                Button {
+                    cleanModel.toggleExclusion(item.path)
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.textDim)
+                }
+                .buttonStyle(.plain)
+                .help("Restore to Reclaim categories")
+                .accessibilityLabel("Restore to Reclaim")
+
+                Button {
+                    storage.trashProtectedItem(item, cleanModel: cleanModel)
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.critical)
+                }
+                .buttonStyle(.plain)
+                .help("Move to Trash")
+                .accessibilityLabel("Move to Trash")
+            } else {
+                Button {
+                    if storage.selection.contains(item.id) {
+                        storage.toggle(item)
+                    }
+                    cleanModel.toggleExclusion(item.path)
+                } label: {
+                    Image(systemName: "shield.slash")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Halo.textDim)
+                }
+                .buttonStyle(.plain)
+                .help("Move to Worth a Look — protect from auto-clean")
+                .accessibilityLabel("Move to Worth a Look")
+            }
+
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.path)])
             } label: {

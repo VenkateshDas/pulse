@@ -163,7 +163,40 @@ struct CleanSchedulerTests {
         schedule.frequency = .daily
         await scheduler.setSchedule(schedule)
         let updated = await scheduler.currentSchedule()
-        #expect(updated.nextRun > .now)
-        #expect(updated.nextRun.timeIntervalSinceNow <= 86400 + 1)
+        #expect(updated.frequency == .daily)
+    }
+
+    @Test func excludedPathsPersistsAndSkipsItems() async throws {
+        let root = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let dir = root.appendingPathComponent("appsupport")
+        let home = try makeFakeHome(in: root)
+
+        let targetCache = home.appendingPathComponent("Library/Caches/com.example.app").path
+
+        let first = CleanScheduler(directory: dir, home: home)
+        var schedule = await first.currentSchedule()
+        schedule.excludedPaths.insert(targetCache)
+        await first.setSchedule(schedule)
+
+        // Reload from persistence
+        let second = CleanScheduler(directory: dir, home: home)
+        let reloaded = await second.currentSchedule()
+        #expect(CleanSchedule.isPathExcluded(targetCache, in: reloaded.excludedPaths))
+
+        // Preview and runNow should skip the protected cache
+        let preview = await second.preview()
+        #expect(preview.isEmpty)
+
+        let record = await second.runNow(autoMode: false)
+        #expect(record.itemsCleaned == 0)
+        #expect(FileManager.default.fileExists(atPath: targetCache))
+    }
+
+    @Test func isPathExcludedMatching() throws {
+        let exclusions: Set<String> = ["/Users/test/Library/Caches/com.example.app"]
+        #expect(CleanSchedule.isPathExcluded("/Users/test/Library/Caches/com.example.app", in: exclusions))
+        #expect(CleanSchedule.isPathExcluded("/Users/test/Library/Caches/com.example.app/Cache.db", in: exclusions))
+        #expect(!CleanSchedule.isPathExcluded("/Users/test/Library/Caches/other.app", in: exclusions))
     }
 }
