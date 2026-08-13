@@ -38,3 +38,12 @@
 - Added `SpeedTestRunner` and `WiFiSampler` to support network diagnostics and metrics.
 - Integrated Network Health Card into `DashboardView` and `MenuBarContent`.
 ## [2026-07-11] Network Feature | Implemented Network Health Card with real-time Wi-Fi metrics, connection type monitoring, and automated speed tests cached in SpeedTestStore.
+
+## [2026-07-18] Documentation | Created interactive tldraw architecture diagram & animated workflow
+- Created `pulse_architecture.tldraw` mapping UI, Control, and Platform/Driver layers of the app.
+- Redesigned the diagram to use highly modular visual mockups (e.g. status bar extra, dashboard window with sidebar, health score, and brightness sliders), Apple system emojis for icons, and structured arrow routing to avoid overlaps.
+- Implemented `main.js` document script running live background animations across 9 flows and real-time metric updates on individual stat chips.
+
+## [2026-08-13] Documentation | Created product & technical spec for BLAKE3 Duplicate File Finder
+- Created `docs/blake3-duplicate-finder-spec.md` detailing the 4-stage progressive filtering pipeline (Size -> 8KB Head/Tail -> Full BLAKE3 -> APFS Inode/Clone check).
+- Designed zero-subprocess C engine integration in `CPulse`, Swift 6 `DuplicateScanner` actor, smart auto-selection heuristics, and `DiskView` sub-tab layout.

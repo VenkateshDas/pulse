@@ -678,4 +678,103 @@ final class StorageModel {
         ])
         return UInt64(values?.volumeAvailableCapacity ?? 0)
     }
+
+    // MARK: - Duplicate Finder State & Caching
+    private(set) var duplicateGroups: [DuplicateScanner.DuplicateGroup] = []
+    private(set) var isDuplicateScanning = false
+    private(set) var duplicateScanProgress: DuplicateScanner.ScanProgress?
+    private(set) var duplicateStatusMessage: String?
+
+    func toggleDuplicateSelection(groupId: String, fileId: String, isSelected: Bool) {
+        guard let gIdx = duplicateGroups.firstIndex(where: { $0.id == groupId }) else { return }
+        guard let fIdx = duplicateGroups[gIdx].files.firstIndex(where: { $0.id == fileId }) else { return }
+        duplicateGroups[gIdx].files[fIdx].isSelectedForDeletion = isSelected
+    }
+
+    func startDuplicateScan() {
+        guard !isDuplicateScanning else { return }
+        isDuplicateScanning = true
+        duplicateScanProgress = nil
+        duplicateStatusMessage = nil
+
+        let fileManager = FileManager.default
+        var searchDirs: [URL] = []
+
+        if let downloads = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first {
+            searchDirs.append(downloads)
+        }
+        if let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            searchDirs.append(documents)
+        }
+        if let desktop = fileManager.urls(for: .desktopDirectory, in: .userDomainMask).first {
+            searchDirs.append(desktop)
+        }
+
+        Task {
+            do {
+                let scanner = DuplicateScanner()
+                let result = try await scanner.scan(directories: searchDirs) { prog in
+                    Task { @MainActor in
+                        self.duplicateScanProgress = prog
+                    }
+                }
+                self.duplicateGroups = result
+                self.isDuplicateScanning = false
+            } catch {
+                self.duplicateStatusMessage = "Scan error: \(error.localizedDescription)"
+                self.isDuplicateScanning = false
+            }
+        }
+    }
+
+    func deleteSelectedDuplicates() {
+        var urlsToDelete: [URL] = []
+
+        for group in duplicateGroups {
+            for file in group.files where file.isSelectedForDeletion {
+                urlsToDelete.append(file.url)
+            }
+        }
+
+        guard !urlsToDelete.isEmpty else { return }
+
+        Task {
+            var trashedCount = 0
+            var bytesFreed: Int64 = 0
+            var itemsRecord: [TrashedItem] = []
+
+            for url in urlsToDelete {
+                do {
+                    let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
+                    trashedCount += 1
+                    bytesFreed += Int64(size)
+                    if let trashedPath = trashedURL?.path {
+                        itemsRecord.append(TrashedItem(originalPath: url.path, trashPath: trashedPath))
+                    }
+                } catch {
+                    // Skip if trash fails
+                }
+            }
+
+            if !itemsRecord.isEmpty {
+                let entry = UndoEntry(op: "Delete Duplicates", items: itemsRecord, bytesFreed: bytesFreed)
+                await UndoJournal.shared.record(entry)
+            }
+
+            var updatedGroups: [DuplicateScanner.DuplicateGroup] = []
+            for group in duplicateGroups {
+                let remainingFiles = group.files.filter { !urlsToDelete.contains($0.url) }
+                if remainingFiles.count > 1 {
+                    var updated = group
+                    updated.files = remainingFiles
+                    updatedGroups.append(updated)
+                }
+            }
+            self.duplicateGroups = updatedGroups
+            self.duplicateStatusMessage = "Moved \(trashedCount) duplicate files to Trash."
+            self.refreshTrashInfo()
+        }
+    }
 }

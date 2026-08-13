@@ -55,6 +55,7 @@ enum {
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreGraphics/CoreGraphics.h>
 #include "DDC.h"
+#include "pulse_blake3.h"
 
 extern double CoreDisplay_Display_GetUserBrightness(CGDirectDisplayID display) __attribute__((weak_import));
 extern void CoreDisplay_Display_SetUserBrightness(CGDirectDisplayID display, double brightness) __attribute__((weak_import));
