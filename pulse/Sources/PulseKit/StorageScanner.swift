@@ -178,12 +178,29 @@ public struct StorageScanner: Sendable {
                     }
                     
                     var currentChildren = children
+                    var lastYieldTime = ContinuousClock.now
+                    var pendingUpdates = 0
                     for await (index, size, count) in group {
                         if size > 0 || count > 0 {
                             let child = currentChildren[index]
                             currentChildren[index] = StorageNode(id: child.id, name: child.name, path: child.path, sizeBytes: size, isDirectory: child.isDirectory, fileCount: count, children: child.children)
                         }
+                        pendingUpdates += 1
                         
+                        let now = ContinuousClock.now
+                        if now - lastYieldTime >= .milliseconds(100) {
+                            lastYieldTime = now
+                            pendingUpdates = 0
+                            var newTotal: UInt64 = resolvedBytes
+                            for c in currentChildren { if c.isDirectory { newTotal += c.sizeBytes } }
+                            
+                            let sortedChildren = currentChildren.sorted { $0.sizeBytes > $1.sizeBytes }
+                            let updatedNode = StorageNode(id: node.id, name: node.name, path: node.path, sizeBytes: newTotal, isDirectory: node.isDirectory, children: sortedChildren)
+                            continuation.yield(updatedNode)
+                        }
+                    }
+                    
+                    if pendingUpdates > 0 {
                         var newTotal: UInt64 = resolvedBytes
                         for c in currentChildren { if c.isDirectory { newTotal += c.sizeBytes } }
                         

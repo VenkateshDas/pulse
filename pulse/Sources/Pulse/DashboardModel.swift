@@ -206,15 +206,18 @@ final class DashboardModel {
         observeDisplaySleep()
         requestNotificationAuthorization()
         
-        // Trigger background backfill on launch: daily totals + reconstructed
-        // unplug sessions (times + charge drop) from the pmset log.
+        batteryTrend = batteryHistory.entries
+        batterySessions = batterySessionStore.allSessions
+
         Task { [weak self] in
             guard let self else { return }
-            await self.batteryHistory.backfillFromSystemLog()
-            self.batteryTrend = self.batteryHistory.entries
-            let sessions = await backfillBatterySessionsFromSystemLog()
-            self.batterySessionStore.mergeBackfilled(sessions)
-            self.batterySessions = self.batterySessionStore.allSessions
+            if self.batteryHistory.entries.isEmpty || self.batterySessionStore.allSessions.isEmpty {
+                let (history, sessions) = await backfillBatteryDataFromSystemLog()
+                self.batteryHistory.mergeParsedEntries(history)
+                self.batteryTrend = self.batteryHistory.entries
+                self.batterySessionStore.mergeBackfilled(sessions)
+                self.batterySessions = self.batterySessionStore.allSessions
+            }
         }
 
         startSamplingLoop()

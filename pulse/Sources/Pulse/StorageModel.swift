@@ -267,15 +267,16 @@ final class StorageModel {
                  "Cleared by macOS when updates finish"),
             ]
             var comps: [HiddenComponent] = []
-            if let out = try? await Shell.run("/bin/df", ["-k"] + volumes.map(\.path)), out.ok {
-                // df prints one line per argument, in order, after the header:
-                // "<fs> <1024-blocks> <used> <avail> …"
-                let lines = out.stdout.split(separator: "\n").dropFirst()
-                for (vol, line) in zip(volumes, lines) {
-                    let cols = line.split(separator: " ", omittingEmptySubsequences: true)
-                    guard cols.count > 2, let usedKB = UInt64(cols[2]), usedKB > 0 else { continue }
-                    comps.append(HiddenComponent(
-                        label: vol.label, subtitle: vol.subtitle, bytes: usedKB * 1024))
+            for vol in volumes {
+                var st = statfs()
+                if statfs(vol.path, &st) == 0 {
+                    let bsize = UInt64(st.f_bsize)
+                    let usedBlocks = st.f_blocks > st.f_bfree ? UInt64(st.f_blocks - st.f_bfree) : 0
+                    let usedBytes = usedBlocks * bsize
+                    if usedBytes > 0 {
+                        comps.append(HiddenComponent(
+                            label: vol.label, subtitle: vol.subtitle, bytes: usedBytes))
+                    }
                 }
             }
             self.hiddenComponents = comps
@@ -373,6 +374,7 @@ final class StorageModel {
                 SmartScanner().scan()
             }.value
             self.scan = result
+            self.scanItemsByPath = Dictionary(result.items.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
             self.rootNode = self.navigationPath.first
             self.scanState = .done(result.finished)
             self.selection = Set(
@@ -483,10 +485,7 @@ final class StorageModel {
         }
     }
 
-    var scanItemsByPath: [String: CleanItem] {
-        guard let scan else { return [:] }
-        return Dictionary(scan.items.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
-    }
+    private(set) var scanItemsByPath: [String: CleanItem] = [:]
     
     func navigateTo(index: Int) {
         if index >= 0 && index < navigationPath.count {

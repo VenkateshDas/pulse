@@ -66,7 +66,7 @@ final class UninstallModel {
 
     func icon(for path: String) -> NSImage {
         if let cached = iconCache[path] { return cached }
-        let image = NSWorkspace.shared.icon(forFile: path)
+        let image = FileIconCache.icon(forPath: path)
         iconCache[path] = image
         return image
     }
@@ -80,9 +80,15 @@ final class UninstallModel {
         isLoadingApps = true
         Task.detached(priority: .userInitiated) { [scanner] in
             let apps = scanner.installedApps()
+            var prewarmed: [String: NSImage] = [:]
+            for app in apps {
+                prewarmed[app.path] = NSWorkspace.shared.icon(forFile: app.path)
+            }
             await MainActor.run { [weak self] in
-                self?.installedApps = apps
-                self?.isLoadingApps = false
+                guard let self else { return }
+                self.iconCache.merge(prewarmed) { current, _ in current }
+                self.installedApps = apps
+                self.isLoadingApps = false
             }
         }
     }
