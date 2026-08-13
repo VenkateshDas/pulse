@@ -199,7 +199,7 @@ struct CleanView: View {
 
     private func insightRow(_ insight: Insight) -> some View {
         HStack(spacing: 10) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: insight.path))
+            Image(nsImage: FileIconCache.icon(forPath: insight.path, isDirectory: true))
                 .resizable()
                 .frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 1) {
@@ -265,7 +265,7 @@ struct CleanView: View {
                 .disabled(!selectable)
             }
 
-            Image(nsImage: NSWorkspace.shared.icon(forFile: item.path))
+            Image(nsImage: FileIconCache.icon(forPath: item.path))
                 .resizable()
                 .frame(width: 16, height: 16)
 

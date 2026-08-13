@@ -114,7 +114,7 @@ public final class BatteryHistoryStore {
     }
 
     @MainActor
-    private func mergeParsedEntries(_ parsed: [Date: TimeInterval]) {
+    public func mergeParsedEntries(_ parsed: [Date: TimeInterval]) {
         let now = Date()
         for (day, duration) in parsed {
             updateEntry(for: day, duration: duration, maxAgeDate: now) { current, new in
@@ -393,9 +393,9 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
     return sessions
 }
 
-/// Background read of `pmset -g log`, parsed into backfilled sessions.
-public func backfillBatterySessionsFromSystemLog() async -> [BatterySession] {
-    await Task.detached(priority: .background) { () -> [BatterySession] in
+/// Background single-process read of `pmset -g log`, parsed into both history totals and discrete sessions.
+public func backfillBatteryDataFromSystemLog() async -> ([Date: TimeInterval], [BatterySession]) {
+    await Task.detached(priority: .background) { () -> ([Date: TimeInterval], [BatterySession]) in
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
         process.arguments = ["-g", "log"]
@@ -407,11 +407,19 @@ public func backfillBatterySessionsFromSystemLog() async -> [BatterySession] {
             let data = try pipe.fileHandleForReading.readToEnd()
             process.waitUntilExit()
             if let data, let logContent = String(data: data, encoding: .utf8) {
-                return parseBatterySessions(logContent)
+                let history = parseLogContent(logContent)
+                let sessions = parseBatterySessions(logContent)
+                return (history, sessions)
             }
         } catch {
-            log.error("pmset session backfill failed: \(error, privacy: .public)")
+            log.error("pmset combined backfill failed: \(error, privacy: .public)")
         }
-        return []
+        return ([:], [])
     }.value
+}
+
+/// Background read of `pmset -g log`, parsed into backfilled sessions.
+public func backfillBatterySessionsFromSystemLog() async -> [BatterySession] {
+    let (_, sessions) = await backfillBatteryDataFromSystemLog()
+    return sessions
 }

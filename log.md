@@ -55,3 +55,10 @@
 - Updated `CleanView` with "Move to Worth a Look" shield action on cleanable item rows and a "PROTECTED ITEMS" sub-section under "WORTH A LOOK" with "Restore to Reclaim", "Trash", and "Reveal in Finder" controls.
 - Added comprehensive unit tests in `CleanTests.swift` validating `excludedPaths` persistence and subpath exclusion behavior.
 
+## [2026-08-14] Perf | App and Loading Elements Speed Optimization
+- Added `FileIconCache` (`Pulse/FileIconCache.swift`) with static cache and async pre-warming, eliminating blocking synchronous `NSWorkspace.shared.icon(forFile:)` calls across `StorageView`, `CleanView`, and `UninstallView`.
+- Optimized `StorageModel.scanItemsByPath` to maintain a cached index updated on scan completion instead of re-allocating a dictionary on every column and row render.
+- Replaced `/bin/df` shell subprocess in `StorageModel.refreshHiddenBreakdown()` with native POSIX `statfs` kernel calls, achieving sub-millisecond execution with zero subprocesses.
+- Throttled `StorageScanner.scanSizesStream` yields (100ms interval + final yield) to eliminate SwiftUI `@MainActor` re-render thrashing during directory sizing.
+- Unified battery log backfill in `BatteryHistoryStore` and `DashboardModel` to a single pass and avoided redundant `pmset -g log` subprocess execution on startup when cached history is present.
+

@@ -386,7 +386,7 @@ struct StorageView: View {
             }
         } label: {
             HStack(spacing: 8) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: node.path))
+                Image(nsImage: FileIconCache.icon(forPath: node.path, isDirectory: node.isDirectory))
                     .resizable().frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
