@@ -397,10 +397,47 @@ final class StorageModel {
         }
     }
 
-    func selectAllSafe() {
+    func selectAllSafe(excludedPaths: Set<String> = []) {
         guard let scan else { return }
         for item in scan.items where item.grade == .safe {
-            selection.insert(item.id)
+            if !CleanSchedule.isPathExcluded(item.path, in: excludedPaths) {
+                selection.insert(item.id)
+            }
+        }
+    }
+
+    func trashProtectedItem(_ item: CleanItem, cleanModel: CleanModel) {
+        guard !isCleaning else { return }
+        isCleaning = true
+        let itemPath = item.path
+        let itemSize = item.sizeBytes
+        Task {
+            let (report, trashed) = await Task.detached(priority: .userInitiated) {
+                do {
+                    var trashedURL: NSURL?
+                    try FileManager.default.trashItem(at: URL(fileURLWithPath: itemPath), resultingItemURL: &trashedURL)
+                    var items: [TrashedItem] = []
+                    if let trashPath = trashedURL?.path {
+                        items.append(TrashedItem(originalPath: itemPath, trashPath: trashPath))
+                    }
+                    if !items.isEmpty {
+                        await UndoJournal.shared.record(UndoEntry(op: "Worth a Look Clean", items: items, bytesFreed: Int64(itemSize)))
+                    }
+                    return ("\(ByteFormat.string(itemSize)) moved to Trash", true)
+                } catch {
+                    return ("Failed to move item to Trash", false)
+                }
+            }.value
+            self.isCleaning = false
+            self.cleanReport = report
+            if trashed {
+                TrashSound.moveToTrash()
+                cleanModel.toggleExclusion(itemPath)
+                self.selection.remove(item.id)
+                self.runScan()
+            }
+            self.refreshTrashInfo()
+            self.refreshPurgeable()
         }
     }
 

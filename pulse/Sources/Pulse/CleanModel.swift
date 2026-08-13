@@ -58,6 +58,16 @@ final class CleanModel {
         if enabled { requestNotificationAuthorization() }
     }
 
+    func toggleExclusion(_ path: String) {
+        var updated = schedule
+        if updated.excludedPaths.contains(path) {
+            updated.excludedPaths.remove(path)
+        } else {
+            updated.excludedPaths.insert(path)
+        }
+        apply(updated)
+    }
+
     private func apply(_ updated: CleanSchedule) {
         schedule = updated
         Task {
