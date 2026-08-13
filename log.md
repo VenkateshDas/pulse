@@ -1,6 +1,13 @@
 # Pulse Changelog & Wiki Log
 
-## [2026-07-16] Fix | Sub-zero brightness persistence and OSD UI
+## [2026-08-14] Optimization | Landing Page Speed, Modern Web Guidance, and A11y
+- Converted hero background image (`hero-bg-2.png`, 1.09MB) to modern WebP (`hero-bg-2.webp`, 29KB, 97.2% reduction) and JPEG fallback.
+- Added critical resource preloading with `fetchpriority="high"` and CSS `image-set()` responsive format delivery.
+- Added `content-visibility: auto` and `contain-intrinsic-size` across off-screen sections (`.section`, `.merge`, `.cta-section`) to reduce initial render cost.
+- Implemented `font-size-adjust: from-font` to eliminate layout shift (CLS) across fallback system fonts.
+- Implemented complete ARIA semantics: skip-to-content landmark, accessible form inputs with `autocomplete="email"`, tablist/tab controls for carousel, synchronized `aria-expanded` and `aria-controls` for FAQ accordion, and `role="progressbar"` for mini-bars.
+- Optimized JavaScript runtime: throttled bento hover animations via `requestAnimationFrame`, paused CPU sparkline intervals when scrolled out of viewport via `IntersectionObserver`, and added `{ passive: true }` flags on scroll listeners.
+- Added OpenGraph, Twitter Cards, canonical URL, and Schema.org `SoftwareApplication` JSON-LD metadata for SEO.
 - Fixed an issue where `BrightnessEngine`'s hardware brightness echo (from clamping built-in displays to 0.01 in the sub-zero range) would overwrite the software brightness state, erasing sub-zero dimming.
 - Updated `BrightnessOSD.swift` slider track to correctly visualize the -1.0 to 1.0 range, matching the main popover slider with an indigo-to-blue gradient for sub-zero values.
 
