@@ -38,17 +38,19 @@ jobs:
 
       # CI runners have a healthy toolchain, so the local CLT 26.5 workaround
       # (Makefile fix-toolchain / SWIFTPM_CUSTOM_LIBS_DIR) is neither needed nor
-      # wanted here — invoke SwiftPM directly.
+      # wanted here — override the Makefile toolchain settings.
       - name: Build (debug)
-        run: swift build -v
+        run: make build SWIFT=swift
 
       - name: Test
-        run: swift test -v
+        run: make test SWIFT=swift TEST_FLAGS=
+
+      - name: CLI fixture smoke tests
+        run: make cli-smoke SWIFT=swift
 
       # Smoke-test the release path that CD depends on: a release build must
       # compile and bundle.sh must produce a launchable .app.
       - name: Release build + bundle smoke test
         run: |
-          swift build -c release
-          scripts/bundle.sh dist-ci
-          test -x dist-ci/Pulse.app/Contents/MacOS/Pulse
+          make bundle SWIFT=swift
+          test -x dist/Pulse.app/Contents/MacOS/Pulse

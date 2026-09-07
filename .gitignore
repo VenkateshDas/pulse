@@ -15,15 +15,22 @@ pulse/dist/
 pulse/dist-ci/
 
 # Dev tools (local only — not for public repo)
-.agents/
-.claude/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/pulse/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/pulse
 graphify-out/
 pulse/graphify-out/
 skills-lock.json
 legacy_tui/skills-lock.json
 
 # Internal docs / wiki (dev-only)
-docs/
+docs/*
+!docs/pulse-cli.md
 index.md
 log.md
 AGENTS.md

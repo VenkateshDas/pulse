@@ -1,4 +1,5 @@
 import Foundation
+import CPulse
 import Testing
 
 @testable import PulseKit
@@ -91,4 +92,29 @@ struct DuplicateScannerTests {
 
         #expect(groups.isEmpty)
     }
+    @Test func recognizesHardLinksAndConfigurableMinimum() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let original = dir.appendingPathComponent("original")
+        try Data(repeating: 0x51, count: 500).write(to: original)
+        try FileManager.default.linkItem(at: original, to: dir.appendingPathComponent("linked"))
+        let groups = try await DuplicateScanner(minFileSize: 100).scan(directories: [dir]) { _ in }
+        #expect(groups.count == 1)
+        #expect(groups.first?.isAPFSClone == true)
+        #expect(groups.first?.totalReclaimableBytes == 0)
+    }
+
+    @Test func recognizesAPFSCloneIdentityWhenAvailable() async throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let original = dir.appendingPathComponent("original"), copy = dir.appendingPathComponent("clone")
+        try Data(repeating: 0x41, count: 16384).write(to: original)
+        guard clonefile(original.path, copy.path, 0) == 0 else { return }
+        let identity = pulse_clone_id(original.path)
+        guard identity != 0 else { return } // Older volumes do not expose clone IDs.
+        #expect(pulse_clone_id(copy.path) == identity)
+        let groups = try await DuplicateScanner().scan(directories: [dir]) { _ in }
+        #expect(groups.first?.isAPFSClone == true)
+    }
+
 }

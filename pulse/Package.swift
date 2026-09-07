@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "PulseKit", targets: ["PulseKit"]),
         .executable(name: "Pulse", targets: ["Pulse"]),
+        .executable(name: "pulse-cli", targets: ["PulseCLI"]),
     ],
     // Sparkle auto-updates (P0-8): Updater.swift wires it up behind
     // `#if canImport(Sparkle)`, so enabling is a two-line change here —
@@ -37,10 +38,13 @@ let package = Package(
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [
             .process("Resources")
         ]),
+        // Native CLI command center for agents and terminal users.
+        .executableTarget(name: "PulseCLI", dependencies: ["PulseKit"]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
         // Unit tests for pure app-layer logic (display-mode gating, sidebar
         // visibility, label formatting) — no UI, so testable directly
         // against the executable target.
         .testTarget(name: "PulseTests", dependencies: ["Pulse"]),
+        .testTarget(name: "PulseCLITests", dependencies: ["PulseCLI", "PulseKit"]),
     ]
 )

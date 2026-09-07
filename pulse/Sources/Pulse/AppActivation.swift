@@ -116,7 +116,9 @@ final class AppActivation {
 /// the initial activation policy once AppKit is ready.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var cliControl: AppControlServer?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        cliControl = AppControlServer()
         AppActivation.shared.applyInitialPolicy()
         MenuBarManager.shared.start()
         

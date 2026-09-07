@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 public struct TrashedItem: Codable, Sendable, Equatable {
     public let originalPath: String
@@ -26,115 +27,98 @@ public struct UndoEntry: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
+/// File lock spans reload, mutation and atomic save across GUI and CLI processes.
 public actor UndoJournal {
     public static let shared = UndoJournal()
-
     private let storeURL: URL
-    public private(set) var entries: [UndoEntry] = []
-
-    /// Default journal location: Pulse's own Application Support directory.
-    /// Must NOT live under any path the cleaners can delete (e.g. `~/.gemini`,
-    /// which CleanCatalog stages as developer junk) — that would let Smart Clean
-    /// wipe its own undo history.
+    private var cached: [UndoEntry] = []
+    public private(set) var lastError: String?
+    public var entries: [UndoEntry] { (try? read()) ?? cached }
     public static func defaultStoreURL() -> URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask
-        ).first ?? FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support")
-        return appSupport.appendingPathComponent("Pulse/undo_journal.json")
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/Pulse/undo_journal.json")
     }
-
-    public init(storeURL: URL = UndoJournal.defaultStoreURL()) {
-        self.storeURL = storeURL
-        if let data = try? Data(contentsOf: storeURL),
-           let loaded = try? JSONDecoder().decode([UndoEntry].self, from: data) {
-            self.entries = loaded
-        } else {
-            self.entries = []
-        }
+    public init(storeURL: URL = UndoJournal.defaultStoreURL()) { self.storeURL = storeURL }
+    private func read() throws -> [UndoEntry] {
+        guard FileManager.default.fileExists(atPath: storeURL.path) else { return [] }
+        return try JSONDecoder().decode([UndoEntry].self, from: Data(contentsOf: storeURL))
     }
-
-    private func save() {
-        let dir = storeURL.deletingLastPathComponent()
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        try? data.write(to: storeURL, options: .atomic)
+    private func save() throws {
+        try JSONEncoder().encode(cached).write(to: storeURL, options: .atomic)
     }
-
+    private func locked<T>(_ body: () throws -> T) throws -> T {
+        try FileManager.default.createDirectory(at: storeURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let fd = open(storeURL.path + ".lock", O_CREAT | O_RDWR | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        defer { close(fd) }
+        guard flock(fd, LOCK_EX) == 0 else { throw POSIXError(.EIO) }
+        defer { flock(fd, LOCK_UN) }
+        cached = try read()
+        return try body()
+    }
+    public func snapshot() throws -> [UndoEntry] { try locked { cached } }
+    public func recordChecked(_ entry: UndoEntry) throws {
+        try locked { cached.insert(entry, at: 0); try save() }
+    }
+    /// Compatibility for existing GUI callers; failure remains observable.
     public func record(_ entry: UndoEntry) {
-        entries.insert(entry, at: 0)
-        save()
+        do { try recordChecked(entry); lastError = nil }
+        catch { lastError = error.localizedDescription; NSLog("Pulse undo journal: %@", error.localizedDescription) }
     }
-
-    /// Attempts to restore every item in the entry. Returns the count actually
-    /// moved back. Items whose trashed copy is gone (Trash emptied) or whose
-    /// original path is already occupied are skipped, not fatal — one bad item
-    /// must not abort the rest. Successfully restored items are dropped from the
-    /// entry; the entry is removed only once it's fully restored.
-    @discardableResult
-    public func restore(_ id: UUID) async throws -> Int {
-        guard let index = entries.firstIndex(where: { $0.id == id }) else { return 0 }
-        let entry = entries[index]
-        let fm = FileManager.default
-
-        var restored = 0
-        var remaining: [TrashedItem] = []
-        for item in entry.items {
-            let trashURL = URL(fileURLWithPath: item.trashPath)
-            let originalURL = URL(fileURLWithPath: item.originalPath)
-
-            // Trashed copy gone (e.g. Trash emptied) — nothing to restore.
-            guard fm.fileExists(atPath: trashURL.path) else { continue }
-            // Original path reoccupied (e.g. cache regenerated) — leave the
-            // trashed copy in place rather than clobbering live data.
-            guard !fm.fileExists(atPath: originalURL.path) else {
-                remaining.append(item)
-                continue
+    /// Persist each CLI move before starting the next one. Roll back on save failure.
+    public func trashItem(at url: URL, operation: String, bytes: UInt64) throws -> UndoEntry {
+        try locked {
+            try save() // Preflight persistence before touching user files.
+            var trashed: NSURL?
+            try FileManager.default.trashItem(at: url, resultingItemURL: &trashed)
+            guard let trashPath = trashed?.path else {
+                throw NSError(domain: "Pulse", code: 1, userInfo: [NSLocalizedDescriptionKey: "Trash moved \(url.path) without returning its destination; inspect Finder Trash."])
             }
-
-            let parent = originalURL.deletingLastPathComponent()
-            try? fm.createDirectory(at: parent, withIntermediateDirectories: true)
-
-            do {
-                try fm.moveItem(at: trashURL, to: originalURL)
-                restored += 1
-            } catch {
-                remaining.append(item)
+            let entry = UndoEntry(op: operation, items: [.init(originalPath: url.path, trashPath: trashPath)], bytesFreed: Int64(clamping: bytes))
+            cached.insert(entry, at: 0)
+            do { try save() }
+            catch {
+                do { try FileManager.default.moveItem(atPath: trashPath, toPath: url.path) }
+                catch { throw NSError(domain: "Pulse", code: 2, userInfo: [NSLocalizedDescriptionKey: "Journal save and rollback failed. Recover \(trashPath) to \(url.path) manually."]) }
+                throw error
             }
+            return entry
         }
-
-        if remaining.isEmpty {
-            entries.remove(at: index)
-        } else {
-            entries[index] = UndoEntry(
-                id: entry.id, op: entry.op, date: entry.date,
-                items: remaining, bytesFreed: entry.bytesFreed)
-        }
-        save()
-        return restored
     }
-
-    /// Drops items whose trashed copy no longer exists (Trash emptied in
-    /// Finder or Pulse), so history never shows a Restore that can't work.
-    /// Entries left with no restorable items disappear entirely.
+    @discardableResult public func restore(_ id: UUID) throws -> Int {
+        try locked {
+            guard let index = cached.firstIndex(where: { $0.id == id }) else { return 0 }
+            try save()
+            let entry = cached[index]
+            var count = 0, remaining: [TrashedItem] = []
+            for item in entry.items {
+                let fm = FileManager.default
+                guard fm.fileExists(atPath: item.trashPath) else { continue }
+                guard !fm.fileExists(atPath: item.originalPath) else { remaining.append(item); continue }
+                do {
+                    try fm.createDirectory(at: URL(fileURLWithPath: item.originalPath).deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try fm.moveItem(atPath: item.trashPath, toPath: item.originalPath)
+                    count += 1
+                } catch { remaining.append(item) }
+            }
+            if remaining.isEmpty { cached.remove(at: index) }
+            else { cached[index] = .init(id: entry.id, op: entry.op, date: entry.date, items: remaining, bytesFreed: entry.bytesFreed) }
+            try save()
+            return count
+        }
+    }
     public func pruneMissing() {
-        let fm = FileManager.default
-        var changed = false
-        entries = entries.compactMap { entry in
-            let alive = entry.items.filter { fm.fileExists(atPath: $0.trashPath) }
-            if alive.count == entry.items.count { return entry }
-            changed = true
-            guard !alive.isEmpty else { return nil }
-            return UndoEntry(
-                id: entry.id, op: entry.op, date: entry.date,
-                items: alive, bytesFreed: entry.bytesFreed)
-        }
-        if changed { save() }
+        do {
+            try locked {
+                cached = cached.compactMap { entry in
+                    let items = entry.items.filter { FileManager.default.fileExists(atPath: $0.trashPath) }
+                    return items.isEmpty ? nil : .init(id: entry.id, op: entry.op, date: entry.date, items: items, bytesFreed: entry.bytesFreed)
+                }
+                try save()
+            }
+        } catch { lastError = error.localizedDescription; NSLog("Pulse undo journal: %@", error.localizedDescription) }
     }
-
     public func prune(olderThan days: Int = 30) {
-        let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
-        entries.removeAll { $0.date < cutoff }
-        save()
+        do { try locked { cached.removeAll { $0.date < Date().addingTimeInterval(-Double(days) * 86400) }; try save() } }
+        catch { lastError = error.localizedDescription; NSLog("Pulse undo journal: %@", error.localizedDescription) }
     }
 }

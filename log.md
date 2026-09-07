@@ -69,3 +69,10 @@
 - Throttled `StorageScanner.scanSizesStream` yields (100ms interval + final yield) to eliminate SwiftUI `@MainActor` re-render thrashing during directory sizing.
 - Unified battery log backfill in `BatteryHistoryStore` and `DashboardModel` to a single pass and avoided redundant `pmset -g log` subprocess execution on startup when cached history is present.
 
+## [2026-09-08] Feature | Complete native Pulse CLI and portable agent skill
+- Repaired the uncommitted CLI draft; added strict parser/JSON contracts, all 14 planned commands, cached-only speed-test history, Make targets and test coverage.
+- Added acknowledged app-owned display/sleep controls and bounded DDC completion reporting; CLI sampling no longer writes GUI disk history.
+- Hardened exact cleanup/uninstall selection, protected-data and active-file checks, per-move journal persistence/rollback, cross-process locking and conflict-preserving undo.
+- Fixed APFS clone detection to use native clone IDs instead of equating clones with inodes; made duplicate minimum size configurable.
+- Added standards-validated `.agents/skills/pulse/SKILL.md`, Claude discovery link and `docs/pulse-cli.md`; preserved the existing branch and unrelated local work.
+- Verified build/tests, native read commands, full volume growth, fixture Trash/uninstall/restore, display read/set, and timed app-owned keep-awake. Visual/functional user approval remains the merge gate.
