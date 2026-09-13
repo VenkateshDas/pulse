@@ -6,7 +6,7 @@ Scope: all 15 CLI commands, portable skill, shared native probes, build/test/pac
 
 - Baseline: 323 tests across 68 suites passed; local CLI smoke passed, but PR #80 CI had failed because cold-cache verdict exceeded 120 seconds.
 - Corrected verdict probes: native Homebrew receipts and bounded Mach-O headers replace shell execution. Regression failed before the fix. Updated suite: 327 tests across 69 suites passed. Expanded smoke passed; first native-cache verdict took 0.76 seconds locally.
-- Debug build, release build and local signed app bundle passed. Final native release rebuild and CI status are recorded below when complete.
+- Debug build, final native release rebuild, local signed app bundle and strict signature verification passed. Staged install and user-local install passed; corrected release CLI is installed at `~/.local/bin/pulse`. Fresh rebuilt app passed display writes and timed/indefinite sleep with expiry/allow. Required CI status is tracked on [PR #80](https://github.com/VenkateshDas/pulse/pull/80).
 - All 15 commands returned parseable JSON with expected exit status. Human and JSON help were checked. Additional 54 live JSON/argument/safety calls passed.
 
 | Component | Verification |
