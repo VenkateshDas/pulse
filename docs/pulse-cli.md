@@ -67,3 +67,11 @@ Manual terminal verification also covered all read commands, a full growth scan,
 A release `vitals --lite` invocation measured 0.69s and 18,219,008 bytes peak RSS (about 17.4 MiB). The CLI was installed at `~/.local/bin/pulse` on this machine.
 
 The proposed <10ms/<15MB blanket target is not a valid contract for filesystem scans or fresh CPU/network rates. On this machine, debug telemetry measured approximately 0.4–0.7s, history reads approximately 10ms, and a full growth scan approximately 46s. These are observations, not guarantees. CLI invocation adds no background sampler. Physical duplicate savings remain estimates because APFS sharing/compression can differ from logical size; unavailable clone metadata is not proof of independent blocks.
+
+## September 13 native probe correction
+
+The original cold-cache `verdict` path indirectly invoked `brew uses` and `otool -L` through UsageGraphScanner. This violated the CLI contract and CI timed out after 120 seconds. Both collectors now read files directly: Homebrew keg receipts supply installed runtime dependencies; Mach-O headers supply library load paths. Header reads are bounded to 1 MiB, universal tables to 64 architectures, and malformed input is rejected. The cache namespace is `usage-cache-native-v1`, so existing shell-derived caches cannot mask the new readers.
+
+Receipt evidence does not include build-only dependencies or changed formula definitions. Mach-O inspection covers thin/universal binaries, both byte orders, absolute paths and loader/executable-relative paths; unresolved `@rpath` names are omitted. These are static clues, not a complete dependency proof.
+
+See [September 13 CLI and skill audit](pulse-cli-audit-2026-09-13.md) for command coverage, action recovery, performance and remaining release gates.

@@ -79,3 +79,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 | F2 SQLite VACUUM (Mail/Messages) | Mole F2 | Not built |
 | F2 Quarantine cleanup | Mole F2 | Not built |
 | F3 Weekly orphan background scan | Mole F3 | Not built — manual only |
+
+- **CLI/skill deployment audit (2026-09-13):** [Results and release gates](docs/pulse-cli-audit-2026-09-13.md); [approved native probe design](docs/superpowers/specs/2026-09-13-native-verdict-design.md). UsageGraphScanner now reads Homebrew receipts and Mach-O headers without subprocesses.

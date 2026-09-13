@@ -107,55 +107,25 @@ struct UsageGraphTests {
         #expect(edges.isEmpty)
     }
 
-    // MARK: Homebrew (mocked shell)
+    // MARK: Native Homebrew receipts
 
-    @Test func homebrewUsesEdgeForInstalledFormula() async throws {
+    @Test func homebrewReceiptFindsInstalledDependencyWithoutBrew() async throws {
         let prefix = tempDir()
+        defer { try? FileManager.default.removeItem(at: prefix) }
         let cellar = prefix.appendingPathComponent("Cellar")
-        let formulaDir = cellar.appendingPathComponent("miniforge")
-        try FileManager.default.createDirectory(at: formulaDir, withIntermediateDirectories: true)
-        let brewBin = prefix.appendingPathComponent("bin")
-        try FileManager.default.createDirectory(at: brewBin, withIntermediateDirectories: true)
-        let brewPath = brewBin.appendingPathComponent("brew").path
-        FileManager.default.createFile(atPath: brewPath, contents: nil)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: brewPath)
-
+        let target = cellar.appendingPathComponent("libfoo")
+        let receipt = cellar.appendingPathComponent("consumer/1.0/INSTALL_RECEIPT.json")
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: receipt.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"runtime_dependencies":[{"full_name":"vendor/tap/libfoo","version":"1.0"}]}"#.utf8).write(to: receipt)
         let scanner = UsageGraphScanner(
-            cache: UsageIndexCache(directory: tempDir()),
-            home: tempDir().path,
-            brewPrefixes: [prefix.path],
-            textRefFiles: [], plistDirs: [], appDirectories: [], binDirectories: [], symlinkRoots: [],
-            runShell: { exe, args in
-                guard exe == brewPath, args == ["uses", "--installed", "miniforge"] else { return nil }
-                return Shell.Output(exitCode: 0, stdout: "some-package\n", stderr: "")
-            })
-
-        let edges = await scanner.referrers(for: formulaDir)
+            cache: UsageIndexCache(directory: prefix.appendingPathComponent("cache")),
+            home: prefix.path, brewPrefixes: [prefix.path], textRefFiles: [],
+            plistDirs: [], appDirectories: [], binDirectories: [], symlinkRoots: [])
+        let edges = await scanner.referrers(for: target)
         #expect(edges.count == 1)
         #expect(edges.first?.signal == .homebrew)
-        #expect(edges.first?.detail == "brew uses: some-package")
-    }
-
-    @Test func homebrewFormulaWithNoDependentsIsOrphan() async throws {
-        let prefix = tempDir()
-        let cellar = prefix.appendingPathComponent("Cellar")
-        let formulaDir = cellar.appendingPathComponent("old-lib")
-        try FileManager.default.createDirectory(at: formulaDir, withIntermediateDirectories: true)
-        let brewBin = prefix.appendingPathComponent("bin")
-        try FileManager.default.createDirectory(at: brewBin, withIntermediateDirectories: true)
-        let brewPath = brewBin.appendingPathComponent("brew").path
-        FileManager.default.createFile(atPath: brewPath, contents: nil)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: brewPath)
-
-        let scanner = UsageGraphScanner(
-            cache: UsageIndexCache(directory: tempDir()),
-            home: tempDir().path,
-            brewPrefixes: [prefix.path],
-            textRefFiles: [], plistDirs: [], appDirectories: [], binDirectories: [], symlinkRoots: [],
-            runShell: { _, _ in Shell.Output(exitCode: 0, stdout: "", stderr: "") })
-
-        let edges = await scanner.referrers(for: formulaDir)
-        #expect(edges.isEmpty)
+        #expect(edges.first?.source.path == prefix.appendingPathComponent("opt/consumer").path)
     }
 
     // MARK: Cache
@@ -173,14 +143,11 @@ struct UsageGraphTests {
             cache: cache, home: tempDir().path,
             brewPrefixes: ["/nonexistent-brew-prefix-for-test"],
             textRefFiles: [], plistDirs: [], appDirectories: [], binDirectories: [],
-            symlinkRoots: ["/nonexistent-root-for-test"],
-            runShell: { _, _ in nil })
+            symlinkRoots: ["/nonexistent-root-for-test"])
 
         let edges = await scanner.referrers(for: target)
         #expect(edges.map(\.detail) == ["pre-seeded"])
-        // homebrew is the only signal that shells out, and its cache is
-        // untouched here — confirms the symlink cache hit skipped a re-walk
-        // rather than silently recomputing and overwriting it.
+        // Cached evidence must survive without touching the absent scan root.
         #expect(cache.load(.symlink)?.map(\.detail) == ["pre-seeded"])
     }
 
@@ -200,8 +167,7 @@ struct UsageGraphTests {
             cache: cache, home: root.path,
             brewPrefixes: ["/nonexistent-brew-prefix-for-test"],
             textRefFiles: ["~/.zshrc"], plistDirs: [], appDirectories: [], binDirectories: [],
-            symlinkRoots: [],
-            runShell: { _, _ in nil })
+            symlinkRoots: [])
 
         let stale = await scanner.referrers(for: target)
         #expect(stale.isEmpty)

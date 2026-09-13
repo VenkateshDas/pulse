@@ -10,6 +10,9 @@ def run(args,expected=0,timeout=120):
  assert p.returncode==expected,(args,p.returncode,data)
  print(args[0], 'exit',p.returncode, 'seconds',round(time.monotonic()-t,2),flush=True)
  return data
+help=run(['--help']); assert len(help['subcommands'])==15
+for command in help['subcommands']:
+ run([command,'--help']); run([command,'--unknown'],2)
 for args in [['clean','--yes'],['display','set','nan'],['procs','--limit','-1'],['vitals','--json=false']]:run(args,2)
 root=pathlib.Path(tempfile.mkdtemp(prefix='pulse-cli-fixture-'))
 try:
@@ -23,7 +26,14 @@ try:
  try:
   scan=run(['clean','--scan']);assert any(x['id']==str(cache) for x in scan)
   preview=run(['clean','--target',str(cache)]);assert preview['dryRun'] and cache.exists()
+  preview=run(['clean','--target',str(cache),'--dry-run','--yes']);assert preview['dryRun'] and cache.exists()
+  with (cache/'fixture').open() as opened:
+   refused=run(['clean','--target',str(cache),'--yes'],1);assert refused['failures'] and cache.exists()
   result=run(['clean','--target',str(cache),'--yes']);assert not cache.exists() and len(result['undoIDs'])==1
+  cache.mkdir();(cache/'conflict').write_text('keep')
+  conflict=run(['undo','restore',result['undoIDs'][0]],1);assert conflict['remainingItems']==1 and (cache/'conflict').read_text()=='keep'
+  # Only this generated conflicting fixture is removed; no user files are touched.
+  (cache/'conflict').unlink();cache.rmdir()
   run(['undo','restore',result['undoIDs'][0]]);assert (cache/'fixture').read_text()=='pulse safe fixture'
  finally: shutil.rmtree(cache,ignore_errors=True)
  app=pathlib.Path.home()/'Applications'/('PulseCLIFixture-'+str(uuid.uuid4())+'.app')

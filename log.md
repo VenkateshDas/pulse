@@ -76,3 +76,6 @@
 - Fixed APFS clone detection to use native clone IDs instead of equating clones with inodes; made duplicate minimum size configurable.
 - Added standards-validated `.agents/skills/pulse/SKILL.md`, Claude discovery link and `docs/pulse-cli.md`; preserved the existing branch and unrelated local work.
 - Verified build/tests, native read commands, full volume growth, fixture Trash/uninstall/restore, display read/set, and timed app-owned keep-awake. Visual/functional user approval remains the merge gate.
+
+## [2026-09-13] CLI verification and native probes | Fix cold-cache verdict subprocesses
+- Audited every CLI command and exercised fixture cleanup/uninstall/restore, display controls and timed sleep. Replaced brew/otool probes with native receipt/header reads; added malformed-input regressions and expanded CLI smoke. See docs/pulse-cli-audit-2026-09-13.md for results and remaining release gates.
