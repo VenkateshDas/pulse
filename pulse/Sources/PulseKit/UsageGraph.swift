@@ -11,7 +11,7 @@ public struct UsageEdge: Sendable, Codable, Identifiable, Equatable {
     public let source: URL
     public let target: URL
     public let signal: ReferenceSignal
-    /// Human-readable evidence, e.g. ".zshrc:12" or "brew uses: python@3.11".
+    /// Human-readable evidence, e.g. ".zshrc:12" or "Installed runtime dependency: python@3.11".
     public let detail: String
 
     public init(source: URL, target: URL, signal: ReferenceSignal, detail: String) {
@@ -24,7 +24,7 @@ public struct UsageEdge: Sendable, Codable, Identifiable, Equatable {
 
 /// Per-signal JSON cache so a whole-disk crawl only happens once per signal
 /// until the user asks for a Rescan. Each signal is cached independently —
-/// a brew lookup is cheap, an otool binary sweep is not, and there's no
+/// receipt and binary header scans can be reused independently; there is no
 /// reason a Rescan of one should throw away the other three.
 public struct UsageIndexCache: Sendable {
     private struct Entry: Codable {
@@ -45,7 +45,7 @@ public struct UsageIndexCache: Sendable {
             for: .applicationSupportDirectory, in: .userDomainMask
         ).first ?? FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support")
-        return appSupport.appendingPathComponent("Pulse/usage-cache")
+        return appSupport.appendingPathComponent("Pulse/usage-cache-native-v1")
     }
 
     private func fileURL(for signal: ReferenceSignal) -> URL {
@@ -77,7 +77,6 @@ public struct UsageIndexCache: Sendable {
 public actor UsageGraphScanner {
     private let cache: UsageIndexCache
     private let fileManager: FileManager
-    private let runShell: @Sendable (String, [String]) async -> Shell.Output?
     private let home: String
 
     /// Root paths for each collector, `~` expanded against `home`. Defaults
@@ -98,10 +97,7 @@ public actor UsageGraphScanner {
         plistDirs: [String] = ["~/Library/LaunchAgents", "/Library/LaunchAgents", "/Library/LaunchDaemons"],
         appDirectories: [String] = ["/Applications", "~/Applications"],
         binDirectories: [String] = ["/opt/homebrew/bin", "/usr/local/bin"],
-        symlinkRoots: [String] = ["/opt/homebrew", "/usr/local", "~/Applications", "~/bin", "~/.local"],
-        runShell: @escaping @Sendable (String, [String]) async -> Shell.Output? = { exe, args in
-            try? await Shell.run(exe, args)
-        }
+        symlinkRoots: [String] = ["/opt/homebrew", "/usr/local", "~/Applications", "~/bin", "~/.local"]
     ) {
         self.cache = cache
         self.fileManager = fileManager
@@ -112,7 +108,6 @@ public actor UsageGraphScanner {
         self.appDirectories = appDirectories
         self.binDirectories = binDirectories
         self.symlinkRoots = symlinkRoots
-        self.runShell = runShell
     }
 
     private func expand(_ path: String) -> String {
@@ -138,7 +133,7 @@ public actor UsageGraphScanner {
     }
 
     /// True when `edgeTarget` is `queried` itself or falls inside it — an
-    /// edge's target is often a specific file (an otool load path, a resolved
+    /// edge's target is often a specific file (a Mach-O load path, a resolved
     /// symlink destination) one or more levels under the folder being asked
     /// about.
     private func matches(_ edgeTarget: URL, _ queried: URL) -> Bool {
@@ -147,50 +142,49 @@ public actor UsageGraphScanner {
 
     private func crawl(_ signal: ReferenceSignal) async -> [UsageEdge] {
         switch signal {
-        case .homebrew: return await homebrewEdges()
+        case .homebrew: return homebrewEdges()
         case .textRef: return textRefEdges()
-        case .dylib: return await dylibEdges()
+        case .dylib: return dylibEdges()
         case .symlink: return symlinkEdges()
         }
     }
 
     // MARK: - Homebrew
 
-    /// Every `brew uses --installed <formula>` edge for every installed
-    /// formula — cheapest, most authoritative signal for the Cellar/opt
-    /// case (covers `miniforge`, `python@3.x`, etc.).
-    private func homebrewEdges() async -> [UsageEdge] {
-        guard let brew = brewExecutable() else { return [] }
+    /// Installed runtime dependencies come from keg receipts, without invoking brew.
+    private func homebrewEdges() -> [UsageEdge] {
         var out: [UsageEdge] = []
         for prefix in brewPrefixes {
             let cellar = URL(fileURLWithPath: "\(prefix)/Cellar")
-            guard let formulae = try? fileManager.contentsOfDirectory(
-                at: cellar, includingPropertiesForKeys: nil)
-            else { continue }
-            for formulaDir in formulae {
-                let formula = formulaDir.lastPathComponent
-                guard let result = await runShell(brew, ["uses", "--installed", formula]),
-                    result.ok
-                else { continue }
-                for dep in result.stdout.split(separator: "\n").map(String.init)
-                where !dep.isEmpty {
-                    let depPath = URL(fileURLWithPath: "\(prefix)/opt/\(dep)")
-                    out.append(
-                        UsageEdge(
-                            source: depPath, target: formulaDir, signal: .homebrew,
-                            detail: "brew uses: \(dep)"))
+            guard let formulae = try? fileManager.contentsOfDirectory(at: cellar, includingPropertiesForKeys: nil) else { continue }
+            for formula in formulae {
+                guard let versions = try? fileManager.contentsOfDirectory(at: formula, includingPropertiesForKeys: nil) else { continue }
+                var dependencies = Set<String>()
+                for version in versions {
+                    let receipt = version.appendingPathComponent("INSTALL_RECEIPT.json")
+                    guard let values = try? receipt.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                          values.isRegularFile == true, let size = values.fileSize, size <= 1_048_576,
+                          let data = try? Data(contentsOf: receipt),
+                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let runtime = json["runtime_dependencies"] as? [[String: Any]] else { continue }
+                    for dependency in runtime {
+                        guard let fullName = dependency["full_name"] as? String,
+                              let name = fullName.split(separator: "/").last.map(String.init),
+                              name != ".", name != ".." else { continue }
+                        dependencies.insert(name)
+                    }
+                }
+                for dependency in dependencies {
+                    let target = cellar.appendingPathComponent(dependency)
+                    guard fileManager.fileExists(atPath: target.path) else { continue }
+                    out.append(UsageEdge(
+                        source: URL(fileURLWithPath: "\(prefix)/opt/\(formula.lastPathComponent)"),
+                        target: target, signal: .homebrew,
+                        detail: "Installed runtime dependency: \(formula.lastPathComponent)"))
                 }
             }
         }
         return out
-    }
-
-    private func brewExecutable() -> String? {
-        for prefix in brewPrefixes {
-            let candidate = "\(prefix)/bin/brew"
-            if fileManager.isExecutableFile(atPath: candidate) { return candidate }
-        }
-        return nil
     }
 
     // MARK: - Text references
@@ -259,24 +253,14 @@ public actor UsageGraphScanner {
 
     // MARK: - Dylib linkage
 
-    /// Walks common binary roots with `otool -L`, recording every linked
-    /// load path. Filtered down to whatever falls under the queried target
-    /// by `referrers(for:)` — this crawl itself is target-agnostic so it can
-    /// be cached and reused across queries.
-    private func dylibEdges() async -> [UsageEdge] {
-        var out: [UsageEdge] = []
-        for binary in binariesToInspect() {
-            guard let result = await runShell("/usr/bin/otool", ["-L", binary.path]), result.ok
-            else { continue }
-            for line in result.stdout.split(separator: "\n").dropFirst() {
-                guard let loadPath = line.split(separator: " ").first else { continue }
-                out.append(
-                    UsageEdge(
-                        source: binary, target: URL(fileURLWithPath: String(loadPath)),
-                        signal: .dylib, detail: "otool -L: \(binary.path)"))
+    /// Bounded native header reads; inspected executables are never run.
+    private func dylibEdges() -> [UsageEdge] {
+        binariesToInspect().flatMap { binary in
+            MachODependencies.paths(in: binary).map { path in
+                UsageEdge(source: binary, target: URL(fileURLWithPath: path),
+                          signal: .dylib, detail: "Mach-O dependency: \(binary.path)")
             }
         }
-        return out
     }
 
     /// Main executables of top-level `.app` bundles, plus direct children of

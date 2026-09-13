@@ -272,7 +272,7 @@ public final class UsageObserver: @unchecked Sendable {
     /// One sweep over this user's processes: every open vnode's path, with
     /// the owning process name. Other users' pids fail EPERM and are skipped.
     /// Cost is bounded: fd walks are capped per process.
-    static func sampleOpenFiles(maxFDsPerProcess: Int = 1024) -> [(path: String, process: String)] {
+    public static func sampleOpenFiles(maxFDsPerProcess: Int = 1024, includeNoise: Bool = false) -> [(path: String, process: String)] {
         var pids = [pid_t](repeating: 0, count: 8192)
         let byteCount = pids.withUnsafeMutableBufferPointer { buffer in
             proc_listallpids(buffer.baseAddress, Int32(buffer.count * MemoryLayout<pid_t>.size))
@@ -283,7 +283,7 @@ public final class UsageObserver: @unchecked Sendable {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let interestingPrefixes = [home, "/opt/homebrew", "/usr/local", "/Applications"]
 
-        for pid in pids[0..<Int(byteCount)] where pid > 0 {
+        for pid in pids[0..<min(Int(byteCount), pids.count)] where pid > 0 {
             let fdBytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
             guard fdBytes > 0 else { continue }
             let fdCount = min(Int(fdBytes) / MemoryLayout<proc_fdinfo>.size, maxFDsPerProcess)
@@ -299,11 +299,12 @@ public final class UsageObserver: @unchecked Sendable {
             var pathBuffer = [CChar](repeating: 0, count: 4096)
             let executablePath =
                 proc_pidpath(pid, &pathBuffer, 4096) > 0 ? String(nullTerminated: pathBuffer) : ""
-            guard !isNoiseProcess(name: processName, executablePath: executablePath) else {
+            guard includeNoise || !isNoiseProcess(name: processName, executablePath: executablePath) else {
                 continue
             }
 
-            for fd in fds[0..<(Int(got) / MemoryLayout<proc_fdinfo>.size)]
+            if includeNoise && !executablePath.isEmpty { out.append((executablePath, processName)) }
+            for fd in fds[0..<min(fds.count, Int(got) / MemoryLayout<proc_fdinfo>.size)]
             where fd.proc_fdtype == PROX_FDTYPE_VNODE {
                 var vnodeInfo = vnode_fdinfowithpath()
                 let size = proc_pidfdinfo(
@@ -314,7 +315,7 @@ public final class UsageObserver: @unchecked Sendable {
                     String(decoding: raw.prefix(while: { $0 != 0 }), as: UTF8.self)
                 }
                 guard interestingPrefixes.contains(where: { path.hasPrefix($0) }),
-                    !ignoredSubstrings.contains(where: { path.contains($0) })
+                    (includeNoise || !ignoredSubstrings.contains(where: { path.contains($0) }))
                 else { continue }
                 out.append((path, processName))
             }

@@ -19,7 +19,8 @@ public actor PulseEngine {
     // (actor context, off the main thread), not at app init.
     private lazy var smc = SMCSensors()
 
-    public init() {}
+    private let recordsHistory: Bool
+    public init(recordsHistory: Bool = true) { self.recordsHistory = recordsHistory }
 
     /// Lightweight sample: skips process enumeration entirely.
     public func sampleLite() async -> SystemSnapshot {
@@ -43,7 +44,7 @@ public actor PulseEngine {
         let wifiInfo = connectionType == .wifi ? await wifi.sample() : nil
 
         let diskUsed = diskTotal > diskFree ? diskTotal - diskFree : 0
-        diskHistory.record(usedBytes: diskUsed)
+        if recordsHistory { diskHistory.record(usedBytes: diskUsed) }
 
         var load = [Double](repeating: 0, count: 3)
         getloadavg(&load, 3)

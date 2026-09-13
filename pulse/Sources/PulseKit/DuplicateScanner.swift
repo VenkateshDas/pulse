@@ -81,10 +81,10 @@ public final class DuplicateScanner: @unchecked Sendable {
         }
     }
 
-    private let minFileSize: Int64 = 4096 // Ignore files smaller than 4 KiB
+    private let minFileSize: Int64 // Ignore files smaller than 4 KiB
     private let maxConcurrentTasks = min(ProcessInfo.processInfo.activeProcessorCount, 8)
 
-    public init() {}
+    public init(minFileSize: Int64 = 4096) { self.minFileSize = max(1, minFileSize) }
 
     public func scan(
         directories: [URL],
@@ -284,7 +284,9 @@ public final class DuplicateScanner: @unchecked Sendable {
 
         for (hash, urls) in rawGroups {
             var files: [DuplicateFile] = []
-            var inodes: Set<UInt64> = []
+            var identities: Set<String> = []
+            var cloneIDs: Set<String> = []
+            var allCloneIDsKnown = true
 
             for url in urls {
                 var statBuf = stat()
@@ -295,7 +297,10 @@ public final class DuplicateScanner: @unchecked Sendable {
                     let modifiedAt = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
                     let fileSize = Int64(statBuf.st_size)
 
-                    inodes.insert(inode)
+                    identities.insert("\(dev):\(inode)")
+                    let cloneID = pulse_clone_id(url.path)
+                    if cloneID == 0 { allCloneIDsKnown = false }
+                    else { cloneIDs.insert("\(dev):\(cloneID)") }
                     let file = DuplicateFile(
                         url: url,
                         fileSize: fileSize,
@@ -311,8 +316,8 @@ public final class DuplicateScanner: @unchecked Sendable {
             guard files.count > 1 else { continue }
 
             let fileSize = files.first?.fileSize ?? 0
-            // APFS clone or hard link if all copies share same inode
-            let isAPFSClone = (inodes.count == 1)
+            // Device-qualified inode identity detects hard links; APFS reports clones separately.
+            let isAPFSClone = identities.count == 1 || (allCloneIDsKnown && cloneIDs.count == 1)
 
             // Apply Smart Selection Heuristics
             files = applySmartSelection(to: files)

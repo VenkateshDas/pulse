@@ -3,6 +3,8 @@
 
 #include <libproc.h>
 #include <stdint.h>
+
+uint64_t pulse_clone_id(const char *path);
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
 

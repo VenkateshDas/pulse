@@ -32,6 +32,7 @@ public class BrightnessEngine: ObservableObject {
 
     @Published public private(set) var monitors: [Monitor] = []
     @Published public var brightnessMap: [CGDirectDisplayID: Double] = [:]
+    public private(set) var lastWriteErrors: [CGDirectDisplayID: String] = [:]
     private var ddcFailures: [CGDirectDisplayID: Int] = [:]
     private var observedDisplays: Set<CGDirectDisplayID> = []
     private var lastAppSet: [CGDirectDisplayID: Date] = [:]
@@ -148,6 +149,7 @@ public class BrightnessEngine: ObservableObject {
 
     public func setBrightness(for monitor: Monitor, to value: Double, showOSD: Bool = true) {
         guard monitors.contains(where: { $0.id == monitor.id }) else { return }
+        lastWriteErrors.removeValue(forKey: monitor.id)
         let clampedValue = max(-1.0, min(1.0, value))
         
         // Prevent the built-in screen from completely turning off (0.0) when entering the 
@@ -155,7 +157,8 @@ public class BrightnessEngine: ObservableObject {
         let hwValue = !monitor.isBuiltIn ? max(0.0, clampedValue) : (clampedValue <= -1.0 ? 0.0 : max(0.01, clampedValue))
 
         if DisplayServicesCanChangeBrightness(monitor.id) != 0 {
-            _ = DisplayServicesSetBrightness(monitor.id, Float(hwValue))
+            let status = DisplayServicesSetBrightness(monitor.id, Float(hwValue))
+            if status != 0 { lastWriteErrors[monitor.id] = "DisplayServices refused brightness (\(status))" }
             // User scale and linear scale are different curves — writing the
             // same number to both corrupts brightness (0.78 user + 0.78
             // linear lands at 0.91 user; measured). They only agree at 1.0,
@@ -208,6 +211,15 @@ public class BrightnessEngine: ObservableObject {
         }
     }
 
+    /// Let one-shot callers wait until queued hardware writes finish.
+    public func waitForPendingWrites() async -> Bool {
+        for _ in 0..<150 {
+            if ddcWriteInFlight.isEmpty { return true }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return ddcWriteInFlight.isEmpty
+    }
+
     // MARK: - Async DDC writes
 
     private var pendingDDCValue: [CGDirectDisplayID: UInt16] = [:]
@@ -231,6 +243,8 @@ public class BrightnessEngine: ObservableObject {
                 let success = Self.performDDCWrite(monitor: monitor, controlID: 0x10, newValue: value)
                 await MainActor.run {
                     self.ddcFailures[id] = success ? 0 : (self.ddcFailures[id] ?? 0) + 1
+                    if success { self.lastWriteErrors.removeValue(forKey: id) }
+                    else { self.lastWriteErrors[id] = "Monitor did not acknowledge DDC brightness" }
                 }
                 // Most external monitors' I2C controllers can't keep up with
                 // back-to-back commands — hammering them without a gap was

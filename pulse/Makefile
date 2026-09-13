@@ -76,9 +76,26 @@ clean:
 
 # Copy ManifestAPI and drop the stale *.private.swiftinterface files.
 fix-toolchain:
-	@if [ ! -d "$(FIX_DIR)/ManifestAPI" ]; then \
+	@if [ -d "$(CLT)/usr/lib/swift/pm/ManifestAPI" ] && [ ! -d "$(FIX_DIR)/ManifestAPI" ]; then \
 		mkdir -p "$(FIX_DIR)"; \
 		cp -R "$(CLT)/usr/lib/swift/pm/ManifestAPI" "$(FIX_DIR)/"; \
 		rm -f "$(FIX_DIR)"/ManifestAPI/PackageDescription.swiftmodule/*.private.swiftinterface; \
 		echo "Patched ManifestAPI installed at $(FIX_DIR)"; \
 	fi
+
+# Native agent CLI. DESTDIR/PREFIX support staged or user-local installs.
+PREFIX ?= /usr/local
+.PHONY: cli install-cli
+cli: fix-toolchain
+	$(SWIFT) build --product pulse-cli
+	install -d dist/cli
+	install -m 755 .build/debug/pulse-cli dist/cli/pulse
+
+install-cli: fix-toolchain
+	$(SWIFT) build -c release --product pulse-cli
+	install -d "$(DESTDIR)$(PREFIX)/bin"
+	install -m 755 .build/release/pulse-cli "$(DESTDIR)$(PREFIX)/bin/pulse"
+
+.PHONY: cli-smoke
+cli-smoke: cli
+	python3 scripts/cli-smoke.py
