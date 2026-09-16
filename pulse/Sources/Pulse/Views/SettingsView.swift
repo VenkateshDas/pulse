@@ -19,6 +19,10 @@ struct SettingsView: View {
     /// Bumped after every keybinding write to force the shortcuts section to
     /// re-read `KeybindingStore`, which isn't `@Observable`.
     @State private var keybindingsVersion = 0
+    @State private var agentBaseURL = AgentConfiguration.baseURL
+    @State private var agentAPIKey = AgentConfiguration.apiKey
+    @State private var agentModel = AgentConfiguration.model
+    @State private var agentStatus: String?
 
     private static let autoHideOptions: [TimeInterval] = [0, 5, 10, 15, 30]
     private static let maxItemsOptions = [1, 2, 3, 4, 5]
@@ -38,6 +42,7 @@ struct SettingsView: View {
                     appearanceSection
                     displayModeSection
                     generalSection
+                    agentSection
                     menuBarSection
                     keyboardShortcutsSection
                     notificationsSection
@@ -180,6 +185,71 @@ struct SettingsView: View {
             get: { AppActivation.shared.launchAtLogin },
             set: { AppActivation.shared.setLaunchAtLogin($0) }
         )
+    }
+
+    // MARK: - Pulse Agent
+
+    private var agentSection: some View {
+        section(
+            "Pulse Agent", icon: "sparkles", tint: Halo.interactive,
+            footnote: "Provider key stays in this Mac's Keychain. Pulse sends it only to its local Agent runtime."
+        ) {
+            settingsRow(title: "Provider", detail: "OpenRouter-compatible OpenAI endpoint.") {
+                Button("Use OpenRouter") {
+                    agentBaseURL = "https://openrouter.ai/api/v1"
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            rowDivider
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Base URL").font(.system(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                TextField("https://openrouter.ai/api/v1", text: $agentBaseURL)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+            }
+            rowDivider
+            VStack(alignment: .leading, spacing: 6) {
+                Text("API Key").font(.system(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                SecureField("sk-or-v1-…", text: $agentAPIKey)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+            }
+            rowDivider
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Model").font(.system(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                TextField("openai/gpt-4.1-mini", text: $agentModel)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+            }
+            HStack {
+                Button("Save Agent Settings") { saveAgentSettings() }
+                    .buttonStyle(.borderedProminent).tint(Halo.interactive)
+                if let agentStatus { Text(agentStatus).font(.system(size: 11)).foregroundStyle(Halo.textDim) }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private func saveAgentSettings() {
+        let baseURL = agentBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = agentModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: baseURL), ["https", "http"].contains(url.scheme?.lowercased()),
+              url.host != nil, !model.isEmpty, !agentAPIKey.isEmpty else {
+            agentStatus = "Enter a valid HTTP(S) base URL, API key, and model."
+            return
+        }
+        AgentConfiguration.baseURL = baseURL
+        AgentConfiguration.model = model
+        AgentConfiguration.apiKey = agentAPIKey
+        agentStatus = "Saved to Keychain"
+        Task {
+            guard await AgentDaemonManager.shared.ensureRunning() else { return }
+            do {
+                try await AgentClient.shared.updateConfiguration(baseURL: baseURL, apiKey: agentAPIKey, model: model)
+                agentStatus = "Connected"
+            } catch { agentStatus = "Saved; agent will use this after restart." }
+        }
     }
 
     // MARK: - Menu Bar

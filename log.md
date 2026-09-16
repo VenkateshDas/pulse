@@ -3,6 +3,7 @@
 ## [2026-09-16] Feature | Native Pulse Agent interface and authenticated Agno harness
 - Added Overview → Agent: native session rail, streamed evidence timeline, tool cards, final-answer lane, native action approvals, and pinned natural-language composer.
 - Added versioned sidecar event envelopes, local bearer authentication, bounded context/session summaries, and server-enforced human approval for all mutations.
+- Added OpenRouter-compatible Agent Settings: Keychain API-key storage, configurable base URL and model, plus runtime configuration refresh.
 - Recorded design and verification requirements in `docs/superpowers/specs/2026-09-16-pulse-agent-design.md`.
 
 ## [2026-09-04] Architecture Blueprint | CLI + Agent Skill Architecture & Implementation Plan

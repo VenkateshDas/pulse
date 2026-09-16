@@ -8,6 +8,8 @@ Add a local, opt-in Agno-powered assistant to Pulse. It diagnoses the Mac, inspe
 
 The native SwiftUI app owns the UI, approval controls, and sidecar lifecycle. A local Python AgentOS sidecar is permitted by product decision. It binds only to loopback and accepts a random bearer token created by Pulse for that launch. The sidecar invokes the existing Pulse CLI and Pulse Skill through typed tools.
 
+Settings stores the provider base URL and model in UserDefaults, and the provider API key in the macOS Keychain. OpenRouter defaults to `https://openrouter.ai/api/v1`; any OpenAI-compatible HTTP(S) endpoint and model identifier may be used.
+
 The agent is one agent, not a team. It stores sessions in SQLite and sends bounded context: four recent turns, a structured session summary, the current compact Pulse snapshot, and relevant tool evidence. Durable memories are opt-in and limited to user preferences. Tool outputs, paths, raw scans, API keys, and telemetry do not become durable memory.
 
 ## Event protocol

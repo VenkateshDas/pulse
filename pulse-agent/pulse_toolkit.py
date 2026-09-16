@@ -38,6 +38,11 @@ def find_pulse_cli() -> str:
 class PulseToolkit(Toolkit):
     def __init__(self, cli_path: Optional[str] = None, **kwargs):
         self.cli_path = cli_path or find_pulse_cli()
+        # Preview is a real safety precondition, not a prompt suggestion.
+        # State is intentionally process-local: a restarted sidecar requires a
+        # fresh scan, avoiding stale-path commits after the filesystem changed.
+        self.previewed_clean_targets: set[str] = set()
+        self.previewed_apps: set[str] = set()
 
         tools = [
             self.diagnose,
@@ -205,8 +210,13 @@ class PulseToolkit(Toolkit):
             dry_run: If True (default), previews paths and bytes without deleting.
                      Set to False ONLY after explicit user confirmation.
         """
+        if not dry_run and target_id not in self.previewed_clean_targets:
+            return {"error": "Preview this cleanup target before committing it."}
         flag = "--dry-run" if dry_run else "--yes"
-        return self._run_cmd(["clean", "--target", target_id, flag])
+        result = self._run_cmd(["clean", "--target", target_id, flag])
+        if dry_run and not result.get("error"):
+            self.previewed_clean_targets.add(target_id)
+        return result
 
     def list_installed_apps(self) -> Any:
         """
@@ -225,8 +235,13 @@ class PulseToolkit(Toolkit):
             dry_run: If True (default), previews bundle and leftovers without deleting.
                      Set to False ONLY after explicit user confirmation.
         """
+        if not dry_run and app_path_or_name not in self.previewed_apps:
+            return {"error": "Preview this app removal before committing it."}
         flag = "--dry-run" if dry_run else "--yes"
-        return self._run_cmd(["uninstall", app_path_or_name, flag])
+        result = self._run_cmd(["uninstall", app_path_or_name, flag])
+        if dry_run and not result.get("error"):
+            self.previewed_apps.add(app_path_or_name)
+        return result
 
     def list_undo_history(self) -> Any:
         """

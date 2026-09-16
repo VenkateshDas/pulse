@@ -22,6 +22,9 @@ public actor AgentDaemonManager {
         process.environment = ProcessInfo.processInfo.environment.merging([
             "PULSE_AGENT_TOKEN": token,
             "PULSE_AGENT_PORT": "\(port)",
+            "OPENAI_API_KEY": AgentConfiguration.apiKey,
+            "OPENAI_BASE_URL": AgentConfiguration.baseURL,
+            "PULSE_MODEL_ID": AgentConfiguration.model,
         ]) { _, new in new }
         process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         do { try process.run() } catch { return false }

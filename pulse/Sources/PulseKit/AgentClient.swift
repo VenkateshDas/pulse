@@ -81,6 +81,15 @@ public actor AgentClient {
         _ = try await URLSession.shared.data(for: request(path: "/runs/\(runId)/cancel", method: "POST"))
     }
 
+    public func updateConfiguration(baseURL: String, apiKey: String, model: String) async throws {
+        let body: [String: Any] = ["base_url": baseURL, "api_key": apiKey, "model": model]
+        var request = request(path: "/config", method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+    }
+
     public func fetchSessions() async throws -> [AgentSessionItem] {
         let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions"))
         struct Response: Decodable { let sessions: [Session]; struct Session: Decodable { let session_id: String; let name: String; let created_at: Int?; let updated_at: Int? } }

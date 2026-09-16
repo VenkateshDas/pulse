@@ -29,6 +29,10 @@ class RunRequest(BaseModel):
     session_id: Optional[str] = None
 class ContinueRequest(BaseModel):
     approved: bool
+class ConfigurationRequest(BaseModel):
+    base_url: str
+    api_key: str
+    model: str
 
 def compact(value: Any, limit: int = 800) -> str:
     text = value if isinstance(value, str) else json.dumps(value, default=str, separators=(",", ":"))
@@ -76,6 +80,16 @@ async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[
 async def status() -> dict[str, Any]:
     return {"status": "ok", "has_api_key": bool(os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")), "summary": "Ready"}
 
+@app.post("/config", dependencies=[Depends(require_token)])
+async def configure(request: ConfigurationRequest) -> dict[str, str]:
+    """Apply new provider settings only after native Keychain persistence."""
+    global agent_instance
+    os.environ["OPENAI_BASE_URL"] = request.base_url.strip()
+    os.environ["OPENAI_API_KEY"] = request.api_key
+    os.environ["PULSE_MODEL_ID"] = request.model.strip()
+    agent_instance = None
+    return {"status": "updated"}
+
 @app.post("/runs", dependencies=[Depends(require_token)])
 async def run(request: RunRequest) -> StreamingResponse:
     async def events() -> AsyncIterator[str]:
@@ -89,8 +103,10 @@ async def run(request: RunRequest) -> StreamingResponse:
         try:
             stream = await agent().arun(input=request.message, session_id=session_id, stream=True, stream_events=True)
             async for line in translate(stream, run_id, session_id, store): yield line
-        except Exception as error:
-            async for line in emit(store, run_id, session_id, "run.failed", {"text": str(error)}): yield line
+        except Exception:
+            # Provider exceptions may include endpoint or request diagnostics.
+            # Keep those in local server logs; never put them in chat history.
+            async for line in emit(store, run_id, session_id, "run.failed", {"text": "The provider request failed. Check Agent settings and try again."}): yield line
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 @app.post("/runs/{run_id}/continue", dependencies=[Depends(require_token)])
