@@ -33,6 +33,11 @@ struct CommandPaletteView: View {
         }
         list.append(
             Command(
+                title: "Ask Pulse Agent", subtitle: "Diagnose and act using natural language",
+                symbol: "sparkles"
+            ) { selection = .agent })
+        list.append(
+            Command(
                 title: "Run Quick Clean", subtitle: "Move the safe tier to Trash",
                 symbol: "sparkles"
             ) {

@@ -1,5 +1,20 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-09-16] Feature | Native Pulse Agent interface and authenticated Agno harness
+- Added Overview → Agent: native session rail, streamed evidence timeline, tool cards, final-answer lane, native action approvals, and pinned natural-language composer.
+- Added versioned sidecar event envelopes, local bearer authentication, bounded context/session summaries, and server-enforced human approval for all mutations.
+- Recorded design and verification requirements in `docs/superpowers/specs/2026-09-16-pulse-agent-design.md`.
+
+## [2026-09-04] Architecture Blueprint | CLI + Agent Skill Architecture & Implementation Plan
+- Completed deep architectural blueprint replacing MCP with native Swift CLI (`pulse`) + Agent Skill (`SKILL.md`).
+- Documented dual-persona output engine (TTY tables vs deterministic `--json`), Darwin notification bridge to `MenuBarFlash`, dry-run safety gates, and 12-subcommand catalog in [docs/cli-skill-architecture-report.md](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/cli-skill-architecture-report.md).
+- Designed zero-dependency implementation roadmap preserving offline CLT build reliability with 0 lines changed in existing codebase.
+
+## [2026-09-04] Architecture Spike | Pulse MCP Server Feasibility & Design
+- Completed comprehensive architectural spike on turning Pulse into an agent-friendly Model Context Protocol (MCP) server for Antigravity, Claude Code, and Codex.
+- Verified zero codebase disruption path: new lightweight CLI target `pulse-mcp` linking `PulseKit` + `modelcontextprotocol/swift-sdk` over `stdio` transport.
+- Documented complete technical spike, 10 tool definitions, 4 resources, 2 prompt templates, performance budget (<1% CPU, <15MB RSS), and implementation roadmap in [docs/mcp-server-architecture-spike.md](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/mcp-server-architecture-spike.md).
+
 ## [2026-08-14] Optimization | Landing Page Speed, Modern Web Guidance, and A11y
 - Converted hero background image (`hero-bg-2.png`, 1.09MB) to modern WebP (`hero-bg-2.webp`, 29KB, 97.2% reduction) and JPEG fallback.
 - Added critical resource preloading with `fetchpriority="high"` and CSS `image-set()` responsive format delivery.
@@ -68,6 +83,7 @@
 - Replaced `/bin/df` shell subprocess in `StorageModel.refreshHiddenBreakdown()` with native POSIX `statfs` kernel calls, achieving sub-millisecond execution with zero subprocesses.
 - Throttled `StorageScanner.scanSizesStream` yields (100ms interval + final yield) to eliminate SwiftUI `@MainActor` re-render thrashing during directory sizing.
 - Unified battery log backfill in `BatteryHistoryStore` and `DashboardModel` to a single pass and avoided redundant `pmset -g log` subprocess execution on startup when cached history is present.
+
 
 ## [2026-09-08] Feature | Complete native Pulse CLI and portable agent skill
 - Repaired the uncommitted CLI draft; added strict parser/JSON contracts, all 14 planned commands, cached-only speed-test history, Make targets and test coverage.

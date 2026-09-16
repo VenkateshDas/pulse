@@ -26,6 +26,7 @@ struct RootView: View {
             SidebarView(selection: $selection)
             Group {
                 switch selection {
+                case .agent: AgentView()
                 case .storage: DiskView()
                 case .timeline: TimelineView()
                 case .optimize: OptimizeView()
