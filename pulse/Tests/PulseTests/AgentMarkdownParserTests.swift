@@ -2,6 +2,10 @@ import Testing
 @testable import Pulse
 
 struct AgentMarkdownParserTests {
+    @Test func transcriptMutationNeverRequestsProgrammaticScrolling() {
+        #expect(!AgentTimelineScrollPolicy.shouldScroll(for: .transcriptMutation))
+    }
+
     @Test func parsesAgentAnswerBlocks() {
         let source = """
         ## Top CPU Consumers

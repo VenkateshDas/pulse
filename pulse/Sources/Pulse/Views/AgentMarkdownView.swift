@@ -159,15 +159,18 @@ struct AgentMarkdownView: View {
 
     private func table(headers: [String], rows: [[String]]) -> some View {
         let count = max(headers.count, rows.map(\.count).max() ?? 0)
-        return VStack(spacing: 0) {
-            tableRow(headers, count: count, header: true)
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                Divider().overlay(Halo.borderSubtle)
-                tableRow(row, count: count, header: false)
+        return ScrollView(.horizontal, showsIndicators: true) {
+            VStack(spacing: 0) {
+                tableRow(headers, count: count, header: true)
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    Divider().overlay(Halo.borderSubtle)
+                    tableRow(row, count: count, header: false)
+                }
             }
+            .fixedSize(horizontal: true, vertical: false)
+            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: Halo.Radius.small))
+            .overlay(RoundedRectangle(cornerRadius: Halo.Radius.small).stroke(Halo.borderSubtle))
         }
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: Halo.Radius.small))
-        .overlay(RoundedRectangle(cornerRadius: Halo.Radius.small).stroke(Halo.borderSubtle))
     }
 
     private func tableRow(_ cells: [String], count: Int, header: Bool) -> some View {
@@ -175,7 +178,9 @@ struct AgentMarkdownView: View {
             ForEach(0..<count, id: \.self) { index in
                 inline(index < cells.count ? cells[index] : "")
                     .font(.system(size: 11, weight: header ? .semibold : .regular, design: header ? .default : .monospaced))
-                    .padding(.horizontal, 9).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 9).padding(.vertical, 7)
+                    .frame(minWidth: 112, maxWidth: 260, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .background(header ? Halo.surface2 : Color.clear)

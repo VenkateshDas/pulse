@@ -1,5 +1,9 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-09-19] Fix | Stop second-turn Agent transcript layout loop
+- Removed item-count-driven `ScrollViewReader.scrollTo`, which fed changing bottom offsets back into SwiftUI while prior Markdown tables were being remeasured and pinned the app's main thread at 100% CPU.
+- Bounded Markdown table cells and isolated wide tables in a horizontal scroller; added a regression policy test forbidding programmatic scroll requests from transcript mutations.
+
 ## [2026-09-19] Feature | Pulse Agent native workspace upgrade
 - Reworked Agent page around persistent sessions, chronological streamed chat, on-demand typed evidence inspector, and explicit native approval cards.
 - Active conversation is inserted into the sidebar immediately when the sidecar emits its first run event, then refreshed from durable session storage at completion.

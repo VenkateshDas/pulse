@@ -1,6 +1,20 @@
 import SwiftUI
 import PulseKit
 
+enum AgentTimelineScrollEvent {
+    case transcriptMutation
+}
+
+enum AgentTimelineScrollPolicy {
+    /// Growing rich text can change its measured height more than once. Driving a
+    /// ScrollViewReader from that mutation creates an offset/layout feedback loop.
+    static func shouldScroll(for event: AgentTimelineScrollEvent) -> Bool {
+        switch event {
+        case .transcriptMutation: false
+        }
+    }
+}
+
 /// Local-first chat workspace: conversations remain navigable while Pulse
 /// exposes only typed evidence and native approval controls.
 struct AgentView: View {
@@ -59,14 +73,12 @@ struct AgentView: View {
     }
 
     private var timeline: some View {
-        ScrollViewReader { proxy in ScrollView(.vertical, showsIndicators: false) { LazyVStack(alignment: .leading, spacing: Halo.Space.md) {
+        ScrollView(.vertical, showsIndicators: false) { LazyVStack(alignment: .leading, spacing: Halo.Space.md) {
             if model.items.isEmpty { welcome }
             ForEach(model.items) { item in card(item) }
-            Color.clear.frame(height: 1).id("end")
         }.padding(.horizontal, Halo.Space.xxl).padding(.vertical, Halo.Space.xl)
             .frame(maxWidth: 1040, alignment: .leading).frame(maxWidth: .infinity, alignment: .top) }
-        .onChange(of: model.items.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
-        .frame(maxHeight: .infinity) }
+        .frame(maxHeight: .infinity)
     }
 
     private var welcome: some View {
