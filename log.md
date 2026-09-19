@@ -99,3 +99,4 @@
 ## [2026-09-19] fix | Bundle Pulse Agent runtime, skill, and CLI; resolve its app-resource path and allow first-run dependency setup to complete.
 ## [2026-09-19] fix | Correct Agno streamed-run handling: `arun` and `acontinue_run` return async generators, not awaitable values. Verified with OpenRouter DeepSeek V4.1 Flash.
 ## [2026-09-19] fix | Package skill under its required `pulse` name and load persisted user-visible session history instead of clearing conversation on selection.
+## [2026-09-19] fix | Coalesce eight streamed Agent answer chunks per SwiftUI publication; prevents provider token bursts from monopolizing the main actor.

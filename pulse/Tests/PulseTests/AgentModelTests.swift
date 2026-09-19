@@ -27,4 +27,15 @@ struct AgentModelTests {
         #expect(model.items.count == 1)
         #expect(model.items[0].detail == "CPU is healthy.")
     }
+
+    @Test func streamedAnswerRendersAtMostOncePerEightChunks() {
+        let model = AgentModel()
+        for sequence in 1...7 {
+            model.apply(.init(sequence: sequence, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
+        }
+        #expect(model.items.isEmpty)
+        model.apply(.init(sequence: 8, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
+        #expect(model.items.count == 1)
+        #expect(model.items[0].detail == "xxxxxxxx")
+    }
 }

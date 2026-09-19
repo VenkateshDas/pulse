@@ -26,6 +26,10 @@ final class AgentModel {
     var hasApiKey = false
     private var seenEventIDs = Set<String>()
     private var lastSequence = 0
+    /// DeepSeek and similar providers can emit hundreds of tiny deltas per
+    /// second. Coalesce them before publishing to SwiftUI's main actor.
+    private var pendingAnswerText: [String: String] = [:]
+    private var pendingAnswerChunks: [String: Int] = [:]
 
     func start() async {
         state = .starting; status = "Starting local agent…"
@@ -89,9 +93,11 @@ final class AgentModel {
         switch event.kind {
         case "run.started": status = "Working…"; state = .running
         case "reasoning.summary.delta": appendOrUpdate(id: "reasoning-\(event.runId)", kind: .progress, title: "Working on it", detail: text)
-        case "answer.delta": appendOrUpdate(id: "answer-\(event.runId)", kind: .answer, title: "", detail: text)
+        case "answer.delta": bufferAnswerDelta(runId: event.runId, text: text)
         case "answer.interim": items.append(.init(id: event.eventId, kind: .progress, title: "Progress update", detail: text))
-        case "answer.final": replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
+        case "answer.final":
+            clearPendingAnswer(runId: event.runId)
+            replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
         case "tool.started": items.append(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
         case "tool.completed", "tool.failed":
             let id = event.payload["tool_call_id"] ?? event.eventId
@@ -110,6 +116,20 @@ final class AgentModel {
     private func appendOrUpdate(id: String, kind: AgentTimelineItem.Kind, title: String, detail: String) {
         if let index = items.firstIndex(where: { $0.id == id }) { items[index].detail += detail; if !title.isEmpty { items[index].title = title } }
         else { items.append(.init(id: id, kind: kind, title: title, detail: detail)) }
+    }
+
+    private func bufferAnswerDelta(runId: String, text: String) {
+        let id = "answer-\(runId)"
+        pendingAnswerText[id, default: ""] += text
+        pendingAnswerChunks[id, default: 0] += 1
+        guard pendingAnswerChunks[id, default: 0] >= 8 else { return }
+        appendOrUpdate(id: id, kind: .answer, title: "", detail: pendingAnswerText[id, default: ""])
+        pendingAnswerText[id] = ""; pendingAnswerChunks[id] = 0
+    }
+
+    private func clearPendingAnswer(runId: String) {
+        let id = "answer-\(runId)"
+        pendingAnswerText[id] = nil; pendingAnswerChunks[id] = nil
     }
 
     private func replace(id: String, kind: AgentTimelineItem.Kind, title: String, detail: String) {
