@@ -101,7 +101,9 @@ async def run(request: RunRequest) -> StreamingResponse:
             async for line in emit(store, run_id, session_id, "run.failed", {"text": "Add a model key in Pulse Agent settings to continue."}): yield line
             return
         try:
-            stream = await agent().arun(input=request.message, session_id=session_id, stream=True, stream_events=True)
+            # Agno returns an async generator when streaming. Awaiting it
+            # raises TypeError before any provider response can be consumed.
+            stream = agent().arun(input=request.message, session_id=session_id, stream=True, stream_events=True)
             async for line in translate(stream, run_id, session_id, store): yield line
         except Exception:
             # Provider exceptions may include endpoint or request diagnostics.
@@ -120,7 +122,7 @@ async def continue_run(run_id: str, request: ContinueRequest) -> StreamingRespon
         async for line in emit(store, run_id, session_id, "approval.resolved", {"text": "Approved" if request.approved else "Declined"}): yield line
         async for line in emit(store, run_id, session_id, "run.continued"): yield line
         try:
-            stream = await agent().acontinue_run(run_response=paused, stream=True, stream_events=True)
+            stream = agent().acontinue_run(run_response=paused, stream=True, stream_events=True)
             async for line in translate(stream, run_id, session_id, store): yield line
         finally: paused_runs.pop(run_id, None)
     return StreamingResponse(events(), media_type="text/event-stream")
