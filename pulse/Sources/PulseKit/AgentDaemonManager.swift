@@ -30,7 +30,7 @@ public actor AgentDaemonManager {
             "PULSE_MODEL_ID": AgentConfiguration.model,
             "PULSE_AGENT_RUNTIME_DIR": runtimeDirectory.path,
             "PULSE_CLI_PATH": cliPath,
-            "PULSE_SKILL_DIR": Bundle.main.resourceURL?.appendingPathComponent("pulse-skill").path ?? "",
+            "PULSE_SKILL_DIR": Bundle.main.resourceURL?.appendingPathComponent("skills/pulse").path ?? "",
         ]) { _, new in new }
         process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
         do { try process.run() } catch { return false }

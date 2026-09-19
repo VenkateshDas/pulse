@@ -48,6 +48,11 @@ public struct AgentSessionItem: Identifiable, Codable, Sendable {
     }
 }
 
+public struct AgentHistoryMessage: Codable, Sendable {
+    public let role: String
+    public let content: String
+}
+
 /// Local authenticated SSE client. No UI types belong here.
 public actor AgentClient {
     public static let shared = AgentClient()
@@ -96,6 +101,12 @@ public actor AgentClient {
         return try JSONDecoder.agent.decode(Response.self, from: data).sessions.map {
             .init(sessionId: $0.session_id, name: $0.name, createdAt: $0.created_at, updatedAt: $0.updated_at)
         }
+    }
+
+    public func fetchHistory(sessionId: String) async throws -> [AgentHistoryMessage] {
+        let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history"))
+        struct Response: Decodable { let messages: [AgentHistoryMessage] }
+        return try JSONDecoder.agent.decode(Response.self, from: data).messages
     }
 
     private func stream(path: String, body: [String: Any]) -> AsyncThrowingStream<AgentEnvelope, Error> {

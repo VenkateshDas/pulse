@@ -27,7 +27,7 @@ struct AgentView: View {
             }.buttonStyle(.borderedProminent).tint(Halo.interactive)
             Text("RECENT").sectionLabel()
             ForEach(model.sessions.prefix(8)) { session in
-                Button { model.sessionId = session.sessionId; model.items = [] } label: {
+                Button { Task { await model.loadSession(session.sessionId) } } label: {
                     Text(session.name).lineLimit(1).font(.system(size: 12)).foregroundStyle(Halo.textPrimary)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 5)
                 }.buttonStyle(.plain)

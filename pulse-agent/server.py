@@ -142,8 +142,35 @@ async def sessions() -> dict[str, Any]:
     try:
         with sqlite3.connect(db) as connection:
             rows = connection.execute("SELECT session_id, session_data, created_at, updated_at FROM agno_sessions ORDER BY updated_at DESC LIMIT 50").fetchall()
-        return {"sessions": [{"session_id": row[0], "name": row[0], "created_at": row[2], "updated_at": row[3]} for row in rows]}
-    except sqlite3.Error: return {"sessions": []}
+        sessions = []
+        for session_id, session_data, created_at, updated_at in rows:
+            name = session_id
+            with sqlite3.connect(db) as connection:
+                run = connection.execute("SELECT run_data FROM agno_runs WHERE session_id = ? ORDER BY created_at ASC LIMIT 1", (session_id,)).fetchone()
+            if run:
+                messages = json.loads(run[0]).get("messages", [])
+                first_user = next((message.get("content") for message in messages if message.get("role") == "user" and isinstance(message.get("content"), str)), None)
+                if first_user: name = compact(first_user, 48)
+            sessions.append({"session_id": session_id, "name": name, "created_at": created_at, "updated_at": updated_at})
+        return {"sessions": sessions}
+    except (sqlite3.Error, json.JSONDecodeError): return {"sessions": []}
+
+@app.get("/sessions/{session_id}/history", dependencies=[Depends(require_token)])
+async def session_history(session_id: str) -> dict[str, Any]:
+    """Return only user-visible messages; never replay system prompts or reasoning."""
+    db = Path.home() / ".pulse" / "agent.db"
+    if not db.exists(): return {"messages": []}
+    try:
+        with sqlite3.connect(db) as connection:
+            rows = connection.execute("SELECT run_data FROM agno_runs WHERE session_id = ? ORDER BY created_at ASC", (session_id,)).fetchall()
+        messages = []
+        for (raw_run,) in rows:
+            for message in json.loads(raw_run).get("messages", []):
+                role, content = message.get("role"), message.get("content")
+                if role in {"user", "assistant"} and isinstance(content, str) and content:
+                    messages.append({"role": role, "content": compact(content, 12_000)})
+        return {"messages": messages}
+    except (sqlite3.Error, json.JSONDecodeError): return {"messages": []}
 
 if __name__ == "__main__":
     import uvicorn

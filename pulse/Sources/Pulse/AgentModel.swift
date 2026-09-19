@@ -67,6 +67,21 @@ final class AgentModel {
         state = .cancelled; status = "Cancelled"
     }
 
+    func loadSession(_ id: String) async {
+        sessionId = id; items = []; state = .starting; status = "Loading conversation…"
+        do {
+            let history = try await AgentClient.shared.fetchHistory(sessionId: id)
+            items = history.map { message in
+                .init(id: UUID().uuidString, kind: message.role == "user" ? .user : .answer,
+                      title: message.role == "user" ? message.content : "Pulse Agent",
+                      detail: message.role == "user" ? "" : message.content)
+            }
+            state = .idle; status = "Ready"
+        } catch {
+            state = .failed; status = "Could not load conversation"
+        }
+    }
+
     func apply(_ event: AgentEnvelope) {
         guard event.version == 1, seenEventIDs.insert(event.eventId).inserted, event.sequence > lastSequence else { return }
         lastSequence = event.sequence; activeRunId = event.runId

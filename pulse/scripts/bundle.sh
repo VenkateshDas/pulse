@@ -68,12 +68,12 @@ if [ -f "Sources/Pulse/Resources/AppIcon.icns" ]; then
 fi
 
 # Agent files are deliberately whitelisted. Never bundle a local .env or venv.
-mkdir -p "$APP/Contents/Resources/pulse-agent" "$APP/Contents/Resources/pulse-skill"
+mkdir -p "$APP/Contents/Resources/pulse-agent" "$APP/Contents/Resources/skills/pulse"
 for f in agent.py context.py pulse_toolkit.py server.py start.sh; do
     cp "../pulse-agent/$f" "$APP/Contents/Resources/pulse-agent/$f"
 done
 chmod +x "$APP/Contents/Resources/pulse-agent/start.sh"
-cp -R ../.agents/skills/pulse/. "$APP/Contents/Resources/pulse-skill/"
+cp -R ../.agents/skills/pulse/. "$APP/Contents/Resources/skills/pulse/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
