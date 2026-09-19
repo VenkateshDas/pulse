@@ -61,11 +61,12 @@ struct AgentView: View {
     }
 
     private var timeline: some View {
-        ScrollViewReader { proxy in ScrollView { LazyVStack(alignment: .leading, spacing: Halo.Space.md) {
+        ScrollViewReader { proxy in ScrollView(.vertical, showsIndicators: false) { LazyVStack(alignment: .leading, spacing: Halo.Space.md) {
             if model.items.isEmpty { welcome }
             ForEach(model.items) { item in card(item) }
             Color.clear.frame(height: 1).id("end")
-        }.padding(.horizontal, Halo.Space.xxl).padding(.vertical, Halo.Space.xl).frame(maxWidth: 780, alignment: .leading) }
+        }.padding(.horizontal, Halo.Space.xxl).padding(.vertical, Halo.Space.xl)
+            .frame(maxWidth: 1040, alignment: .leading).frame(maxWidth: .infinity, alignment: .top) }
         .onChange(of: model.items.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }}
     }
 
@@ -96,12 +97,30 @@ struct AgentView: View {
                     VStack(alignment: .leading, spacing: 3) { Text(item.title).font(.system(size: 12, weight: .semibold)); Text(item.isRunning ? "Working…" : compact(item.detail)).font(.system(size: 10, design: .monospaced)).lineLimit(1) }
                     Spacer(); Image(systemName: model.selectedToolID == item.id ? "sidebar.right" : "chevron.right").font(.system(size: 10))
                 }.foregroundStyle(Halo.textPrimary).premiumCard(padding: Halo.Space.md)
-            }.buttonStyle(.plain).frame(maxWidth: 640)
-        default:
+            }.buttonStyle(.plain).frame(maxWidth: 880)
+        case .progress:
+            DisclosureGroup(isExpanded: Binding(
+                get: { item.isExpanded },
+                set: { _ in model.toggleExpansion(id: item.id) }
+            )) {
+                AgentMarkdownView(source: item.detail).font(.system(size: 12)).foregroundStyle(Halo.textSecondary)
+                    .padding(.top, Halo.Space.sm)
+            } label: {
+                Label(item.title, systemImage: item.isExpanded ? "brain.head.profile.fill" : "brain.head.profile")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Halo.textSecondary)
+            }
+            .tint(Halo.textDim).premiumCard(padding: Halo.Space.md).frame(maxWidth: 880)
+        case .answer:
+            VStack(alignment: .leading, spacing: Halo.Space.sm) {
+                Label(item.title.isEmpty ? "Pulse Agent" : item.title, systemImage: "sparkles")
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Halo.textSecondary)
+                AgentMarkdownView(source: item.detail)
+            }.frame(maxWidth: 960, alignment: .leading)
+        case .error:
             VStack(alignment: .leading, spacing: 5) {
-                if !item.title.isEmpty { Label(item.title, systemImage: icon(item.kind)).font(.system(size: 11, weight: .semibold)).foregroundStyle(item.kind == .error ? Halo.flare : Halo.textSecondary) }
-                Text(item.detail.isEmpty && item.isRunning ? "Working…" : item.detail).font(.system(size: item.kind == .answer ? 14 : 12)).foregroundStyle(Halo.textPrimary).textSelection(.enabled)
-            }.frame(maxWidth: 720, alignment: .leading)
+                Label(item.title, systemImage: "exclamationmark.triangle").font(.system(size: 11, weight: .semibold)).foregroundStyle(Halo.flare)
+                Text(item.detail).font(.system(size: 12)).foregroundStyle(Halo.textPrimary).textSelection(.enabled)
+            }.frame(maxWidth: 880, alignment: .leading)
         }
     }
 
@@ -125,5 +144,4 @@ struct AgentView: View {
     private func relativeTime(_ time: Int?) -> String { guard let time else { return "recent" }; let minutes = max(0, Int(Date().timeIntervalSince1970) - time) / 60; return minutes < 1 ? "now" : minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h" }
     private func compact(_ detail: String) -> String { detail.isEmpty ? "Complete" : detail.replacingOccurrences(of: "\n", with: " ") }
     private func submit() { let text = prompt; prompt = ""; model.send(text) }
-    private func icon(_ kind: AgentTimelineItem.Kind) -> String { kind == .answer ? "sparkles" : kind == .progress ? "ellipsis" : kind == .error ? "exclamationmark.triangle" : "circle" }
 }

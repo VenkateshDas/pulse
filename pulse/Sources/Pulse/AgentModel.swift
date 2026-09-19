@@ -101,25 +101,23 @@ final class AgentModel {
         let text = event.payload["text"] ?? ""
         switch event.kind {
         case "run.started": status = "Working…"; state = .running
-        case "reasoning.summary.delta": appendOrUpdate(id: "reasoning-\(event.runId)", kind: .progress, title: "Working on it", detail: text)
+        case "reasoning.summary.delta": appendOrUpdate(id: "reasoning-\(event.runId)", kind: .progress, title: "Thinking", detail: text)
         case "answer.delta":
-            removeProgress(runId: event.runId)
             bufferAnswerDelta(runId: event.runId, text: text)
         case "answer.interim": items.append(.init(id: event.eventId, kind: .progress, title: "Progress update", detail: text))
         case "answer.final":
-            removeProgress(runId: event.runId)
             clearPendingAnswer(runId: event.runId)
             replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
-        case "tool.started": items.append(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
+        case "tool.started":
+            insertTool(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true), runId: event.runId)
         case "tool.completed", "tool.failed":
             let id = event.payload["tool_call_id"] ?? event.eventId
             if let index = items.firstIndex(where: { $0.id == id }) { items[index].detail = event.payload["detail"] ?? text; items[index].isRunning = false }
-            else { items.append(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text)) }
+            else { insertTool(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text), runId: event.runId) }
         case "approval.requested":
             state = .awaitingApproval; status = "Approval required"
             items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text))
-        case "run.completed":
-            removeProgress(runId: event.runId); state = .completed; status = "Complete"; refreshSessions()
+        case "run.completed": state = .completed; status = "Complete"; refreshSessions()
         case "run.cancelled": state = .cancelled; status = "Cancelled"; refreshSessions()
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
         default: break
@@ -145,8 +143,12 @@ final class AgentModel {
         pendingAnswerText[id] = nil; pendingAnswerChunks[id] = nil
     }
 
-    private func removeProgress(runId: String) {
-        items.removeAll { $0.id == "reasoning-\(runId)" }
+    private func insertTool(_ item: AgentTimelineItem, runId: String) {
+        if let answerIndex = items.firstIndex(where: { $0.id == "answer-\(runId)" }) {
+            items.insert(item, at: answerIndex)
+        } else {
+            items.append(item)
+        }
     }
 
     func toggleExpansion(id: String) {
