@@ -33,6 +33,7 @@ let package = Package(
         ], linkerSettings: [
             .linkedFramework("CoreWLAN"),
             .linkedFramework("CoreLocation"),
+            .linkedFramework("Security"),
         ]),
         // SwiftUI app: menu bar extra + dashboard window.
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [

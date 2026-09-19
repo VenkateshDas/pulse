@@ -1,5 +1,26 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-09-19] Fix | Resume Agno human approvals without breaking Agent chat
+- Retained the resumable `RunOutput` emitted after `RunPausedEvent`, rather than incorrectly attempting to resume the notification event.
+- Kept mutation confirmation enforced; unavailable or failed resumes now yield safe terminal Agent events rather than closing the SSE response mid-stream.
+- Added focused sidecar regressions for pause capture and continuation.
+
+## [2026-09-16] Feature | Native Pulse Agent interface and authenticated Agno harness
+- Added Overview → Agent: native session rail, streamed evidence timeline, tool cards, final-answer lane, native action approvals, and pinned natural-language composer.
+- Added versioned sidecar event envelopes, local bearer authentication, bounded context/session summaries, and server-enforced human approval for all mutations.
+- Added OpenRouter-compatible Agent Settings: Keychain API-key storage, configurable base URL and model, plus runtime configuration refresh.
+- Recorded design and verification requirements in `docs/superpowers/specs/2026-09-16-pulse-agent-design.md`.
+
+## [2026-09-04] Architecture Blueprint | CLI + Agent Skill Architecture & Implementation Plan
+- Completed deep architectural blueprint replacing MCP with native Swift CLI (`pulse`) + Agent Skill (`SKILL.md`).
+- Documented dual-persona output engine (TTY tables vs deterministic `--json`), Darwin notification bridge to `MenuBarFlash`, dry-run safety gates, and 12-subcommand catalog in [docs/cli-skill-architecture-report.md](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/cli-skill-architecture-report.md).
+- Designed zero-dependency implementation roadmap preserving offline CLT build reliability with 0 lines changed in existing codebase.
+
+## [2026-09-04] Architecture Spike | Pulse MCP Server Feasibility & Design
+- Completed comprehensive architectural spike on turning Pulse into an agent-friendly Model Context Protocol (MCP) server for Antigravity, Claude Code, and Codex.
+- Verified zero codebase disruption path: new lightweight CLI target `pulse-mcp` linking `PulseKit` + `modelcontextprotocol/swift-sdk` over `stdio` transport.
+- Documented complete technical spike, 10 tool definitions, 4 resources, 2 prompt templates, performance budget (<1% CPU, <15MB RSS), and implementation roadmap in [docs/mcp-server-architecture-spike.md](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/mcp-server-architecture-spike.md).
+
 ## [2026-08-14] Optimization | Landing Page Speed, Modern Web Guidance, and A11y
 - Converted hero background image (`hero-bg-2.png`, 1.09MB) to modern WebP (`hero-bg-2.webp`, 29KB, 97.2% reduction) and JPEG fallback.
 - Added critical resource preloading with `fetchpriority="high"` and CSS `image-set()` responsive format delivery.
@@ -69,6 +90,7 @@
 - Throttled `StorageScanner.scanSizesStream` yields (100ms interval + final yield) to eliminate SwiftUI `@MainActor` re-render thrashing during directory sizing.
 - Unified battery log backfill in `BatteryHistoryStore` and `DashboardModel` to a single pass and avoided redundant `pmset -g log` subprocess execution on startup when cached history is present.
 
+
 ## [2026-09-08] Feature | Complete native Pulse CLI and portable agent skill
 - Repaired the uncommitted CLI draft; added strict parser/JSON contracts, all 14 planned commands, cached-only speed-test history, Make targets and test coverage.
 - Added acknowledged app-owned display/sleep controls and bounded DDC completion reporting; CLI sampling no longer writes GUI disk history.
@@ -79,3 +101,8 @@
 
 ## [2026-09-13] CLI verification and native probes | Fix cold-cache verdict subprocesses
 - Audited every CLI command and exercised fixture cleanup/uninstall/restore, display controls and timed sleep. Replaced brew/otool probes with native receipt/header reads; added malformed-input regressions and expanded CLI smoke. See docs/pulse-cli-audit-2026-09-13.md for results and remaining release gates.
+## [2026-09-19] fix | Bundle Pulse Agent runtime, skill, and CLI; resolve its app-resource path and allow first-run dependency setup to complete.
+## [2026-09-19] fix | Correct Agno streamed-run handling: `arun` and `acontinue_run` return async generators, not awaitable values. Verified with OpenRouter DeepSeek V4.1 Flash.
+## [2026-09-19] fix | Package skill under its required `pulse` name and load persisted user-visible session history instead of clearing conversation on selection.
+## [2026-09-19] fix | Coalesce eight streamed Agent answer chunks per SwiftUI publication; prevents provider token bursts from monopolizing the main actor.
+## [2026-09-19] fix | Keep Agno tool-event content out of final answers, preserve complete final text, collapse tool details by default, and clear working progress when answer begins.

@@ -5,6 +5,7 @@ import SwiftUI
 /// render dimmed with a "soon" tag — no dead UI pretending to work.
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
+    case agent = "Agent"
     case storage = "Storage"
     case timeline = "Timeline"
     case optimize = "Optimize"
@@ -21,6 +22,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .dashboard: "heart.fill"
+        case .agent: "sparkles"
         case .storage: "internaldrive.fill"
         case .timeline: "chart.xyaxis.line"
         case .optimize: "sparkles"
@@ -50,7 +52,7 @@ enum SidebarSection: String, CaseIterable {
 
     var items: [SidebarItem] {
         switch self {
-        case .overview: [.dashboard]
+        case .overview: [.dashboard, .agent]
         case .insights: [.storage, .timeline]
         case .system: [.monitor, .network, .displays, .health]
         case .tools: [.optimize, .uninstall, .settings, .diagnostics]
