@@ -47,7 +47,7 @@ def create_pulse_agent(
 ) -> Agent:
     """Instantiate a fully configured Pulse Agno Agent."""
     repo_root = Path(__file__).resolve().parent.parent
-    pulse_skill_dir = repo_root / ".agents" / "skills" / "pulse"
+    pulse_skill_dir = Path(os.environ.get("PULSE_SKILL_DIR", repo_root / ".agents" / "skills" / "pulse"))
 
     # Ensure database path
     if db_path is None:

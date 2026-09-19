@@ -96,3 +96,4 @@
 
 ## [2026-09-13] CLI verification and native probes | Fix cold-cache verdict subprocesses
 - Audited every CLI command and exercised fixture cleanup/uninstall/restore, display controls and timed sleep. Replaced brew/otool probes with native receipt/header reads; added malformed-input regressions and expanded CLI smoke. See docs/pulse-cli-audit-2026-09-13.md for results and remaining release gates.
+## [2026-09-19] fix | Bundle Pulse Agent runtime, skill, and CLI; resolve its app-resource path and allow first-run dependency setup to complete.

@@ -16,6 +16,10 @@ from agno.tools import Toolkit, tool
 
 def find_pulse_cli() -> str:
     """Locate the Pulse CLI binary."""
+    configured_cli = os.environ.get("PULSE_CLI_PATH")
+    if configured_cli and Path(configured_cli).is_file() and os.access(configured_cli, os.X_OK):
+        return configured_cli
+
     # Check repo dist first
     repo_root = Path(__file__).resolve().parent.parent
     dist_cli = repo_root / "pulse" / "dist" / "cli" / "pulse"
