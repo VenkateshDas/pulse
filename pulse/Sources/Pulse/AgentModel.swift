@@ -34,6 +34,7 @@ final class AgentModel {
     /// second. Coalesce them before publishing to SwiftUI's main actor.
     private var pendingAnswerText: [String: String] = [:]
     private var pendingAnswerChunks: [String: Int] = [:]
+    private var streamTask: Task<Void, Never>?
 
     func start() async {
         state = .starting; status = "Starting local agent…"
@@ -52,27 +53,48 @@ final class AgentModel {
         guard !message.isEmpty, state == .idle || state == .completed || state == .failed || state == .cancelled else { return }
         items.append(.init(id: UUID().uuidString, kind: .user, title: message, detail: ""))
         pendingSessionTitle = String(message.prefix(52))
-        state = .running; status = "Working…"; lastSequence = 0; seenEventIDs.removeAll()
-        Task {
+        state = .running; status = "Working…"; activeRunId = nil; lastSequence = 0; seenEventIDs.removeAll()
+        streamTask?.cancel()
+        streamTask = Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId) { apply(event) }
-            } catch { fail(error.localizedDescription) }
+                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId) {
+                    guard !Task.isCancelled else { return }
+                    apply(event)
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                fail(error.localizedDescription)
+            }
         }
     }
 
     func resolveApproval(_ approved: Bool) {
         guard let runId = activeRunId else { return }
         state = .running; status = approved ? "Continuing…" : "Action declined"
-        Task {
+        streamTask = Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                for try await event in await AgentClient.shared.continueRun(runId: runId, approved: approved) { apply(event) }
-            } catch { fail(error.localizedDescription) }
+                for try await event in await AgentClient.shared.continueRun(runId: runId, approved: approved) {
+                    guard !Task.isCancelled else { return }
+                    apply(event)
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                fail(error.localizedDescription)
+            }
         }
     }
 
     func cancel() {
-        guard let runId = activeRunId else { return }
-        Task { try? await AgentClient.shared.cancel(runId: runId) }
+        guard state == .running else { return }
+        if let activeRunId { flushPendingAnswer(runId: activeRunId) }
+        for index in items.indices where items[index].kind == .tool && items[index].isRunning {
+            items[index].isRunning = false
+            if items[index].detail.isEmpty { items[index].detail = "Cancelled" }
+        }
+        streamTask?.cancel(); streamTask = nil
+        if let activeRunId { Task { try? await AgentClient.shared.cancel(runId: activeRunId) } }
         state = .cancelled; status = "Cancelled"
     }
 
@@ -117,8 +139,8 @@ final class AgentModel {
         case "approval.requested":
             state = .awaitingApproval; status = "Approval required"
             items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text))
-        case "run.completed": state = .completed; status = "Complete"; refreshSessions()
-        case "run.cancelled": state = .cancelled; status = "Cancelled"; refreshSessions()
+        case "run.completed": streamTask = nil; state = .completed; status = "Complete"; refreshSessions()
+        case "run.cancelled": streamTask = nil; state = .cancelled; status = "Cancelled"; refreshSessions()
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
         default: break
         }
@@ -141,6 +163,14 @@ final class AgentModel {
     private func clearPendingAnswer(runId: String) {
         let id = "answer-\(runId)"
         pendingAnswerText[id] = nil; pendingAnswerChunks[id] = nil
+    }
+
+    private func flushPendingAnswer(runId: String) {
+        let id = "answer-\(runId)"
+        let pending = pendingAnswerText[id, default: ""]
+        guard !pending.isEmpty else { return }
+        appendOrUpdate(id: id, kind: .answer, title: "Pulse Agent", detail: pending)
+        clearPendingAnswer(runId: runId)
     }
 
     private func insertTool(_ item: AgentTimelineItem, runId: String) {

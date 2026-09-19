@@ -53,10 +53,8 @@ struct AgentView: View {
             Image(systemName: "sparkles").foregroundStyle(Halo.interactive)
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeSessionName).font(.system(size: 15, weight: .semibold))
-                Text(model.status).font(.system(size: 10, design: .monospaced)).foregroundStyle(Halo.textDim)
             }; Spacer()
             Label("Local only", systemImage: "lock.fill").font(.system(size: 10, weight: .medium)).foregroundStyle(Halo.textSecondary).padding(.horizontal, 8).padding(.vertical, 5).background(Halo.surface2, in: Capsule())
-            if model.state == .running { Button("Cancel") { model.cancel() }.buttonStyle(.bordered).controlSize(.small) }
         }.padding(.horizontal, Halo.Space.xxl).padding(.vertical, Halo.Space.md)
     }
 
@@ -133,15 +131,32 @@ struct AgentView: View {
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: Halo.Space.sm) {
-            TextField(model.state == .awaitingApproval ? "Approval pending" : "Ask Pulse about your Mac…", text: $prompt, axis: .vertical).textFieldStyle(.plain).lineLimit(1...4).focused($composerFocused).onSubmit { submit() }.disabled(model.state == .awaitingApproval)
-            Button(action: submit) { Image(systemName: "arrow.up.circle.fill").font(.system(size: 22)) }.buttonStyle(.plain).foregroundStyle(Halo.interactive).disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.state == .running || model.state == .awaitingApproval)
+        VStack(alignment: .leading, spacing: 6) {
+            if model.state != .idle {
+                Label(model.status, systemImage: composerStatusIcon)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(composerStatusColor)
+            }
+            HStack(alignment: .bottom, spacing: Halo.Space.sm) {
+                TextField(model.state == .awaitingApproval ? "Approval pending" : "Ask Pulse about your Mac…", text: $prompt, axis: .vertical)
+                    .textFieldStyle(.plain).lineLimit(1...4).focused($composerFocused).onSubmit { submit() }
+                    .disabled(model.state == .running || model.state == .awaitingApproval)
+                Button(action: composerAction) {
+                    Image(systemName: model.state == .running ? "stop.circle.fill" : "arrow.up.circle.fill").font(.system(size: 22))
+                }
+                .buttonStyle(.plain).foregroundStyle(model.state == .running ? Halo.flare : Halo.interactive)
+                .accessibilityLabel(model.state == .running ? "Stop response" : "Send message")
+                .disabled(model.state == .running ? false : prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.state == .awaitingApproval)
+            }
         }.padding(Halo.Space.md).background(Halo.surface1).overlay(alignment: .top) { Divider().overlay(Halo.borderSubtle) }.padding(.horizontal, Halo.Space.xl).padding(.vertical, Halo.Space.md)
     }
 
     private var activeSessionName: String { model.sessions.first(where: { $0.sessionId == model.sessionId })?.name ?? "Pulse Agent" }
     private var statusColor: Color { model.state == .awaitingApproval ? Halo.amber : model.state == .failed ? Halo.flare : Halo.pulseGreen }
+    private var composerStatusColor: Color { model.state == .running ? Halo.pulseGreen : statusColor }
+    private var composerStatusIcon: String { model.state == .running ? "ellipsis" : model.state == .completed ? "checkmark.circle.fill" : model.state == .cancelled ? "stop.circle.fill" : model.state == .failed ? "exclamationmark.triangle.fill" : "pause.circle.fill" }
     private func relativeTime(_ time: Int?) -> String { guard let time else { return "recent" }; let minutes = max(0, Int(Date().timeIntervalSince1970) - time) / 60; return minutes < 1 ? "now" : minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h" }
     private func compact(_ detail: String) -> String { detail.isEmpty ? "Complete" : detail.replacingOccurrences(of: "\n", with: " ") }
+    private func composerAction() { model.state == .running ? model.cancel() : submit() }
     private func submit() { let text = prompt; prompt = ""; model.send(text) }
 }

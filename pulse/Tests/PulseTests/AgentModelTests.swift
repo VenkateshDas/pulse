@@ -39,6 +39,23 @@ struct AgentModelTests {
         #expect(model.items[0].detail == "xxxxxxxx")
     }
 
+    @Test func cancellationFlushesPartialTextAndRetainsToolEvidence() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "run.started"))
+        for sequence in 2...4 {
+            model.apply(.init(sequence: sequence, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
+        }
+        model.apply(.init(sequence: 5, runId: "run", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "tool", "title": "Reading processes"]))
+
+        model.cancel()
+
+        #expect(model.state == .cancelled)
+        #expect(model.status == "Cancelled")
+        #expect(model.items.map(\.kind) == [.tool, .answer])
+        #expect(model.items.first?.detail == "Cancelled")
+        #expect(model.items.last?.detail == "xxx")
+    }
+
     @Test func answerPreservesThinkingSummary() {
         let model = AgentModel()
         model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "reasoning.summary.delta", payload: ["text": "Checking evidence"]))

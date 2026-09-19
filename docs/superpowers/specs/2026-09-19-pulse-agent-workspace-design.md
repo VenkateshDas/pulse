@@ -11,7 +11,7 @@ Upgrade native Agent page using proven OpenWorker interaction patterns without i
 - Tool events remain adjacent as one chronological work trace, including tools emitted after answer streaming begins; the final answer follows that trace.
 - Final answers render native Markdown blocks (headings, emphasis, lists, quotes, code, rules, and tables) inside a responsive wide reading lane.
 - Selecting a tool reveals typed Pulse evidence inspector. It is absent until requested, protecting normal conversation width.
-- Composer is pinned. Approval pauses sending and exposes Decline / Approve only for native policy-gated actions.
+- Composer is pinned and is the sole live run-status surface; the header stays focused on the conversation identity. While receiving, its send arrow becomes a Stop button. Stop cancels the receive task and asks the sidecar to cancel, but retains already-streamed text and tool evidence; unrendered coalesced text is flushed before cancellation. Approval pauses sending and exposes Decline / Approve only for native policy-gated actions.
 
 ## Constraints
 
