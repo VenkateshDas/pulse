@@ -6,6 +6,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
+from agno.run.agent import RunOutput
 from pydantic import BaseModel
 from agent import create_pulse_agent
 
@@ -54,6 +55,7 @@ async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[
     """Expose observed progress only. Never forward private provider reasoning."""
     answer = ""
     final_answer = ""
+    pause_event = None
     async for item in stream:
         event_name = str(getattr(item, "event", "")).lower()
         tool = getattr(item, "tool", None) or getattr(item, "tool_execution", None)
@@ -71,8 +73,14 @@ async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[
         elif event_name == "runcompleted" and isinstance(content, str) and content:
             final_answer = content
         if getattr(item, "is_paused", False):
+            # Agno emits RunPausedEvent first, then RunOutput only when
+            # yield_run_output=True. The event is notification data, not a
+            # resumable run; retaining it makes acontinue_run crash.
+            pause_event = item
+            continue
+        if pause_event is not None and isinstance(item, RunOutput):
             paused_runs[run_id] = item
-            requirements = getattr(item, "active_requirements", [])
+            requirements = getattr(pause_event, "active_requirements", [])
             pending = getattr(requirements[0], "tool_execution", None) if requirements else None
             async for line in emit(store, run_id, session_id, "approval.requested", {"title": title_for(getattr(pending, "tool_name", "action")), "detail": "Review exact affected items before approving this action."}): yield line
             async for line in emit(store, run_id, session_id, "run.paused"): yield line
@@ -107,7 +115,7 @@ async def run(request: RunRequest) -> StreamingResponse:
         try:
             # Agno returns an async generator when streaming. Awaiting it
             # raises TypeError before any provider response can be consumed.
-            stream = agent().arun(input=request.message, session_id=session_id, stream=True, stream_events=True)
+            stream = agent().arun(input=request.message, session_id=session_id, stream=True, stream_events=True, yield_run_output=True)
             async for line in translate(stream, run_id, session_id, store): yield line
         except Exception:
             # Provider exceptions may include endpoint or request diagnostics.
@@ -118,16 +126,20 @@ async def run(request: RunRequest) -> StreamingResponse:
 @app.post("/runs/{run_id}/continue", dependencies=[Depends(require_token)])
 async def continue_run(run_id: str, request: ContinueRequest) -> StreamingResponse:
     paused = paused_runs.get(run_id)
-    if paused is None: raise HTTPException(status_code=404, detail="Run is no longer awaiting approval")
     async def events() -> AsyncIterator[str]:
         store = run_events.setdefault(run_id, [])
         session_id = store[0]["session_id"] if store else ""
+        if paused is None:
+            async for line in emit(store, run_id, session_id, "run.failed", {"text": "This approval is no longer available. Start a new request."}): yield line
+            return
         for requirement in getattr(paused, "active_requirements", []): requirement.confirm() if request.approved else requirement.reject()
         async for line in emit(store, run_id, session_id, "approval.resolved", {"text": "Approved" if request.approved else "Declined"}): yield line
         async for line in emit(store, run_id, session_id, "run.continued"): yield line
         try:
-            stream = agent().acontinue_run(run_response=paused, stream=True, stream_events=True)
+            stream = agent().acontinue_run(run_response=paused, stream=True, stream_events=True, yield_run_output=True)
             async for line in translate(stream, run_id, session_id, store): yield line
+        except Exception:
+            async for line in emit(store, run_id, session_id, "run.failed", {"text": "The approved action could not be completed. No further changes were made."}): yield line
         finally: paused_runs.pop(run_id, None)
     return StreamingResponse(events(), media_type="text/event-stream")
 

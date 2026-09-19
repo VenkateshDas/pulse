@@ -1,5 +1,10 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-09-19] Fix | Resume Agno human approvals without breaking Agent chat
+- Retained the resumable `RunOutput` emitted after `RunPausedEvent`, rather than incorrectly attempting to resume the notification event.
+- Kept mutation confirmation enforced; unavailable or failed resumes now yield safe terminal Agent events rather than closing the SSE response mid-stream.
+- Added focused sidecar regressions for pause capture and continuation.
+
 ## [2026-09-16] Feature | Native Pulse Agent interface and authenticated Agno harness
 - Added Overview → Agent: native session rail, streamed evidence timeline, tool cards, final-answer lane, native action approvals, and pinned natural-language composer.
 - Added versioned sidecar event envelopes, local bearer authentication, bounded context/session summaries, and server-enforced human approval for all mutations.
