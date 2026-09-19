@@ -65,7 +65,8 @@ struct AgentView: View {
             Color.clear.frame(height: 1).id("end")
         }.padding(.horizontal, Halo.Space.xxl).padding(.vertical, Halo.Space.xl)
             .frame(maxWidth: 1040, alignment: .leading).frame(maxWidth: .infinity, alignment: .top) }
-        .onChange(of: model.items.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }}
+        .onChange(of: model.items.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+        .frame(maxHeight: .infinity) }
     }
 
     private var welcome: some View {
@@ -132,14 +133,14 @@ struct AgentView: View {
 
     private var composer: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if model.state != .idle {
-                Label(model.status, systemImage: composerStatusIcon)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(composerStatusColor)
-            }
+            Label(model.state == .idle ? "Ready" : model.status, systemImage: composerStatusIcon)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(composerStatusColor)
+                .opacity(model.state == .idle ? 0 : 1)
+                .frame(height: 13, alignment: .leading)
             HStack(alignment: .bottom, spacing: Halo.Space.sm) {
-                TextField(model.state == .awaitingApproval ? "Approval pending" : "Ask Pulse about your Mac…", text: $prompt, axis: .vertical)
-                    .textFieldStyle(.plain).lineLimit(1...4).focused($composerFocused).onSubmit { submit() }
+                TextField(model.state == .awaitingApproval ? "Approval pending" : "Ask Pulse about your Mac…", text: $prompt)
+                    .textFieldStyle(.plain).frame(height: 22).focused($composerFocused).onSubmit { submit() }
                     .disabled(model.state == .running || model.state == .awaitingApproval)
                 Button(action: composerAction) {
                     Image(systemName: model.state == .running ? "stop.circle.fill" : "arrow.up.circle.fill").font(.system(size: 22))

@@ -6,6 +6,10 @@
 - Preserved provider-supplied Thinking summaries in a collapsible trace, grouped late tool calls with earlier calls before the answer, widened the transcript, hid its intrusive scroll indicator, and added native structured Markdown rendering including tables.
 - Moved run status from the header into the pinned composer, whose send control becomes Stop while receiving; cancellation now stops the receive task, flushes partial text, and preserves tool evidence.
 
+## [2026-09-19] Fix | Prevent Agent page freeze after consecutive turns
+- Replaced the unbounded multiline composer field with a fixed-height native field, reserved the composer status-line height, and made the transcript explicitly consume remaining vertical space.
+- A live `sample` of the frozen build showed the main thread recursively remeasuring SwiftUI/AppKit text-field layout at 100% CPU; the relaunched fixed build settled at ~0.1% CPU and accepted native accessibility inspection.
+
 ## [2026-09-19] Fix | Resume Agno human approvals without breaking Agent chat
 - Retained the resumable `RunOutput` emitted after `RunPausedEvent`, rather than incorrectly attempting to resume the notification event.
 - Kept mutation confirmation enforced; unavailable or failed resumes now yield safe terminal Agent events rather than closing the SSE response mid-stream.
