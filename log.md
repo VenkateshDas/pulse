@@ -1,5 +1,9 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-09-19] Feature | Pulse Agent native workspace upgrade
+- Reworked Agent page around persistent sessions, chronological streamed chat, on-demand typed evidence inspector, and explicit native approval cards.
+- Active conversation is inserted into the sidebar immediately when the sidecar emits its first run event, then refreshed from durable session storage at completion.
+
 ## [2026-09-19] Fix | Resume Agno human approvals without breaking Agent chat
 - Retained the resumable `RunOutput` emitted after `RunPausedEvent`, rather than incorrectly attempting to resume the notification event.
 - Kept mutation confirmation enforced; unavailable or failed resumes now yield safe terminal Agent events rather than closing the SSE response mid-stream.

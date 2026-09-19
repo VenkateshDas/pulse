@@ -24,6 +24,10 @@ final class AgentModel {
     var status = "Ready"
     var activeRunId: String?
     var hasApiKey = false
+    var selectedToolID: String?
+    /// Title shown before server persists its first event. The live row is
+    /// replaced by its durable session ID as soon as `run.started` arrives.
+    private var pendingSessionTitle = "New conversation"
     private var seenEventIDs = Set<String>()
     private var lastSequence = 0
     /// DeepSeek and similar providers can emit hundreds of tiny deltas per
@@ -47,6 +51,7 @@ final class AgentModel {
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, state == .idle || state == .completed || state == .failed || state == .cancelled else { return }
         items.append(.init(id: UUID().uuidString, kind: .user, title: message, detail: ""))
+        pendingSessionTitle = String(message.prefix(52))
         state = .running; status = "Working…"; lastSequence = 0; seenEventIDs.removeAll()
         Task {
             do {
@@ -72,7 +77,7 @@ final class AgentModel {
     }
 
     func loadSession(_ id: String) async {
-        sessionId = id; items = []; state = .starting; status = "Loading conversation…"
+        sessionId = id; items = []; selectedToolID = nil; state = .starting; status = "Loading conversation…"
         do {
             let history = try await AgentClient.shared.fetchHistory(sessionId: id)
             items = history.map { message in
@@ -89,6 +94,10 @@ final class AgentModel {
     func apply(_ event: AgentEnvelope) {
         guard event.version == 1, seenEventIDs.insert(event.eventId).inserted, event.sequence > lastSequence else { return }
         lastSequence = event.sequence; activeRunId = event.runId
+        if sessionId != event.sessionId {
+            sessionId = event.sessionId
+            upsertLiveSession(id: event.sessionId, title: pendingSessionTitle)
+        }
         let text = event.payload["text"] ?? ""
         switch event.kind {
         case "run.started": status = "Working…"; state = .running
@@ -109,8 +118,9 @@ final class AgentModel {
         case "approval.requested":
             state = .awaitingApproval; status = "Approval required"
             items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text))
-        case "run.completed": removeProgress(runId: event.runId); state = .completed; status = "Complete"
-        case "run.cancelled": state = .cancelled; status = "Cancelled"
+        case "run.completed":
+            removeProgress(runId: event.runId); state = .completed; status = "Complete"; refreshSessions()
+        case "run.cancelled": state = .cancelled; status = "Cancelled"; refreshSessions()
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
         default: break
         }
@@ -142,6 +152,30 @@ final class AgentModel {
     func toggleExpansion(id: String) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].isExpanded.toggle()
+    }
+
+    func selectTool(id: String) { selectedToolID = selectedToolID == id ? nil : id }
+
+    func newConversation() {
+        sessionId = nil; items = []; selectedToolID = nil; activeRunId = nil
+        state = .idle; status = "Ready"; pendingSessionTitle = "New conversation"
+    }
+
+    var selectedTool: AgentTimelineItem? {
+        guard let selectedToolID else { return nil }
+        return items.first { $0.id == selectedToolID && $0.kind == .tool }
+    }
+
+    private func upsertLiveSession(id: String, title: String) {
+        sessions.removeAll { $0.sessionId == id }
+        sessions.insert(.init(sessionId: id, name: title, updatedAt: Int(Date().timeIntervalSince1970)), at: 0)
+    }
+
+    private func refreshSessions() {
+        Task {
+            guard let refreshed = try? await AgentClient.shared.fetchSessions() else { return }
+            sessions = refreshed
+        }
     }
 
     private func replace(id: String, kind: AgentTimelineItem.Kind, title: String, detail: String) {
