@@ -93,9 +93,12 @@ final class AgentModel {
         switch event.kind {
         case "run.started": status = "Working…"; state = .running
         case "reasoning.summary.delta": appendOrUpdate(id: "reasoning-\(event.runId)", kind: .progress, title: "Working on it", detail: text)
-        case "answer.delta": bufferAnswerDelta(runId: event.runId, text: text)
+        case "answer.delta":
+            removeProgress(runId: event.runId)
+            bufferAnswerDelta(runId: event.runId, text: text)
         case "answer.interim": items.append(.init(id: event.eventId, kind: .progress, title: "Progress update", detail: text))
         case "answer.final":
+            removeProgress(runId: event.runId)
             clearPendingAnswer(runId: event.runId)
             replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
         case "tool.started": items.append(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
@@ -106,7 +109,7 @@ final class AgentModel {
         case "approval.requested":
             state = .awaitingApproval; status = "Approval required"
             items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text))
-        case "run.completed": state = .completed; status = "Complete"
+        case "run.completed": removeProgress(runId: event.runId); state = .completed; status = "Complete"
         case "run.cancelled": state = .cancelled; status = "Cancelled"
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
         default: break
@@ -130,6 +133,15 @@ final class AgentModel {
     private func clearPendingAnswer(runId: String) {
         let id = "answer-\(runId)"
         pendingAnswerText[id] = nil; pendingAnswerChunks[id] = nil
+    }
+
+    private func removeProgress(runId: String) {
+        items.removeAll { $0.id == "reasoning-\(runId)" }
+    }
+
+    func toggleExpansion(id: String) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].isExpanded.toggle()
     }
 
     private func replace(id: String, kind: AgentTimelineItem.Kind, title: String, detail: String) {

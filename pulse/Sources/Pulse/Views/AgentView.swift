@@ -82,6 +82,14 @@ struct AgentView: View {
                 Text(item.detail).font(.system(size: 12)).foregroundStyle(Halo.textSecondary)
                 HStack { Button("Cancel") { model.resolveApproval(false) }; Button("Approve action") { model.resolveApproval(true) }.buttonStyle(.borderedProminent).tint(Halo.amber) }
             }.premiumCard().frame(maxWidth: 620)
+        case .tool:
+            DisclosureGroup(isExpanded: Binding(get: { item.isExpanded }, set: { _ in model.toggleExpansion(id: item.id) })) {
+                Text(item.detail.isEmpty && item.isRunning ? "Working…" : item.detail)
+                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Halo.textPrimary)
+                    .textSelection(.enabled).padding(.top, Halo.Space.xs)
+            } label: {
+                Label(item.title, systemImage: icon(for: item.kind)).font(.system(size: 12, weight: .semibold)).foregroundStyle(color(for: item.kind))
+            }.premiumCard(padding: Halo.Space.md).frame(maxWidth: 620)
         default:
             VStack(alignment: .leading, spacing: 5) {
                 if !item.title.isEmpty { Label(item.title, systemImage: icon(for: item.kind)).font(.system(size: 12, weight: .semibold)).foregroundStyle(color(for: item.kind)) }

@@ -34,15 +34,16 @@ class ConfigurationRequest(BaseModel):
     api_key: str
     model: str
 
-def compact(value: Any, limit: int = 800) -> str:
+def compact(value: Any, limit: Optional[int] = 800) -> str:
     text = value if isinstance(value, str) else json.dumps(value, default=str, separators=(",", ":"))
-    return text if len(text) <= limit else text[: limit - 1] + "…"
+    return text if limit is None or len(text) <= limit else text[: limit - 1] + "…"
 
 def title_for(name: str) -> str:
     return {"diagnose": "Checking system health", "get_vitals": "Reading system vitals", "get_top_processes": "Checking highest CPU users", "inspect_storage_growth": "Checking storage growth", "scan_clean_targets": "Finding cleanup candidates", "clean_target": "Previewing cleanup", "uninstall_app": "Previewing app removal", "find_duplicates": "Finding exact duplicates"}.get(name, name.replace("_", " ").capitalize())
 
 def make_event(sequence: int, run_id: str, session_id: str, kind: str, payload: Optional[Dict[str, Any]] = None) -> dict[str, Any]:
-    return {"version": 1, "event_id": str(uuid.uuid4()), "sequence": sequence, "run_id": run_id, "session_id": session_id, "timestamp": datetime.now(timezone.utc).isoformat(), "kind": kind, "payload": {key: compact(value) for key, value in (payload or {}).items() if value is not None}}
+    limit = None if kind == "answer.final" else 800
+    return {"version": 1, "event_id": str(uuid.uuid4()), "sequence": sequence, "run_id": run_id, "session_id": session_id, "timestamp": datetime.now(timezone.utc).isoformat(), "kind": kind, "payload": {key: compact(value, limit) for key, value in (payload or {}).items() if value is not None}}
 
 async def emit(store: list[dict[str, Any]], run_id: str, session_id: str, kind: str, payload: Optional[Dict[str, Any]] = None) -> AsyncIterator[str]:
     event = make_event(len(store) + 1, run_id, session_id, kind, payload)
@@ -52,6 +53,7 @@ async def emit(store: list[dict[str, Any]], run_id: str, session_id: str, kind: 
 async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[str, Any]]) -> AsyncIterator[str]:
     """Expose observed progress only. Never forward private provider reasoning."""
     answer = ""
+    final_answer = ""
     async for item in stream:
         event_name = str(getattr(item, "event", "")).lower()
         tool = getattr(item, "tool", None) or getattr(item, "tool_execution", None)
@@ -63,9 +65,11 @@ async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[
             kind = "tool.failed" if "error" in event_name else "tool.completed"
             async for line in emit(store, run_id, session_id, kind, {"tool_call_id": getattr(tool, "tool_call_id", None) or str(uuid.uuid4()), "title": title_for(name), "detail": getattr(tool, "result", getattr(tool, "content", "Complete"))}): yield line
         content = getattr(item, "content", None)
-        if isinstance(content, str) and content:
+        if event_name == "runcontent" and isinstance(content, str) and content:
             answer += content
             async for line in emit(store, run_id, session_id, "answer.delta", {"text": content}): yield line
+        elif event_name == "runcompleted" and isinstance(content, str) and content:
+            final_answer = content
         if getattr(item, "is_paused", False):
             paused_runs[run_id] = item
             requirements = getattr(item, "active_requirements", [])
@@ -73,7 +77,7 @@ async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[
             async for line in emit(store, run_id, session_id, "approval.requested", {"title": title_for(getattr(pending, "tool_name", "action")), "detail": "Review exact affected items before approving this action."}): yield line
             async for line in emit(store, run_id, session_id, "run.paused"): yield line
             return
-    async for line in emit(store, run_id, session_id, "answer.final", {"text": answer}): yield line
+    async for line in emit(store, run_id, session_id, "answer.final", {"text": final_answer or answer}): yield line
     async for line in emit(store, run_id, session_id, "run.completed"): yield line
 
 @app.get("/status", dependencies=[Depends(require_token)])

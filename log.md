@@ -100,3 +100,4 @@
 ## [2026-09-19] fix | Correct Agno streamed-run handling: `arun` and `acontinue_run` return async generators, not awaitable values. Verified with OpenRouter DeepSeek V4.1 Flash.
 ## [2026-09-19] fix | Package skill under its required `pulse` name and load persisted user-visible session history instead of clearing conversation on selection.
 ## [2026-09-19] fix | Coalesce eight streamed Agent answer chunks per SwiftUI publication; prevents provider token bursts from monopolizing the main actor.
+## [2026-09-19] fix | Keep Agno tool-event content out of final answers, preserve complete final text, collapse tool details by default, and clear working progress when answer begins.

@@ -38,4 +38,14 @@ struct AgentModelTests {
         #expect(model.items.count == 1)
         #expect(model.items[0].detail == "xxxxxxxx")
     }
+
+    @Test func answerRemovesWorkingProgress() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "reasoning.summary.delta", payload: ["text": "Checking evidence"]))
+        for sequence in 2...9 {
+            model.apply(.init(sequence: sequence, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
+        }
+        #expect(model.items.count == 1)
+        #expect(model.items[0].kind == .answer)
+    }
 }
