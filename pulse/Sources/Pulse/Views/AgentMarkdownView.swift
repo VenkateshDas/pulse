@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AgentMarkdownBlock: Equatable {
+enum AgentMarkdownBlock: Equatable, Sendable {
     case heading(Int, String)
     case paragraph(String)
     case bullets([String])
@@ -108,11 +108,11 @@ enum AgentMarkdownParser {
 }
 
 struct AgentMarkdownView: View {
-    let source: String
+    let blocks: [AgentMarkdownBlock]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(AgentMarkdownParser.parse(source).enumerated()), id: \.offset) { _, block in
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 blockView(block)
             }
         }

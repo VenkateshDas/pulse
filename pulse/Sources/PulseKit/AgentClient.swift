@@ -53,6 +53,13 @@ public struct AgentHistoryMessage: Codable, Sendable {
     public let content: String
 }
 
+public struct AgentHistoryPage: Codable, Sendable {
+    public let messages: [AgentHistoryMessage]
+    public let nextOffset: Int?
+
+    enum CodingKeys: String, CodingKey { case messages; case nextOffset = "next_offset" }
+}
+
 /// Local authenticated SSE client. No UI types belong here.
 public actor AgentClient {
     public static let shared = AgentClient()
@@ -103,17 +110,16 @@ public actor AgentClient {
         }
     }
 
-    public func fetchHistory(sessionId: String) async throws -> [AgentHistoryMessage] {
-        let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history"))
-        struct Response: Decodable { let messages: [AgentHistoryMessage] }
-        return try JSONDecoder.agent.decode(Response.self, from: data).messages
+    public func fetchHistory(sessionId: String, offset: Int = 0) async throws -> AgentHistoryPage {
+        let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history?offset=\(offset)"))
+        return try JSONDecoder.agent.decode(AgentHistoryPage.self, from: data)
     }
 
     private func stream(path: String, body: [String: Any]) -> AsyncThrowingStream<AgentEnvelope, Error> {
         let token = bearerToken, url = URL(string: path, relativeTo: baseURL)!
         let encodedBody = try? JSONSerialization.data(withJSONObject: body)
         return AsyncThrowingStream { continuation in
-            Task {
+            let requestTask = Task {
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"; request.timeoutInterval = 120
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -130,6 +136,7 @@ public actor AgentClient {
                     continuation.finish()
                 } catch { continuation.finish(throwing: error) }
             }
+            continuation.onTermination = { @Sendable _ in requestTask.cancel() }
         }
     }
 

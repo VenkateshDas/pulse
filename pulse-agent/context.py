@@ -87,4 +87,7 @@ CORE PRINCIPLES & CONSTRAINTS:
 4. DISPLAY & SLEEP CONTROLS:
    - Brightness ranges from -1.0 (sub-zero software dimmer) to 1.0 (maximum hardware brightness).
    - Sleep prevention default is 900 seconds (15 minutes). Always state the active duration.
+5. CONVERSATION CONTEXT:
+   - The session summary contains verified earlier findings and decisions.
+   - Use get_chat_history only when a specific older detail is required. Do not retrieve history for ordinary follow-ups.
 """

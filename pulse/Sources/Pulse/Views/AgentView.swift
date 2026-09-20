@@ -75,6 +75,13 @@ struct AgentView: View {
     private var timeline: some View {
         ScrollView(.vertical, showsIndicators: false) { LazyVStack(alignment: .leading, spacing: Halo.Space.md) {
             if model.items.isEmpty { welcome }
+            if model.hasMoreHistory {
+                Button(model.isLoadingHistory ? "Loading earlier messages…" : "Load earlier messages") {
+                    Task { await model.loadEarlierHistory() }
+                }
+                .buttonStyle(.bordered)
+                .disabled(model.isLoadingHistory)
+            }
             ForEach(model.items) { item in card(item) }
         }.padding(.horizontal, Halo.Space.xxl).padding(.vertical, Halo.Space.xl)
             .frame(maxWidth: 1040, alignment: .leading).frame(maxWidth: .infinity, alignment: .top) }
@@ -114,7 +121,7 @@ struct AgentView: View {
                 get: { item.isExpanded },
                 set: { _ in model.toggleExpansion(id: item.id) }
             )) {
-                AgentMarkdownView(source: item.detail).font(.system(size: 12)).foregroundStyle(Halo.textSecondary)
+                markdown(item).font(.system(size: 12)).foregroundStyle(Halo.textSecondary)
                     .padding(.top, Halo.Space.sm)
             } label: {
                 Label(item.title, systemImage: item.isExpanded ? "brain.head.profile.fill" : "brain.head.profile")
@@ -125,7 +132,7 @@ struct AgentView: View {
             VStack(alignment: .leading, spacing: Halo.Space.sm) {
                 Label(item.title.isEmpty ? "Pulse Agent" : item.title, systemImage: "sparkles")
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(Halo.textSecondary)
-                AgentMarkdownView(source: item.detail)
+                markdown(item)
             }.frame(maxWidth: 960, alignment: .leading)
         case .error:
             VStack(alignment: .leading, spacing: 5) {
@@ -141,6 +148,14 @@ struct AgentView: View {
             if let tool = model.selectedTool { Text(tool.title).font(.system(size: 13, weight: .semibold)); Text(tool.isRunning ? "Working…" : tool.detail).font(.system(size: 11, design: .monospaced)).foregroundStyle(Halo.textSecondary).textSelection(.enabled).padding(Halo.Space.sm).frame(maxWidth: .infinity, alignment: .leading).background(Halo.surface2, in: RoundedRectangle(cornerRadius: Halo.Radius.small)) }
             Text("Typed Pulse tool output. Provider reasoning stays private.").font(.system(size: 10)).foregroundStyle(Halo.textDim); Spacer()
         }.padding(Halo.Space.lg).frame(width: 230).background(Halo.surface1.opacity(0.5))
+    }
+
+    @ViewBuilder private func markdown(_ item: AgentTimelineItem) -> some View {
+        if item.rendersMarkdown {
+            AgentMarkdownView(blocks: item.markdownBlocks)
+        } else {
+            Text(item.detail).font(.system(size: 14)).lineSpacing(3).textSelection(.enabled)
+        }
     }
 
     private var composer: some View {

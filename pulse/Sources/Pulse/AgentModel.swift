@@ -12,6 +12,8 @@ struct AgentTimelineItem: Identifiable {
     var detail: String
     var isExpanded = false
     var isRunning = false
+    var markdownBlocks: [AgentMarkdownBlock] = []
+    var rendersMarkdown = false
 }
 
 /// Main-actor event reducer. Event IDs make replay and SSE reconnect safe.
@@ -25,6 +27,8 @@ final class AgentModel {
     var activeRunId: String?
     var hasApiKey = false
     var selectedToolID: String?
+    var hasMoreHistory = false
+    var isLoadingHistory = false
     /// Title shown before server persists its first event. The live row is
     /// replaced by its durable session ID as soon as `run.started` arrives.
     private var pendingSessionTitle = "New conversation"
@@ -35,6 +39,9 @@ final class AgentModel {
     private var pendingAnswerText: [String: String] = [:]
     private var pendingAnswerChunks: [String: Int] = [:]
     private var streamTask: Task<Void, Never>?
+    private var nextHistoryOffset: Int?
+    private var markdownQueue: [(id: String, text: String)] = []
+    private var isRenderingMarkdown = false
 
     func start() async {
         state = .starting; status = "Starting local agent…"
@@ -99,18 +106,39 @@ final class AgentModel {
     }
 
     func loadSession(_ id: String) async {
+        streamTask?.cancel()
         sessionId = id; items = []; selectedToolID = nil; state = .starting; status = "Loading conversation…"
+        hasMoreHistory = false; nextHistoryOffset = nil; markdownQueue.removeAll(); isRenderingMarkdown = false
         do {
             let history = try await AgentClient.shared.fetchHistory(sessionId: id)
-            items = history.map { message in
+            items = history.messages.map { message in
                 .init(id: UUID().uuidString, kind: message.role == "user" ? .user : .answer,
                       title: message.role == "user" ? message.content : "Pulse Agent",
                       detail: message.role == "user" ? "" : message.content)
             }
+            nextHistoryOffset = history.nextOffset; hasMoreHistory = history.nextOffset != nil
+            for item in items where item.kind == .answer { enqueueMarkdown(id: item.id, text: item.detail) }
             state = .idle; status = "Ready"
         } catch {
             state = .failed; status = "Could not load conversation"
         }
+    }
+
+    func loadEarlierHistory() async {
+        guard let offset = nextHistoryOffset, !isLoadingHistory, let sessionId else { return }
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+        do {
+            let page = try await AgentClient.shared.fetchHistory(sessionId: sessionId, offset: offset)
+            let earlier: [AgentTimelineItem] = page.messages.map { message in
+                .init(id: UUID().uuidString, kind: message.role == "user" ? .user : .answer,
+                      title: message.role == "user" ? message.content : "Pulse Agent",
+                      detail: message.role == "user" ? "" : message.content)
+            }
+            items.insert(contentsOf: earlier, at: 0)
+            nextHistoryOffset = page.nextOffset; hasMoreHistory = page.nextOffset != nil
+            for item in earlier where item.kind == .answer { enqueueMarkdown(id: item.id, text: item.detail) }
+        } catch { status = "Could not load earlier messages" }
     }
 
     func apply(_ event: AgentEnvelope) {
@@ -130,6 +158,7 @@ final class AgentModel {
         case "answer.final":
             clearPendingAnswer(runId: event.runId)
             replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
+            enqueueMarkdown(id: "answer-\(event.runId)", text: text)
         case "tool.started":
             insertTool(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true), runId: event.runId)
         case "tool.completed", "tool.failed":
@@ -214,6 +243,30 @@ final class AgentModel {
         if let index = items.firstIndex(where: { $0.id == id }) {
             items[index].title = title; items[index].detail = detail
         } else { items.append(.init(id: id, kind: kind, title: title, detail: detail)) }
+    }
+
+    /// Parse one answer at a time, off-main. Rendering old rich text must not
+    /// block a follow-up prompt after a large response.
+    private func enqueueMarkdown(id: String, text: String) {
+        guard !text.isEmpty else { return }
+        markdownQueue.append((id, text))
+        renderNextMarkdown()
+    }
+
+    private func renderNextMarkdown() {
+        guard !isRenderingMarkdown, !markdownQueue.isEmpty else { return }
+        isRenderingMarkdown = true
+        let next = markdownQueue.removeFirst()
+        Task { [weak self] in
+            let blocks = await Task.detached(priority: .utility) { AgentMarkdownParser.parse(next.text) }.value
+            guard let self else { return }
+            if let index = items.firstIndex(where: { $0.id == next.id && $0.detail == next.text }) {
+                items[index].markdownBlocks = blocks
+                items[index].rendersMarkdown = true
+            }
+            isRenderingMarkdown = false
+            renderNextMarkdown()
+        }
     }
 
     private func fail(_ detail: String) { state = .failed; status = "Something went wrong"; items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent run failed", detail: detail)) }

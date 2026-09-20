@@ -120,3 +120,8 @@
 ## [2026-09-19] fix | Package skill under its required `pulse` name and load persisted user-visible session history instead of clearing conversation on selection.
 ## [2026-09-19] fix | Coalesce eight streamed Agent answer chunks per SwiftUI publication; prevents provider token bursts from monopolizing the main actor.
 ## [2026-09-19] fix | Keep Agno tool-event content out of final answers, preserve complete final text, collapse tool details by default, and clear working progress when answer begins.
+
+## [2026-09-20] Fix | Prevent Pulse Agent multi-turn hangs after large answers
+- Replaced eager Agno run-history injection with session summaries plus lazy `get_chat_history` access; historical tool calls no longer consume follow-up context.
+- Paged native SQLite transcript history from the newest persisted snapshot, cached long-answer Markdown off the main actor, and made SSE reads cancellation-aware.
+- Bounded sidecar replay events, retained runs, and final-answer replay bytes; added large-history regressions and verified Python + native test suites.
