@@ -39,13 +39,42 @@ struct AgentModelTests {
         #expect(model.items[0].detail == "xxxxxxxx")
     }
 
-    @Test func answerRemovesWorkingProgress() {
+    @Test func cancellationFlushesPartialTextAndRetainsToolEvidence() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "run.started"))
+        for sequence in 2...4 {
+            model.apply(.init(sequence: sequence, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
+        }
+        model.apply(.init(sequence: 5, runId: "run", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "tool", "title": "Reading processes"]))
+
+        model.cancel()
+
+        #expect(model.state == .cancelled)
+        #expect(model.status == "Cancelled")
+        #expect(model.items.map(\.kind) == [.tool, .answer])
+        #expect(model.items.first?.detail == "Cancelled")
+        #expect(model.items.last?.detail == "xxx")
+    }
+
+    @Test func answerPreservesThinkingSummary() {
         let model = AgentModel()
         model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "reasoning.summary.delta", payload: ["text": "Checking evidence"]))
         for sequence in 2...9 {
             model.apply(.init(sequence: sequence, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
         }
-        #expect(model.items.count == 1)
-        #expect(model.items[0].kind == .answer)
+        #expect(model.items.map(\.kind) == [.progress, .answer])
+        #expect(model.items[0].detail == "Checking evidence")
+    }
+
+    @Test func lateToolIsGroupedWithEarlierToolBeforeAnswer() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "first", "title": "Read processes"]))
+        for sequence in 2...9 {
+            model.apply(.init(sequence: sequence, runId: "run", sessionId: "session", kind: "answer.delta", payload: ["text": "x"]))
+        }
+        model.apply(.init(sequence: 10, runId: "run", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "second", "title": "Get anomalies"]))
+
+        #expect(model.items.map(\.kind) == [.tool, .tool, .answer])
+        #expect(model.items.prefix(2).map(\.title) == ["Read processes", "Get anomalies"])
     }
 }

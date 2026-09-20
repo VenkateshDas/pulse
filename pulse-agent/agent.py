@@ -86,15 +86,21 @@ def create_pulse_agent(
         skills=skills,
         instructions=build_system_instructions(),
         compression_manager=compression_manager,
-        add_history_to_context=True,
-        # Small recent window plus a decision-oriented summary prevents old
-        # scans and transient telemetry from consuming every future prompt.
-        num_history_runs=4,
+        # Never inject previous runs wholesale. Agno persists each run with
+        # its message list, so one large answer would otherwise be sent again
+        # on every follow-up. The summary carries normal continuity; the
+        # history tool loads old detail only when the current question needs it.
+        add_history_to_context=False,
+        read_chat_history=True,
+        max_tool_calls_from_history=0,
         enable_session_summaries=True,
         add_session_summary_to_context=True,
         session_summary_manager=SessionSummaryManager(
             model=active_model,
-            last_n_runs=10,
+            # Agno persists a cumulative message snapshot per run. Summarizing
+            # ten snapshots is therefore quadratic after a long first answer.
+            # One newest snapshot updates the existing durable summary.
+            last_n_runs=1,
             session_summary_prompt=(
                 "Summarize only verified findings, user decisions, pending "
                 "approvals, and unresolved work. Never include secrets, raw "

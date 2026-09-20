@@ -1,5 +1,19 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-09-19] Fix | Stop second-turn Agent transcript layout loop
+- Removed item-count-driven `ScrollViewReader.scrollTo`, which fed changing bottom offsets back into SwiftUI while prior Markdown tables were being remeasured and pinned the app's main thread at 100% CPU.
+- Bounded Markdown table cells and isolated wide tables in a horizontal scroller; added a regression policy test forbidding programmatic scroll requests from transcript mutations.
+
+## [2026-09-19] Feature | Pulse Agent native workspace upgrade
+- Reworked Agent page around persistent sessions, chronological streamed chat, on-demand typed evidence inspector, and explicit native approval cards.
+- Active conversation is inserted into the sidebar immediately when the sidecar emits its first run event, then refreshed from durable session storage at completion.
+- Preserved provider-supplied Thinking summaries in a collapsible trace, grouped late tool calls with earlier calls before the answer, widened the transcript, hid its intrusive scroll indicator, and added native structured Markdown rendering including tables.
+- Moved run status from the header into the pinned composer, whose send control becomes Stop while receiving; cancellation now stops the receive task, flushes partial text, and preserves tool evidence.
+
+## [2026-09-19] Fix | Prevent Agent page freeze after consecutive turns
+- Replaced the unbounded multiline composer field with a fixed-height native field, reserved the composer status-line height, and made the transcript explicitly consume remaining vertical space.
+- A live `sample` of the frozen build showed the main thread recursively remeasuring SwiftUI/AppKit text-field layout at 100% CPU; the relaunched fixed build settled at ~0.1% CPU and accepted native accessibility inspection.
+
 ## [2026-09-19] Fix | Resume Agno human approvals without breaking Agent chat
 - Retained the resumable `RunOutput` emitted after `RunPausedEvent`, rather than incorrectly attempting to resume the notification event.
 - Kept mutation confirmation enforced; unavailable or failed resumes now yield safe terminal Agent events rather than closing the SSE response mid-stream.
@@ -106,3 +120,9 @@
 ## [2026-09-19] fix | Package skill under its required `pulse` name and load persisted user-visible session history instead of clearing conversation on selection.
 ## [2026-09-19] fix | Coalesce eight streamed Agent answer chunks per SwiftUI publication; prevents provider token bursts from monopolizing the main actor.
 ## [2026-09-19] fix | Keep Agno tool-event content out of final answers, preserve complete final text, collapse tool details by default, and clear working progress when answer begins.
+
+## [2026-09-20] Fix | Prevent Pulse Agent multi-turn hangs after large answers
+- Replaced eager Agno run-history injection with session summaries plus lazy `get_chat_history` access; historical tool calls no longer consume follow-up context.
+- Paged native SQLite transcript history from the newest persisted snapshot, cached long-answer Markdown off the main actor, and made SSE reads cancellation-aware.
+- Added an 8,000-character answer preview; full Markdown is parsed only after an explicit user expansion.
+- Bounded sidecar replay events, retained runs, and final-answer replay bytes; added large-history regressions and verified Python + native test suites.

@@ -15,6 +15,9 @@ TOKEN = os.environ.get("PULSE_AGENT_TOKEN")
 agent_instance = None
 paused_runs: Dict[str, Any] = {}
 run_events: Dict[str, list[dict[str, Any]]] = {}
+run_sequences: Dict[str, int] = {}
+MAX_REPLAY_EVENTS = 256
+MAX_REPLAY_RUNS = 8
 
 def require_token(authorization: Optional[str] = Header(default=None)) -> None:
     if not TOKEN or authorization != f"Bearer {TOKEN}":
@@ -42,13 +45,34 @@ def compact(value: Any, limit: Optional[int] = 800) -> str:
 def title_for(name: str) -> str:
     return {"diagnose": "Checking system health", "get_vitals": "Reading system vitals", "get_top_processes": "Checking highest CPU users", "inspect_storage_growth": "Checking storage growth", "scan_clean_targets": "Finding cleanup candidates", "clean_target": "Previewing cleanup", "uninstall_app": "Previewing app removal", "find_duplicates": "Finding exact duplicates"}.get(name, name.replace("_", " ").capitalize())
 
+def history_page(raw_messages: list[dict[str, Any]], offset: int, limit: int) -> dict[str, Any]:
+    """Return bounded, user-visible history newest-first by page offset."""
+    messages = [
+        {"role": message["role"], "content": compact(message["content"], 12_000)}
+        for message in raw_messages
+        if message.get("role") in {"user", "assistant"} and isinstance(message.get("content"), str) and message["content"]
+    ]
+    end = max(0, len(messages) - max(0, offset))
+    start = max(0, end - min(max(1, limit), 48))
+    page = messages[start:end]
+    return {"messages": page, "next_offset": offset + len(page) if start > 0 else None}
+
 def make_event(sequence: int, run_id: str, session_id: str, kind: str, payload: Optional[Dict[str, Any]] = None) -> dict[str, Any]:
     limit = None if kind == "answer.final" else 800
     return {"version": 1, "event_id": str(uuid.uuid4()), "sequence": sequence, "run_id": run_id, "session_id": session_id, "timestamp": datetime.now(timezone.utc).isoformat(), "kind": kind, "payload": {key: compact(value, limit) for key, value in (payload or {}).items() if value is not None}}
 
 async def emit(store: list[dict[str, Any]], run_id: str, session_id: str, kind: str, payload: Optional[Dict[str, Any]] = None) -> AsyncIterator[str]:
-    event = make_event(len(store) + 1, run_id, session_id, kind, payload)
-    store.append(event)
+    sequence = run_sequences.get(run_id, 0) + 1
+    run_sequences[run_id] = sequence
+    event = make_event(sequence, run_id, session_id, kind, payload)
+    # Live clients receive the full final answer. Replay state is only a
+    # recovery aid, so never retain an unbounded answer in sidecar memory.
+    stored_event = event if kind != "answer.final" else make_event(
+        sequence, run_id, session_id, kind, {"text": compact(event["payload"].get("text", ""))}
+    )
+    store.append(stored_event)
+    if len(store) > MAX_REPLAY_EVENTS:
+        del store[:-MAX_REPLAY_EVENTS]
     yield f"event: pulse\ndata: {json.dumps(event)}\n\n"
 
 async def translate(stream: Any, run_id: str, session_id: str, store: list[dict[str, Any]]) -> AsyncIterator[str]:
@@ -105,8 +129,12 @@ async def configure(request: ConfigurationRequest) -> dict[str, str]:
 @app.post("/runs", dependencies=[Depends(require_token)])
 async def run(request: RunRequest) -> StreamingResponse:
     async def events() -> AsyncIterator[str]:
+        while len(run_events) >= MAX_REPLAY_RUNS:
+            stale_run_id = next(iter(run_events))
+            run_events.pop(stale_run_id, None); run_sequences.pop(stale_run_id, None)
         session_id, run_id = request.session_id or str(uuid.uuid4()), str(uuid.uuid4())
         store = run_events.setdefault(run_id, [])
+        run_sequences[run_id] = 0
         async for line in emit(store, run_id, session_id, "run.started"): yield line
         async for line in emit(store, run_id, session_id, "reasoning.summary.delta", {"text": "Checking current Pulse evidence."}): yield line
         if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
@@ -172,21 +200,19 @@ async def sessions() -> dict[str, Any]:
     except (sqlite3.Error, json.JSONDecodeError): return {"sessions": []}
 
 @app.get("/sessions/{session_id}/history", dependencies=[Depends(require_token)])
-async def session_history(session_id: str) -> dict[str, Any]:
-    """Return only user-visible messages; never replay system prompts or reasoning."""
+async def session_history(session_id: str, offset: int = 0, limit: int = 24) -> dict[str, Any]:
+    """Page visible history from latest persisted run; never replay private data."""
     db = Path.home() / ".pulse" / "agent.db"
-    if not db.exists(): return {"messages": []}
+    if not db.exists(): return {"messages": [], "next_offset": None}
+    offset, limit = max(0, offset), min(max(1, limit), 48)
     try:
         with sqlite3.connect(db) as connection:
-            rows = connection.execute("SELECT run_data FROM agno_runs WHERE session_id = ? ORDER BY created_at ASC", (session_id,)).fetchall()
-        messages = []
-        for (raw_run,) in rows:
-            for message in json.loads(raw_run).get("messages", []):
-                role, content = message.get("role"), message.get("content")
-                if role in {"user", "assistant"} and isinstance(content, str) and content:
-                    messages.append({"role": role, "content": compact(content, 12_000)})
-        return {"messages": messages}
-    except (sqlite3.Error, json.JSONDecodeError): return {"messages": []}
+            row = connection.execute(
+                "SELECT run_data FROM agno_runs WHERE session_id = ? ORDER BY run_index DESC, created_at DESC LIMIT 1",
+                (session_id,)
+            ).fetchone()
+        return history_page(json.loads(row[0]).get("messages", []) if row else [], offset, limit)
+    except (sqlite3.Error, json.JSONDecodeError): return {"messages": [], "next_offset": None}
 
 if __name__ == "__main__":
     import uvicorn
