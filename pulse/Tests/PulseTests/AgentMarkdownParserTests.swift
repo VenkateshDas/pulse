@@ -27,4 +27,13 @@ struct AgentMarkdownParserTests {
             .bullets(["No sustained anomaly", "Memory is stable"])
         ])
     }
+
+    @Test func hugeAnswerUsesBoundedPreviewUntilExpanded() {
+        let source = String(repeating: "x", count: AgentAnswerPresentation.previewLimit + 1)
+        let preview = AgentAnswerPresentation.visibleSource(source, isExpanded: false)
+
+        #expect(AgentAnswerPresentation.needsExpansion(source))
+        #expect(preview.count < AgentAnswerPresentation.previewLimit + 64)
+        #expect(AgentAnswerPresentation.visibleSource(source, isExpanded: true) == source)
+    }
 }

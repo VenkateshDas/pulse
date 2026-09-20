@@ -117,7 +117,9 @@ final class AgentModel {
                       detail: message.role == "user" ? "" : message.content)
             }
             nextHistoryOffset = history.nextOffset; hasMoreHistory = history.nextOffset != nil
-            for item in items where item.kind == .answer { enqueueMarkdown(id: item.id, text: item.detail) }
+            for item in items where item.kind == .answer {
+                enqueueMarkdown(id: item.id, text: AgentAnswerPresentation.visibleSource(item.detail, isExpanded: false))
+            }
             state = .idle; status = "Ready"
         } catch {
             state = .failed; status = "Could not load conversation"
@@ -137,7 +139,9 @@ final class AgentModel {
             }
             items.insert(contentsOf: earlier, at: 0)
             nextHistoryOffset = page.nextOffset; hasMoreHistory = page.nextOffset != nil
-            for item in earlier where item.kind == .answer { enqueueMarkdown(id: item.id, text: item.detail) }
+            for item in earlier where item.kind == .answer {
+                enqueueMarkdown(id: item.id, text: AgentAnswerPresentation.visibleSource(item.detail, isExpanded: false))
+            }
         } catch { status = "Could not load earlier messages" }
     }
 
@@ -158,7 +162,7 @@ final class AgentModel {
         case "answer.final":
             clearPendingAnswer(runId: event.runId)
             replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
-            enqueueMarkdown(id: "answer-\(event.runId)", text: text)
+            enqueueMarkdown(id: "answer-\(event.runId)", text: AgentAnswerPresentation.visibleSource(text, isExpanded: false))
         case "tool.started":
             insertTool(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true), runId: event.runId)
         case "tool.completed", "tool.failed":
@@ -213,6 +217,11 @@ final class AgentModel {
     func toggleExpansion(id: String) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].isExpanded.toggle()
+        guard items[index].kind == .answer else { return }
+        items[index].rendersMarkdown = false
+        let source = AgentAnswerPresentation.visibleSource(items[index].detail, isExpanded: items[index].isExpanded)
+        markdownQueue.removeAll { $0.id == id }
+        enqueueMarkdown(id: id, text: source)
     }
 
     func selectTool(id: String) { selectedToolID = selectedToolID == id ? nil : id }
@@ -260,7 +269,7 @@ final class AgentModel {
         Task { [weak self] in
             let blocks = await Task.detached(priority: .utility) { AgentMarkdownParser.parse(next.text) }.value
             guard let self else { return }
-            if let index = items.firstIndex(where: { $0.id == next.id && $0.detail == next.text }) {
+            if let index = items.firstIndex(where: { $0.id == next.id }) {
                 items[index].markdownBlocks = blocks
                 items[index].rendersMarkdown = true
             }

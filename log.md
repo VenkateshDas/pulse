@@ -124,4 +124,5 @@
 ## [2026-09-20] Fix | Prevent Pulse Agent multi-turn hangs after large answers
 - Replaced eager Agno run-history injection with session summaries plus lazy `get_chat_history` access; historical tool calls no longer consume follow-up context.
 - Paged native SQLite transcript history from the newest persisted snapshot, cached long-answer Markdown off the main actor, and made SSE reads cancellation-aware.
+- Added an 8,000-character answer preview; full Markdown is parsed only after an explicit user expansion.
 - Bounded sidecar replay events, retained runs, and final-answer replay bytes; added large-history regressions and verified Python + native test suites.

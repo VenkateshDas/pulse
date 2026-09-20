@@ -11,6 +11,17 @@ enum AgentMarkdownBlock: Equatable, Sendable {
     case rule
 }
 
+enum AgentAnswerPresentation {
+    static let previewLimit = 8_000
+
+    static func needsExpansion(_ source: String) -> Bool { source.count > previewLimit }
+
+    static func visibleSource(_ source: String, isExpanded: Bool) -> String {
+        guard !isExpanded, needsExpansion(source) else { return source }
+        return String(source.prefix(previewLimit)) + "\n\n[… response preview …]"
+    }
+}
+
 enum AgentMarkdownParser {
     static func parse(_ source: String) -> [AgentMarkdownBlock] {
         let lines = source.components(separatedBy: .newlines)

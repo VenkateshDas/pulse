@@ -133,6 +133,10 @@ struct AgentView: View {
                 Label(item.title.isEmpty ? "Pulse Agent" : item.title, systemImage: "sparkles")
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(Halo.textSecondary)
                 markdown(item)
+                if AgentAnswerPresentation.needsExpansion(item.detail) {
+                    Button(item.isExpanded ? "Show less" : "Show full response") { model.toggleExpansion(id: item.id) }
+                        .buttonStyle(.bordered).controlSize(.small)
+                }
             }.frame(maxWidth: 960, alignment: .leading)
         case .error:
             VStack(alignment: .leading, spacing: 5) {
@@ -154,7 +158,8 @@ struct AgentView: View {
         if item.rendersMarkdown {
             AgentMarkdownView(blocks: item.markdownBlocks)
         } else {
-            Text(item.detail).font(.system(size: 14)).lineSpacing(3).textSelection(.enabled)
+            Text(AgentAnswerPresentation.visibleSource(item.detail, isExpanded: item.isExpanded))
+                .font(.system(size: 14)).lineSpacing(3).textSelection(.enabled)
         }
     }
 
