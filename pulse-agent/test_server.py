@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 
@@ -92,3 +93,35 @@ class ContextBoundsTests(unittest.IsolatedAsyncioTestCase):
         sent = json.loads(lines[0].split("data: ", 1)[1])
         self.assertEqual(50_000, len(sent["payload"]["text"]))
         self.assertLessEqual(len(store[0]["payload"]["text"]), 800)
+
+    async def test_huge_first_turn_does_not_block_same_session_follow_up(self):
+        class Completed:
+            event = "RunCompleted"
+            def __init__(self, content): self.content = content
+
+        class FakeAgent:
+            def arun(self, *, input, session_id, **_):
+                async def stream():
+                    yield Completed("x" * 50_000 if input == "first" else "second response")
+                return stream()
+
+        previous, previous_token = server.agent_instance, server.TOKEN
+        previous_key = os.environ.get("OPENAI_API_KEY")
+        server.agent_instance, server.TOKEN = FakeAgent(), "test-token"
+        os.environ["OPENAI_API_KEY"] = "test-key"
+        try:
+            first = await server.run(server.RunRequest(message="first", session_id="session"))
+            first_lines = [line async for line in first.body_iterator]
+            second = await server.run(server.RunRequest(message="follow up", session_id="session"))
+            second_lines = [line async for line in second.body_iterator]
+        finally:
+            server.agent_instance, server.TOKEN = previous, previous_token
+            if previous_key is None: os.environ.pop("OPENAI_API_KEY", None)
+            else: os.environ["OPENAI_API_KEY"] = previous_key
+
+        first_events = [json.loads(line.split("data: ", 1)[1]) for line in first_lines]
+        second_events = [json.loads(line.split("data: ", 1)[1]) for line in second_lines]
+        first_final = next(event for event in first_events if event["kind"] == "answer.final")
+        second_final = next(event for event in second_events if event["kind"] == "answer.final")
+        self.assertEqual(50_000, len(first_final["payload"]["text"]))
+        self.assertEqual("second response", second_final["payload"]["text"])
