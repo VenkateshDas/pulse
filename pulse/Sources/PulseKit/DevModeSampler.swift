@@ -44,14 +44,8 @@ public actor DevModeSampler {
     }
 
     public func sampleProcessFDs() -> [ProcessFDSample] {
-        var pids = [pid_t](repeating: 0, count: 8192)
-        // proc_listallpids returns bytes written, not a pid count — divide by
-        // the stride, and clamp to the buffer's bounds for safety.
-        let bytesWritten = pids.withUnsafeMutableBufferPointer { buffer in
-            proc_listallpids(buffer.baseAddress, Int32(buffer.count * MemoryLayout<pid_t>.size))
-        }
-        guard bytesWritten > 0 else { return [] }
-        let pidCount = min(Int(bytesWritten) / MemoryLayout<pid_t>.size, pids.count)
+        let pids = NativeProcesses.list().pids
+        let pidCount = pids.count
 
         var samples = [ProcessFDSample]()
         samples.reserveCapacity(pidCount)

@@ -84,3 +84,6 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 | F3 Weekly orphan background scan | Mole F3 | Not built — manual only |
 
 - **CLI/skill deployment audit (2026-09-13):** [Results and release gates](docs/pulse-cli-audit-2026-09-13.md); [approved native probe design](docs/superpowers/specs/2026-09-13-native-verdict-design.md). UsageGraphScanner now reads Homebrew receipts and Mach-O headers without subprocesses.
+
+- **Diagnostic investigation:** native VM/storage rates, readable PID coverage and shared CPU accounting. `observe`, `process`, `network`, `history`, `startup`, and identity-bound `quit` share core evidence with Monitor → Investigate. Monitor supports app grouping and process role/footprint details. New anomaly start tokens and CPU/pressure/swap/temperature/battery minute histories support gap-honest correlation. See `docs/pulse-cli.md`.
+- **Diagnostic upgrade plan:** `docs/superpowers/specs/2026-10-10-pulse-diagnostics-design.md` — shared native observation, reliable telemetry, app/CLI/skill parity and targeted remedies.

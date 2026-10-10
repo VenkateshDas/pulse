@@ -42,6 +42,8 @@ public struct VitalsDTO: Codable, Sendable {
         public let cycleCount: Int?
     }
 
+    public let activity: ActivityReadings
+    public let processCoverage: ProcessCoverage
     public let timestamp: Date
     public let uptimeSeconds: Double
     public let thermal: String
@@ -53,6 +55,8 @@ public struct VitalsDTO: Codable, Sendable {
     public let battery: BatteryInfo?
 
     public init(snapshot: SystemSnapshot) {
+        self.activity = snapshot.activity
+        self.processCoverage = snapshot.processCoverage
         self.timestamp = snapshot.timestamp
         self.uptimeSeconds = snapshot.uptime
         self.thermal = "\(snapshot.thermal)"
@@ -70,7 +74,7 @@ public struct VitalsDTO: Codable, Sendable {
             wiredBytes: snapshot.memoryWiredBytes,
             compressedBytes: snapshot.memoryCompressedBytes,
             swapUsedBytes: snapshot.swapUsedBytes,
-            pressure: "\(snapshot.memoryPressure)",
+            pressure: snapshot.activity.unavailable.contains("Memory pressure unavailable") ? "unavailable" : "\(snapshot.memoryPressure)",
             usedFraction: (snapshot.memoryUsedFraction * 1000).rounded() / 1000
         )
         self.disk = DiskInfo(

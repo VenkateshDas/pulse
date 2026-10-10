@@ -75,3 +75,19 @@ The original cold-cache `verdict` path indirectly invoked `brew uses` and `otool
 Receipt evidence does not include build-only dependencies or changed formula definitions. Mach-O inspection covers thin/universal binaries, both byte orders, absolute paths and loader/executable-relative paths; unresolved `@rpath` names are omitted. These are static clues, not a complete dependency proof.
 
 See [September 13 CLI and skill audit](pulse-cli-audit-2026-09-13.md) for command coverage, action recovery, performance and remaining release gates.
+
+## October 10 diagnostic upgrade
+
+`observe --seconds 2...600` runs a bounded native session at approximately two-second cadence. JSON contains measured intervals, weighted mean/peak CPU, pressure persistence, swap/compression rates, aggregate storage I/O, process coverage, contributors, findings and limits. First counter reads have no rate baseline. Monitor → Investigate consumes the same PulseKit report, preserves the previous completed interval for comparison, and stops when dismissed, the command-center window is hidden, or the screen locks. Normal focus changes do not stop observation.
+
+`process PID` returns `identity` (executable, parent, startedAt, exact startToken, helper role, footprint, cumulative disk counters), interval `metrics`, and `coverage`. `procs --grouped` aggregates owning apps; `procs --tree` exposes parent linkage. Monitor has Apps aggregation and selected-process role/footprint/executable details. Individual CPU 100% means one core; system CPU 100% means all cores. RSS totals are not exclusive physical usage.
+
+`network [--url HTTP(S)-URL]` reads Wi-Fi/proxy/primary-interface context. The optional probe sends one ten-second-bounded, cookie-free HEAD request, follows no redirects and reports timing stages when available. It is not a speed test. `history --hours N` exposes minute CPU, pressure (1=normal, 2=warning, 4=critical), swap occupancy (bytes), CPU temperature (Celsius) and battery-level (%) histories, anomalies, battery sessions and daily storage snapshots. Missing/corrupt files are disclosed. New anomalies record start tokens; monitoring/leak detection reset on restart. `startup` provides bounded read-only launch-plist configuration, not a complete modern login-item inventory. These contexts are visible in Monitor's investigation sheet; Health retains its existing battery and reversible user-agent controls.
+
+`sleep status` reads assertions without a responding GUI; app-owned keep-awake state then remains absent. `quit PID --started-at START-TOKEN` previews graceful application quit. `--yes` requests it only after consent. Helpers, protected apps, Pulse, and stale identities are refused; no force quit. Results distinguish requested/terminated; incomplete termination exits 1. Monitor uses the same quit boundary after confirmation.
+
+Native correctness: proc_listallpids returns a PID count, not bytes. Task time and mach wall deltas use the same native ticks; an independent POSIX workload check guards the CPU units. Coverage records unreadable tasks; start tokens reset reused-PID baselines. Unavailable measurements do not imply health. Aggregate I/O reports activity, not latency or saturation; storage layers can overlap and I/O throughput remains outside the health score.
+
+No new dependency, shell collector, daemon, browser debugging port or blanket optimization command was introduced. Legacy shell-backed optimization remains outside the diagnostic CLI. Optimize journals successful Trash moves individually and reports moved bytes rather than reclaimed capacity.
+
+Regression checks cover PID coverage, POSIX CPU accounting, bounded/cancelled observations, identity/roles, stale/protected quit rejection, probe validation, CLI grammar, agent partial exits and preview identity gating. The portable skill routes symptom-directed diagnosis and remedies through supporting references. Bundles copy the entire skill folder, including references.

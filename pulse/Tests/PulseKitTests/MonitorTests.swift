@@ -101,13 +101,11 @@ struct MonitorEngineTests {
 
 @Suite("ProcessSampler")
 struct ProcessSamplerTests {
-    // proc_listallpids returns bytes written, not a pid count. Regression
-    // guard: the sampler must convert correctly and never overrun its own
-    // fixed pid buffer when slicing the result.
+    // Exercise the full readable list, independently of process ranking.
     @Test func sampleIncludesOwnProcessAndRespectsLimit() {
         let sampler = ProcessSampler()
-        let rows = sampler.sample(limit: 20)
-        #expect(rows.count <= 20)
+        let rows = sampler.sample(limit: Int.max)
+        #expect(sampler.sample(limit: 20).count <= 20)
         #expect(rows.contains { $0.pid == getpid() })
         #expect(rows.allSatisfy { $0.pid > 0 })
     }

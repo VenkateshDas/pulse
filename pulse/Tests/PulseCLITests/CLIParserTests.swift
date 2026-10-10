@@ -25,7 +25,10 @@ import PulseKit
         ["procs", "--limit", "3", "--limit", "4"], ["vitals", "--jsno"],
         ["vitals", "--json=false"], ["display", "set", "nan"], ["display", "set", "1.1"],
         ["sleep", "prevent", "--until", "inf"], ["sleep", "allow", "--until", "5"],
-        ["uninstall", "--yes"], ["duplicates", "/tmp", "--min-size-mb", "0"]
+        ["uninstall", "--yes"], ["duplicates", "/tmp", "--min-size-mb", "0"],
+        ["observe", "--seconds", "0"], ["observe", "--seconds", "601"],
+        ["process", "1"], ["process", "abc"], ["quit", "123", "--yes"],
+        ["startup", "--yes"]
     ]) func rejectsBadInputs(args: [String]) {
         #expect(throws: CLIUsageError.self) { try CLIParser(arguments: args).validate() }
     }

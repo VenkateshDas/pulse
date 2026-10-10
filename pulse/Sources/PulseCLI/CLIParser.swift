@@ -8,9 +8,12 @@ public struct CLIUsageError: LocalizedError {
 
 /// Closed command grammar: misspelled flags never silently authorize an action.
 public struct CLIParser: Sendable {
-    public static let commands: Set<String> = ["vitals", "diagnose", "procs", "attention", "anomalies", "growth", "verdict", "clean", "uninstall", "display", "sleep", "sensors", "undo", "duplicates", "speedtest"]
+    public static let commands: Set<String> = ["vitals", "diagnose", "procs", "attention", "anomalies", "growth", "verdict", "clean", "uninstall", "display", "sleep", "sensors", "undo", "duplicates", "speedtest", "observe", "process", "network", "history", "startup", "quit"]
     public static let usage: [String: String] = [
-        "vitals": "vitals [--lite]", "diagnose": "diagnose", "procs": "procs [--by cpu|mem] [--limit N]",
+        "observe": "observe [--seconds 2...600]", "process": "process <PID>",
+        "network": "network [--url https://host/path]", "history": "history [--hours N]",
+        "startup": "startup", "quit": "quit <PID> --started-at <startToken> [--dry-run | --yes]",
+        "vitals": "vitals [--lite]", "diagnose": "diagnose", "procs": "procs [--by cpu|mem] [--limit N] [--grouped | --tree]",
         "attention": "attention", "anomalies": "anomalies [--hours N]", "growth": "growth [--days N] [--limit N]",
         "verdict": "verdict <directory>", "clean": "clean [--scan | --target <exact-path-ID> | --all-safe] [--dry-run] [--yes]",
         "uninstall": "uninstall [--list | <exact-name|bundle-ID|path>] [--dry-run] [--yes]",
@@ -21,7 +24,7 @@ public struct CLIParser: Sendable {
     ]
     private static let aliases = ["ps": "procs", "alerts": "attention", "spikes": "anomalies", "rm": "uninstall", "brightness": "display", "awake": "sleep", "smc": "sensors", "restore": "undo", "dups": "duplicates", "speed": "speedtest"]
     private static let short = ["h": "help", "v": "version", "n": "limit", "d": "days", "t": "target"]
-    private static let valueKeys: Set<String> = ["limit", "by", "days", "hours", "target", "display", "until", "min-size-mb"]
+    private static let valueKeys: Set<String> = ["limit", "by", "days", "hours", "target", "display", "until", "min-size-mb", "seconds", "url", "started-at"]
     public let subcommand: String?
     public let flags: Set<String>
     public let options: [String: String]
@@ -62,7 +65,8 @@ public struct CLIParser: Sendable {
         let command = subcommand ?? "help"
         guard Self.commands.contains(command) || ["help", "version"].contains(command) else { try fail("Unknown command '\(command)'"); return }
         let allowed: [String: Set<String>] = [
-            "vitals": ["lite"], "procs": ["by", "limit"], "anomalies": ["hours"],
+            "observe": ["seconds"], "network": ["url"], "history": ["hours"], "quit": ["started-at", "yes", "dry-run"],
+            "vitals": ["lite"], "procs": ["by", "limit", "grouped", "tree"], "anomalies": ["hours"],
             "growth": ["days", "limit"], "clean": ["scan", "target", "all-safe", "dry-run", "yes"],
             "uninstall": ["list", "dry-run", "yes"], "display": ["display"], "sleep": ["until"],
             "duplicates": ["min-size-mb"], "speedtest": ["cached"]]
@@ -74,11 +78,15 @@ public struct CLIParser: Sendable {
         for key in ["until", "min-size-mb"] {
             if let raw = options[key], Double(raw).map({ $0.isFinite && $0 > 0 && $0 <= 31_536_000 }) != true { try fail("--\(key) must be finite, positive, and at most 31536000") }
         }
+        if let raw = options["seconds"], Int(raw).map({ (2...600).contains($0) }) != true { try fail("--seconds must be 2...600") }
         if let raw = options["display"], UInt32(raw) == nil { try fail("--display must be a display ID") }
         if let by = options["by"], !["cpu", "mem"].contains(by) { try fail("--by must be cpu or mem") }
         if let target = options["target"], target.isEmpty { try fail("--target cannot be empty") }
         if hasFlag("help", "version") { return }
         switch command {
+        case "process", "quit":
+            guard positional.count == 1, let pid = Int32(positional[0]), pid > 1 else { try fail("Requires one PID greater than 1"); return }
+            if command == "quit", options["started-at"] == nil { try fail("quit requires --started-at from process inspection") }
         case "verdict", "duplicates": if positional.count != 1 { try fail("\(command) requires one directory path") }
         case "uninstall":
             if positional.count > 1 || (hasFlag("yes") && (positional.isEmpty || hasFlag("list"))) { try fail("uninstall requires one exact app name, bundle ID, or path") }
@@ -94,6 +102,8 @@ public struct CLIParser: Sendable {
             if !(positional.isEmpty || positional == ["list"] || (positional.count == 2 && positional[0] == "restore" && positional[1].count >= 8)) { try fail("Usage: undo [list | restore <ID, at least 8 characters>]") }
         default: if !positional.isEmpty { try fail("Unexpected argument for \(command)") }
         }
+        if command == "procs", hasFlag("grouped") && hasFlag("tree") { try fail("Choose --grouped or --tree") }
+        if command == "quit", let token = options["started-at"], token.isEmpty || token.count > 64 { try fail("Copy the exact startToken from process inspection") }
         if command == "clean" {
             if options["target"] != nil && hasFlag("all-safe") { try fail("Choose --target or --all-safe") }
             if hasFlag("yes") && !hasFlag("scan") && options["target"] == nil && !hasFlag("all-safe") { try fail("clean --yes requires --target ID or --all-safe") }

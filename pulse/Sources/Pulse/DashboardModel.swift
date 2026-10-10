@@ -139,6 +139,9 @@ final class DashboardModel {
     @ObservationIgnored private var cpuBuffer: [Double] = []
     @ObservationIgnored private let cpuDayStore = MinuteHistoryStore(
         fileURL: MinuteHistoryStore.defaultFileURL(metric: "cpu"))
+    @ObservationIgnored private let memoryPressureStore = MinuteHistoryStore(fileURL: MinuteHistoryStore.defaultFileURL(metric: "memory-pressure"))
+    @ObservationIgnored private let swapStore = MinuteHistoryStore(fileURL: MinuteHistoryStore.defaultFileURL(metric: "swap-bytes"))
+    @ObservationIgnored private let thermalStore = MinuteHistoryStore(fileURL: MinuteHistoryStore.defaultFileURL(metric: "cpu-temperature"))
     @ObservationIgnored private var memoryBuffer: [Double] = []
     @ObservationIgnored private var loadBuffer: [Double] = []
     @ObservationIgnored private var tempBuffer: [Double] = []
@@ -258,12 +261,16 @@ final class DashboardModel {
         loop = nil
     }
 
-    /// Sends SIGTERM — the polite quit. Returns user-facing feedback.
+    /// Quit only the application identity actually observed, never a reused PID.
     func quitProcess(pid: Int32, name: String) {
-        actionFeedback =
-            kill(pid, SIGTERM) == 0
-            ? "Sent Quit to \(name)"
-            : "Couldn't quit \(name) — it may be a system process"
+        guard let token = (latest?.topProcesses ?? []).first(where: { $0.pid == pid })?.startToken else {
+            actionFeedback = "Inspect this application in Monitor before quitting"; return
+        }
+        Task {
+            do {
+                actionFeedback = try await AppQuit.run(pid: pid, startToken: token, dryRun: false).message
+            } catch { actionFeedback = error.localizedDescription }
+        }
     }
 
     /// Hides an attention item until `until`. Removed from the published list
@@ -297,10 +304,11 @@ final class DashboardModel {
             for anomaly in sustained where anomaly.isNewlySustained {
                 anomalyStore.record(AnomalyRecord(
                     processName: anomaly.name, pid: anomaly.pid, cpuPercent: anomaly.cpuPercent,
-                    date: snapshot.timestamp, sustainedSeconds: anomaly.sustainedSeconds))
+                    date: snapshot.timestamp, sustainedSeconds: anomaly.sustainedSeconds, startToken: snapshot.topProcesses.first { $0.pid == anomaly.pid }?.startToken))
             }
+            let leakCandidates = Dictionary((snapshot.topProcesses + snapshot.memoryProcesses).map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first }).values
             let leaks = leakWatcher.ingest(
-                snapshot.topProcesses.filter { $0.pid != getpid() }, now: snapshot.timestamp)
+                Array(leakCandidates).filter { $0.pid != getpid() }, now: snapshot.timestamp)
             if let leak = leaks.first {
                 evaluated.insert(Self.memoryLeakAlert(leak), at: 0)
             }
@@ -308,7 +316,7 @@ final class DashboardModel {
                 anomalyStore.record(AnomalyRecord(
                     processName: leak.name, pid: leak.pid, cpuPercent: 0,
                     date: snapshot.timestamp, sustainedSeconds: leak.windowSeconds,
-                    kind: .memoryLeak, growthBytes: leak.growthBytes))
+                    kind: .memoryLeak, growthBytes: leak.growthBytes, startToken: leakCandidates.first { $0.pid == leak.pid }?.startToken))
             }
             latestAlerts = evaluated
             latestDiagnosis = DiagnosisEngine.evaluate(snapshot, leak: leaks.first)
@@ -327,7 +335,10 @@ final class DashboardModel {
         }
 
         append(snapshot.cpuTotalPercent, to: &cpuBuffer)
-        cpuDayStore.record(snapshot.cpuTotalPercent, at: snapshot.timestamp)
+        if !snapshot.activity.unavailable.contains("CPU counters unavailable") { cpuDayStore.record(snapshot.cpuTotalPercent, at: snapshot.timestamp) }
+        if !snapshot.activity.unavailable.contains("Memory pressure unavailable") { memoryPressureStore.record(Double(snapshot.memoryPressure.rawValue), at: snapshot.timestamp) }
+        if !snapshot.activity.unavailable.contains("Swap occupancy unavailable") { swapStore.record(Double(snapshot.swapUsedBytes), at: snapshot.timestamp) }
+        if let temperature = snapshot.sensors.cpuTempC { thermalStore.record(temperature, at: snapshot.timestamp) }
         append(snapshot.memoryUsedFraction * 100, to: &memoryBuffer)
         append(snapshot.loadAverage1m, to: &loadBuffer)
         if let temp = [snapshot.sensors.cpuTempC, snapshot.sensors.gpuTempC]

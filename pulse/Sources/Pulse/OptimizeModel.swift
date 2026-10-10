@@ -20,6 +20,7 @@ final class OptimizeModel {
     private(set) var states: [String: TaskState] = [:]
     private(set) var didLoad = false
     private(set) var totalBytesFreed: Int64 = 0
+    private(set) var totalBytesMovedToTrash: Int64 = 0
 
     func state(for id: String) -> TaskState { states[id] ?? TaskState() }
 
@@ -73,6 +74,7 @@ final class OptimizeModel {
         s.result = result
         states[task.id] = s
         if result.success { totalBytesFreed += result.bytesFreed }
+        totalBytesMovedToTrash += result.bytesMovedToTrash
         if result.trashed { TrashSound.moveToTrash() }
         await refresh(task)
     }

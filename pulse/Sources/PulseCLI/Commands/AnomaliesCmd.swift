@@ -4,6 +4,7 @@ import PulseKit
 public struct AnomalyDTO: Codable, Sendable {
     public let id: String
     public let processName: String
+    public let startToken: String?
     public let pid: Int32
     public let cpuPercent: Double
     public let date: Date
@@ -14,6 +15,7 @@ public struct AnomalyDTO: Codable, Sendable {
     public init(record: AnomalyRecord) {
         self.id = record.id.uuidString
         self.processName = record.processName
+        self.startToken = record.startToken
         self.pid = record.pid
         self.cpuPercent = (record.cpuPercent * 10).rounded() / 10
         self.date = record.date

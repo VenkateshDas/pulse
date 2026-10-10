@@ -47,10 +47,19 @@ class PulseToolkit(Toolkit):
         # fresh scan, avoiding stale-path commits after the filesystem changed.
         self.previewed_clean_targets: set[str] = set()
         self.previewed_apps: set[str] = set()
+        self.previewed_quits: set[tuple[int, str]] = set()
 
         tools = [
+            self.observe_performance,
+            self.inspect_process,
+            self.inspect_network,
+            self.get_diagnostic_history,
+            self.get_startup_inventory,
+            self.preview_application_quit,
+            self.quit_application,
             self.diagnose,
             self.get_top_processes,
+            self.get_process_tree,
             self.get_anomalies,
             self.get_vitals,
             self.get_sensors,
@@ -77,6 +86,7 @@ class PulseToolkit(Toolkit):
             # Server-enforced HITL. Prompt instructions are not an authority
             # boundary; all mutations pause before the tool receives control.
             requires_confirmation_tools=[
+                "quit_application",
                 "clean_target",
                 "uninstall_app",
                 "restore_undo_item",
@@ -101,9 +111,15 @@ class PulseToolkit(Toolkit):
             if not stdout:
                 if res.stderr:
                     return {"error": res.stderr.strip(), "exitCode": res.returncode}
-                return {"success": res.returncode == 0, "exitCode": res.returncode}
+                return {"error": "Pulse returned no JSON", "exitCode": res.returncode}
             try:
                 data = json.loads(stdout)
+                if res.returncode:
+                    if isinstance(data, dict):
+                        data["exitCode"] = res.returncode
+                        data.setdefault("error", "Pulse reported failure or partial completion")
+                        return data
+                    return {"result": data, "exitCode": res.returncode, "error": "Pulse reported failure or partial completion"}
                 return data
             except json.JSONDecodeError:
                 return {
@@ -116,6 +132,67 @@ class PulseToolkit(Toolkit):
         except Exception as e:
             return {"error": str(e), "args": args}
 
+    def observe_performance(self, seconds: int = 30) -> Dict[str, Any]:
+        """Observe synchronized CPU, pressure, swapping, disk activity and app contributors.
+        2...600 seconds; no background monitoring. Repeat after a targeted change."""
+        if not 2 <= seconds <= 600:
+            return {"error": "seconds must be 2...600"}
+        return self._run_cmd(["observe", "--seconds", str(seconds)], timeout=seconds + 20)
+
+    def inspect_process(self, pid: int) -> Dict[str, Any]:
+        """Inspect native executable, parent PID, exact startToken, browser role and memory footprint.
+        Never treat a PID in an old anomaly as current process identity."""
+        return self._run_cmd(["process", str(pid)])
+
+    def inspect_network(self, url: Optional[str] = None) -> Dict[str, Any]:
+        """Read Wi-Fi/proxy/primary-interface context. Optional selected URL sends one
+        bounded HTTP(S) HEAD request without browser cookies or redirects, not a speed test."""
+        args = ["network"]
+        if url is not None:
+            args += ["--url", url]
+        return self._run_cmd(args)
+
+    def get_diagnostic_history(self, hours: int = 24) -> Dict[str, Any]:
+        """Read anomalies, observed minute metrics, battery sessions and storage snapshots.
+        Empty/unobserved history is not evidence of a healthy interval. Returns latest
+        60 observed points per metric, 20 anomalies and 10 sessions with availability counts;
+        the native history CLI retains complete evidence for export."""
+        result = self._run_cmd(["history", "--hours", str(hours)])
+        if not isinstance(result, dict) or result.get("error"):
+            return result
+        coverage = {}
+        for name, entries in result.get("metrics", {}).items():
+            coverage[name] = {"observedMinutes": len(entries), "returnedMinutes": min(60, len(entries))}
+            result["metrics"][name] = entries[-60:]
+        result["agentOutputLimits"] = {"metrics": coverage,
+            "anomaliesAvailable": len(result.get("anomalies", [])),
+            "batterySessionsAvailable": len(result.get("batterySessions", []))}
+        result["anomalies"] = result.get("anomalies", [])[:20]
+        result["batterySessions"] = result.get("batterySessions", [])[-10:]
+        return result
+
+    def get_startup_inventory(self) -> Dict[str, Any]:
+        """Read configured launch agents/daemons and missing executable clues.
+        Read-only plist inventory; not proof of loaded jobs or a full login-item inventory."""
+        return self._run_cmd(["startup"])
+
+    def preview_application_quit(self, pid: int, start_token: str) -> Dict[str, Any]:
+        """Preview graceful application quit using the exact startToken from inspection.
+        This is read only. Save prompts may need user attention; helpers/system apps refused."""
+        result = self._run_cmd(["quit", str(pid), "--started-at", start_token, "--dry-run"])
+        if not result.get("error"):
+            self.previewed_quits.add((pid, start_token))
+        return result
+
+    def quit_application(self, pid: int, start_token: str) -> Dict[str, Any]:
+        """After preview and human approval, ask this exact application to quit normally.
+        Never force quits; inspect terminated status and re-observe to verify improvement."""
+        key = (pid, start_token)
+        if key not in self.previewed_quits:
+            return {"error": "Preview this exact application identity before quitting"}
+        self.previewed_quits.discard(key)
+        return self._run_cmd(["quit", str(pid), "--started-at", start_token, "--yes"])
+
     def diagnose(self) -> Dict[str, Any]:
         """
         Run system health diagnosis.
@@ -124,7 +201,7 @@ class PulseToolkit(Toolkit):
         """
         return self._run_cmd(["diagnose"])
 
-    def get_top_processes(self, by: str = "cpu", limit: int = 5) -> Any:
+    def get_top_processes(self, by: str = "cpu", limit: int = 5, grouped: bool = False) -> Any:
         """
         Fetch top resource-consuming processes.
         Args:
@@ -133,7 +210,11 @@ class PulseToolkit(Toolkit):
         """
         valid_by = "mem" if by.lower().startswith("mem") else "cpu"
         clamped_limit = max(1, min(20, limit))
-        return self._run_cmd(["procs", "--by", valid_by, "--limit", str(clamped_limit)])
+        return self._run_cmd(["procs", "--by", valid_by, "--limit", str(clamped_limit)] + (["--grouped"] if grouped else []))
+
+    def get_process_tree(self) -> Dict[str, Any]:
+        """Inspect the readable parent-child process tree and collection coverage."""
+        return self._run_cmd(["procs", "--tree"])
 
     def get_anomalies(self, hours: int = 24) -> Any:
         """
@@ -218,7 +299,7 @@ class PulseToolkit(Toolkit):
             return {"error": "Preview this cleanup target before committing it."}
         flag = "--dry-run" if dry_run else "--yes"
         result = self._run_cmd(["clean", "--target", target_id, flag])
-        if dry_run and not result.get("error"):
+        if dry_run and not result.get("error") and not result.get("failures"):
             self.previewed_clean_targets.add(target_id)
         return result
 
@@ -243,7 +324,7 @@ class PulseToolkit(Toolkit):
             return {"error": "Preview this app removal before committing it."}
         flag = "--dry-run" if dry_run else "--yes"
         result = self._run_cmd(["uninstall", app_path_or_name, flag])
-        if dry_run and not result.get("error"):
+        if dry_run and not result.get("error") and not result.get("failures"):
             self.previewed_apps.add(app_path_or_name)
         return result
 

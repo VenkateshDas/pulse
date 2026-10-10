@@ -3,7 +3,7 @@ import PulseKit
 
 @main
 struct PulseCLI {
-    static let version = "1.0.0"
+    static let version = "1.1.0"
 
     static func printUsage(output: CLIOutput, command: String? = nil) {
         if output.isJSON {
@@ -30,6 +30,12 @@ struct PulseCLI {
           attention    Prioritized system triage alerts requiring user attention
           anomalies    Historical record of sustained hot processes (>50% for 60s) & memory leaks
           sensors      SMC fan speeds, temperatures, power wattage, and battery health
+          observe      Bounded interval investigation with sustained findings and contributors
+          process      Inspect a PID, executable, helper role, footprint and start identity
+          network      Read network configuration; optionally time an explicit HTTP(S) URL
+          history      Read existing metric, anomaly, storage and battery evidence
+          startup      Inspect configured launch helpers and missing executable clues
+          quit         Preview or request graceful app quit with an exact start identity
 
         \(output.bold("STORAGE & HYGIENE:"))
           growth       Retroactive disk growth analysis (where space went since N days)
@@ -80,6 +86,8 @@ struct PulseCLI {
         }
 
         switch subcommand {
+        case "observe", "process", "network", "history", "startup", "quit":
+            await InvestigateCmd.run(parser: parser, output: output)
         case "vitals":
             await VitalsCmd.run(parser: parser, output: output)
         case "diagnose":

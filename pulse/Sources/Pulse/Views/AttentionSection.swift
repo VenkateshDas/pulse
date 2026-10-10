@@ -89,7 +89,7 @@ private struct AttentionCard: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Sends a normal Quit signal. Unsaved work in that app may be lost.")
+            Text("Asks the inspected application to quit normally. Save prompts may need your attention. Helpers and protected apps are refused.")
         }
     }
 

@@ -14,6 +14,8 @@ public struct DiagnoseDTO: Codable, Sendable {
         public let penalty: Double
     }
 
+    public let measurementWarnings: [String]
+    public let processCoverage: ProcessCoverage
     public let score: Int
     public let band: String
     public let verdict: String
@@ -22,7 +24,9 @@ public struct DiagnoseDTO: Codable, Sendable {
     public let culprit: CulpritInfo?
     public let deductions: [FactorLoss]
 
-    public init(score: HealthScore, diagnosis: Diagnosis, topProcesses: [ProcessSample]) {
+    public init(score: HealthScore, diagnosis: Diagnosis, topProcesses: [ProcessSample], snapshot: SystemSnapshot? = nil) {
+        self.measurementWarnings = snapshot?.activity.unavailable ?? []
+        self.processCoverage = snapshot?.processCoverage ?? ProcessCoverage()
         self.score = score.value
         self.band = "\(score.band)"
         self.verdict = diagnosis.line
@@ -52,13 +56,13 @@ public struct DiagnoseDTO: Codable, Sendable {
 public enum DiagnoseCmd {
     public static func run(parser: CLIParser, output: CLIOutput) async {
         let engine = PulseEngine(recordsHistory: false)
-        _ = await engine.sample(topProcessLimit: 30)
+        _ = await engine.sample(topProcessLimit: Int.max)
         try? await Task.sleep(for: .milliseconds(250))
-        let snapshot = await engine.sample(topProcessLimit: 30)
+        let snapshot = await engine.sample(topProcessLimit: Int.max)
         let diagnosis = DiagnosisEngine.evaluate(snapshot)
         let health = HealthScore.evaluate(snapshot)
 
-        let dto = DiagnoseDTO(score: health, diagnosis: diagnosis, topProcesses: snapshot.topProcesses)
+        let dto = DiagnoseDTO(score: health, diagnosis: diagnosis, topProcesses: snapshot.topProcesses, snapshot: snapshot)
 
         if output.isJSON {
             output.emitJSON(dto)

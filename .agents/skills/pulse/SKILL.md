@@ -1,6 +1,6 @@
 ---
 name: pulse
-description: Diagnose Mac performance, inspect storage growth and duplicates, preview or perform reversible cleanup and app uninstallation, and control Pulse display brightness or keep-awake through its native CLI. Use when the user asks about their Mac's CPU, memory, fan noise, disk space, brightness, or sleep settings.
+description: Diagnose Mac performance, inspect storage growth and duplicates, preview or perform reversible cleanup and app uninstallation, and control Pulse display brightness or keep-awake through its native CLI. Use when the user asks about their Mac's slowness, browser responsiveness, CPU, memory, disk activity/space, networking, heat, battery drain, startup helpers, brightness, or sleep settings.
 ---
 
 # Pulse
@@ -11,15 +11,37 @@ Use `pulse --help --json` to verify the installed CLI. If missing while working 
 
 Always request `--json`; stdout contains one JSON value. Text output is for humans. Exit codes: 0 success, 1 failure or partial result, 2 invalid arguments. Preserve exit status when piping (`set -o pipefail`). Check errors and `failures`, even when some paths succeeded. Unsupported sensor fields are absent, not zero.
 
-## Diagnose first
+## Investigate the symptom
+
+Start with the smallest evidence set relevant to the complaint. For a slow Mac/browser:
 
 ```bash
-pulse diagnose --json | jq '{score, verdict, severity, triggeredFactor, culprit}'
-pulse procs --by cpu --limit 5 --json | jq '.[] | {pid, name, cpuPercent, residentBytes}'
-pulse anomalies --hours 24 --json | jq '.[] | {processName, kind, date, sustainedSeconds}'
+pulse diagnose --json
+pulse vitals --json
+pulse observe --seconds 30 --json
 ```
 
-Use `--by mem` for memory ranking. `vitals [--lite]` samples CPU, memory, disk, network, battery and GPU; lite skips process enumeration. `sensors` reports temperature, fans and battery health. `attention` returns prioritized alerts. CPU/network rates use a 250ms interval and are not sustained-load evidence; correlate with anomalies. These reads work without Pulse.app. Historical anomalies require previous app observation; empty history does not prove no problem occurred.
+`observe` is an explicit, bounded 2...600-second session at approximately two-second cadence. It reports synchronized intervals, CPU persistence, VM swap/compression rates, aggregate device I/O, readable-process coverage and app contributors. The app exposes the same report at **Monitor → Investigate**. Repeat under comparable workload after a targeted remedy. Save before/after JSON if comparison is useful; do not invent improvement from a successful action alone.
+
+A 250ms `procs`/`vitals` rate is a snapshot, not sustained evidence. Use `observe` before calling a spike persistent. `diagnose` is a priority cascade, not exhaustive root-cause proof. Its memory attribution names the largest observed RSS contributor, not a proven culprit.
+
+Read [diagnosis.md](references/diagnosis.md) for symptom routing, browser attribution, metric interpretation, network checks, history and visibility limits. Read [remedies.md](references/remedies.md) when proposing or executing a fix.
+
+```bash
+pulse procs --by cpu --limit 20 --json
+pulse procs --by mem --limit 20 --grouped --json
+pulse procs --tree --json
+pulse process <current-PID> --json
+pulse network --json
+pulse network --url https://affected-host.example/ --json
+pulse history --hours 24 --json
+pulse startup --json
+pulse sleep status --json
+```
+
+`process` returns `identity` (parent/executable/startToken), helper role, physical footprint and cumulative process disk bytes when readable, plus interval `metrics` and `coverage`. Match renderer PID in the browser's Task Manager for the exact tab/extension; Pulse does not map URLs to renderers. `network --url` sends one bounded HEAD request without browser credentials/cookies or redirects; it is not a bandwidth test. `history` exposes existing observed CPU/pressure/swap/temperature/battery minute histories, anomalies, battery sessions and storage snapshots. `startup` reads configured launch plists, not all login items or loaded-job state.
+
+Always disclose `activity.unavailable`, incomplete `processCoverage`, failed probes and stale evidence. Missing rates are unknown, not zero. Historical anomalies require app observation; an empty history cannot prove health. Historical PID/name is not safe current identity. `speedtest --cached` is dated evidence only.
 
 For storage, use `growth --days 1 --limit 5`, then `verdict "/exact/directory"` where useful. Growth is recently modified file size, not a measured before/after delta. Volume scans can take minutes and omit paths blocked by permissions. `duplicates "/directory" --min-size-mb 1` groups BLAKE3-identical files and recognizes hard links/APFS clone identities where available. Reclaimable bytes are estimates; shared blocks and compression affect physical savings. This command never deletes duplicates.
 
@@ -48,9 +70,21 @@ Uninstall requires an exact, unambiguous app name, bundle ID or path and a stopp
 
 Successful actions return `affectedPaths`, `bytesMovedToTrash`, `undoIDs`, and `failures`. Each moved item gets a journal entry. Trash moves retain disk usage until Trash is emptied; do not describe moved bytes as freed space. Restore never overwrites an occupied destination. A partial restore exits 1; inspect `remainingItems` and do not delete the conflicting file to force recovery. Emptying Trash removes the recovery source.
 
+## Targeted application quit
+
+Inspect the **main application PID**, then copy its exact `identity.startToken` into a preview:
+
+```bash
+pulse quit <PID> --started-at <startToken> --dry-run --json
+# After authorization for this exact application:
+pulse quit <PID> --started-at <startToken> --yes --json
+```
+
+Only regular, non-protected applications are eligible. Helpers, stale identities and Pulse itself are refused. Native termination may show a save prompt; `requested` does not mean `terminated`. An unfinished quit exits 1. No force quit or automatic retry. Re-observe to check impact.
+
 ## Display and sleep control
 
-Run the rebuilt Pulse.app first. Controls are acknowledged by that app; they do not create a daemon or hold assertions in an exiting CLI process.
+`sleep status` still reads native blocking assertions when Pulse.app is unavailable; its own keep-awake state is then unknown. Run the rebuilt Pulse.app for mutations. Controls are acknowledged by that app; they do not create a daemon or hold assertions in an exiting CLI process.
 
 ```bash
 pulse display get --json

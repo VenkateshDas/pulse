@@ -56,7 +56,7 @@ public struct LeakWatcher: Sendable {
     /// Tracks unseen this long are evicted (their clock resets).
     public var staleAfter: TimeInterval = 5 * 60
 
-    struct Key: Hashable { let pid: Int32; let name: String }
+    struct Key: Hashable { let pid: Int32; let name: String; let startToken: String? }
     struct Point { let at: Date; let bytes: UInt64 }
     struct Track {
         var points: [Point]
@@ -72,7 +72,7 @@ public struct LeakWatcher: Sendable {
         var alerts: [LeakAlert] = []
 
         for proc in procs {
-            let key = Key(pid: proc.pid, name: proc.name)
+            let key = Key(pid: proc.pid, name: proc.name, startToken: proc.startToken)
             // A pid unseen past staleAfter starts fresh — its old points are a
             // different era (e.g. it left the top-30 for 20 min), not a window.
             let existing = tracks[key].flatMap {

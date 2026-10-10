@@ -10,10 +10,16 @@ def run(args,expected=0,timeout=120):
  assert p.returncode==expected,(args,p.returncode,data)
  print(args[0], 'exit',p.returncode, 'seconds',round(time.monotonic()-t,2),flush=True)
  return data
-help=run(['--help']); assert len(help['subcommands'])==15
+help=run(['--help']); assert {'observe','process','network','history','startup','quit'}.issubset(help['subcommands'])
 for command in help['subcommands']:
  run([command,'--help']); run([command,'--unknown'],2)
 for args in [['clean','--yes'],['display','set','nan'],['procs','--limit','-1'],['vitals','--json=false']]:run(args,2)
+report=run(['observe','--seconds','2']); assert report['samples'] and report['durationSeconds']>=2 and report['samples'][0]['coverage']['readable']>0
+run(['observe','--seconds','601'],2)
+run(['network','--url','file:///etc/passwd'],1)
+run(['network']);run(['history']);run(['startup'])
+run(['procs','--tree']);run(['procs','--grouped'])
+run(['quit','2','--started-at','stale','--yes'],1)
 root=pathlib.Path(tempfile.mkdtemp(prefix='pulse-cli-fixture-'))
 try:
  (root/'one').write_bytes(b'pulse test'*2000);(root/'two').write_bytes((root/'one').read_bytes())

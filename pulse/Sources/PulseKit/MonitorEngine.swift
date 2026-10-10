@@ -21,9 +21,10 @@ public struct NetworkSample: Sendable, Equatable, Identifiable {
 
 /// One process with the extended fields the Monitor page shows.
 /// All fields come from proc_pidinfo — no root, no subprocesses.
-public struct ProcessExtendedSample: Sendable, Identifiable, Equatable {
+public struct ProcessExtendedSample: Codable, Sendable, Identifiable, Equatable {
     public let pid: Int32
     public let name: String
+    public let appName: String?
     /// CPU over the last sampling interval, 0–100 (can exceed 100 on multi-core).
     public let cpuPercent: Double
     public let residentBytes: UInt64
@@ -36,10 +37,11 @@ public struct ProcessExtendedSample: Sendable, Identifiable, Equatable {
 
     public init(
         pid: Int32, name: String, cpuPercent: Double, residentBytes: UInt64,
-        virtualBytes: UInt64, threadCount: UInt32, pageFaultRate: Double
+        virtualBytes: UInt64, threadCount: UInt32, pageFaultRate: Double, appName: String? = nil
     ) {
         self.pid = pid
         self.name = name
+        self.appName = appName
         self.cpuPercent = cpuPercent
         self.residentBytes = residentBytes
         self.virtualBytes = virtualBytes
@@ -49,7 +51,7 @@ public struct ProcessExtendedSample: Sendable, Identifiable, Equatable {
 }
 
 /// Parent-child process linkage for the tree view.
-public struct ProcessNode: Sendable, Identifiable {
+public struct ProcessNode: Codable, Sendable, Identifiable {
     public let process: ProcessExtendedSample
     public let children: [ProcessNode]
     public var id: Int32 { process.pid }
@@ -200,20 +202,17 @@ public actor MonitorEngine {
     private var rows: [ProcessExtendedSample] = []
     private var parentByPID: [pid_t: pid_t] = [:]
     private var nameByPID: [pid_t: String] = [:]
+    private var appCache: [pid_t: String?] = [:]
     private var nameCachePID: [pid_t: String] = [:]
     private var collectedAt: UInt64 = 0  // DispatchTime ns; 0 = never
 
     // CPU/pagein deltas need previous per-pid readings, like ProcessSampler.
+    private var previousStarts: [pid_t: String] = [:]
     private var previousTaskTime: [pid_t: UInt64] = [:]
     private var previousPageins: [pid_t: Int32] = [:]
-    private var previousSampleAt: UInt64 = 0  // mach ticks; convert to ns before ratio
-    // pti_total_* are nanoseconds; mach_absolute_time() is mach ticks (≈24MHz on
-    // Apple Silicon), so the wall delta needs timebase conversion to ns.
-    private static let timebase: mach_timebase_info_data_t = {
-        var info = mach_timebase_info_data_t()
-        mach_timebase_info(&info)
-        return info
-    }()
+    private var previousSampleAt: UInt64 = 0
+    public private(set) var coverage = ProcessCoverage()
+
     private var previousSampleUptime: TimeInterval = 0
 
     /// Re-walks the pid list at most twice per second so `sample`, `tree`,
@@ -227,21 +226,19 @@ public actor MonitorEngine {
 
     private func collect() {
         let now = mach_absolute_time()
-        let wallDelta =
-            (now &- previousSampleAt) &* UInt64(Self.timebase.numer)
-            / UInt64(Self.timebase.denom)
+        let wallDelta = now &- previousSampleAt
         let firstSample = previousSampleAt == 0
         let uptime = ProcessInfo.processInfo.systemUptime
         let seconds = uptime - previousSampleUptime
         previousSampleAt = now
         previousSampleUptime = uptime
 
-        var pids = [pid_t](repeating: 0, count: 8192)
-        let pidCount = pids.withUnsafeMutableBufferPointer { buffer in
-            proc_listallpids(buffer.baseAddress, Int32(buffer.count * MemoryLayout<pid_t>.size))
-        }
-        guard pidCount > 0 else { return }
+        let enumeration = NativeProcesses.list()
+        let pids = enumeration.pids
+        coverage = enumeration.coverage
+        let pidCount = pids.count
 
+        var nextStarts: [pid_t: String] = [:]
         var nextTaskTime: [pid_t: UInt64] = [:]
         var nextPageins: [pid_t: Int32] = [:]
         var nextParents: [pid_t: pid_t] = [:]
@@ -251,6 +248,8 @@ public actor MonitorEngine {
         samples.reserveCapacity(Int(pidCount))
 
         for pid in pids[0..<Int(pidCount)] where pid > 0 {
+            let observedStart = NativeProcesses.startToken(pid)
+            if previousStarts[pid] != observedStart { nameCachePID.removeValue(forKey: pid); appCache.removeValue(forKey: pid) }
             let name: String
             if let cached = nameCachePID[pid] {
                 name = cached
@@ -269,22 +268,32 @@ public actor MonitorEngine {
                 name = resolved
             }
             if name != "pid \(pid)" { nextNames[pid] = name }
+            let appName: String?
+            if let cached = appCache[pid] { appName = cached }
+            else {
+                var path = [CChar](repeating: 0, count: 4096)
+                appName = proc_pidpath(pid, &path, UInt32(path.count)) > 0 ? ProcessGrouper.appName(fromPath: String(nullTerminated: path)) : nil
+                appCache[pid] = appName
+            }
+
 
             var info = proc_taskinfo()
             let size = proc_pidinfo(
                 pid, PROC_PIDTASKINFO, 0, &info, Int32(MemoryLayout<proc_taskinfo>.size))
             guard size == Int32(MemoryLayout<proc_taskinfo>.size) else { continue }
 
+            let startToken = observedStart
+            if let startToken { nextStarts[pid] = startToken }
             let taskTime = info.pti_total_user &+ info.pti_total_system
             nextTaskTime[pid] = taskTime
             nextPageins[pid] = info.pti_pageins
 
             var cpuPercent = 0.0
-            if !firstSample, wallDelta > 0, let prev = previousTaskTime[pid], taskTime >= prev {
-                cpuPercent = Double(taskTime - prev) / Double(wallDelta) * 100
+            if !firstSample, wallDelta > 0, let startToken, previousStarts[pid] == startToken, let prev = previousTaskTime[pid], taskTime >= prev {
+                cpuPercent = NativeProcesses.cpuPercent(taskDelta: taskTime - prev, wallTicks: wallDelta)
             }
             var pageFaultRate = 0.0
-            if !firstSample, seconds > 0, let prev = previousPageins[pid],
+            if !firstSample, seconds > 0, let startToken, previousStarts[pid] == startToken, let prev = previousPageins[pid],
                 info.pti_pageins >= prev
             {
                 pageFaultRate = Double(info.pti_pageins - prev) / seconds
@@ -305,18 +314,21 @@ public actor MonitorEngine {
                     residentBytes: info.pti_resident_size,
                     virtualBytes: info.pti_virtual_size,
                     threadCount: UInt32(max(info.pti_threadnum, 0)),
-                    pageFaultRate: pageFaultRate
+                    pageFaultRate: pageFaultRate, appName: appName
                 ))
         }
 
+        coverage.readable = samples.count
+        previousStarts = nextStarts
         previousTaskTime = nextTaskTime
         previousPageins = nextPageins
         rows = samples
         parentByPID = nextParents
         nameByPID = nextNames
         let livePIDs = Set(nextTaskTime.keys)
-        if nameCachePID.count > livePIDs.count * 2 {
+        do {
             nameCachePID = nameCachePID.filter { livePIDs.contains($0.key) }
+            appCache = appCache.filter { livePIDs.contains($0.key) }
         }
     }
 }

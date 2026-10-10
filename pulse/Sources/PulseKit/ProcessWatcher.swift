@@ -33,7 +33,7 @@ public struct ProcessWatcher: Sendable {
     public var cpuThreshold: Double
     public var window: TimeInterval
 
-    struct Key: Hashable { let pid: Int32; let name: String }
+    struct Key: Hashable { let pid: Int32; let name: String; let startToken: String? }
     struct Track { var firstAbove: Date; var triggered: Bool }
     private var tracks: [Key: Track] = [:]
 
@@ -50,7 +50,7 @@ public struct ProcessWatcher: Sendable {
         var alerts: [ProcessAlert] = []
 
         for proc in procs where proc.cpuPercent >= cpuThreshold {
-            let key = Key(pid: proc.pid, name: proc.name)
+            let key = Key(pid: proc.pid, name: proc.name, startToken: proc.startToken)
             var track = tracks[key] ?? Track(firstAbove: now, triggered: false)
             let sustained = now.timeIntervalSince(track.firstAbove)
             if sustained >= window {

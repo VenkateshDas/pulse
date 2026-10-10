@@ -2,8 +2,8 @@ import Foundation
 
 /// The metrics that contribute to the system health score. Weights and
 /// thresholds are ported verbatim from mole's `metrics_health.go` (facts,
-/// not code). Disk IO has no sampler yet — it is declared so the curve is
-/// ready when F7 lands, but reports `nil` and is excluded from scoring.
+/// not code). Storage throughput alone does not establish saturation; disk IO is
+/// excluded from scoring until a hardware-appropriate latency signal exists.
 public enum HealthFactor: String, Sendable, CaseIterable, Hashable {
     case cpu, memory, disk, thermal, diskIO
 
@@ -100,9 +100,9 @@ public struct HealthScore: Sendable, Equatable {
             availableWeight += f.weight
         }
 
-        add(.cpu, s.cpuTotalPercent)
-        add(.memory, s.memoryUsedFraction * 100)
-        add(.disk, s.diskUsedFraction * 100)
+        if !s.activity.unavailable.contains("CPU counters unavailable") { add(.cpu, s.cpuTotalPercent) }
+        if !s.activity.unavailable.contains("VM statistics unavailable") { add(.memory, s.memoryUsedFraction * 100) }
+        if s.diskTotalBytes > 0 { add(.disk, s.diskUsedFraction * 100) }
 
         // Thermal: prefer SMC CPU temp; fall back to the ThermalLevel enum
         // mapped onto the °C scale so the factor still counts.
@@ -118,13 +118,15 @@ public struct HealthScore: Sendable, Equatable {
             }
             add(.thermal, synthetic)
         }
-        // diskIO intentionally omitted until a sampler exists (F7).
+        // Throughput is activity, not saturation; do not penalize a fast SSD.
 
         // Memory pressure penalty stacks on top of the % curve.
-        switch s.memoryPressure {
-        case .warning: lost[.memory, default: 0] += 5
-        case .critical: lost[.memory, default: 0] += 15
-        case .normal: break
+        if !s.activity.unavailable.contains("Memory pressure unavailable") {
+            switch s.memoryPressure {
+            case .warning: lost[.memory, default: 0] += 5
+            case .critical: lost[.memory, default: 0] += 15
+            case .normal: break
+            }
         }
 
         let totalLost = lost.values.reduce(0, +)

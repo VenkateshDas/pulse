@@ -377,7 +377,7 @@ struct DiagnosisEngineTests {
             diskFreeBytes: 1_000_000_000, diskTotalBytes: 100_000_000_000,
             topProcesses: [ProcessSample(pid: 7, name: "Xcode", cpuPercent: 5, residentBytes: 9_000_000_000)])
         let d = DiagnosisEngine.evaluate(snap)
-        #expect(d.line == "Xcode memory pressure")
+        #expect(d.line == "Memory pressure · largest observed: Xcode")
         #expect(d.culpritPID == 7)
     }
 
@@ -399,7 +399,7 @@ struct DiagnosisEngineTests {
         let leak = LeakAlert(pid: 77, name: "WhatsApp", startBytes: 1 << 30,
                              currentBytes: 5 << 30, windowSeconds: 1800, isNewlySustained: true)
         let d = DiagnosisEngine.evaluate(makeSnapshot(), leak: leak)
-        #expect(d.line == "WhatsApp leaking memory")
+        #expect(d.line == "WhatsApp memory keeps growing")
         #expect(d.severity == .warn)
         #expect(d.culpritPID == 77)
         #expect(d.factor == .memory)

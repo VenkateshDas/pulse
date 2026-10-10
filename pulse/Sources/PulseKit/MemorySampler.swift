@@ -3,6 +3,9 @@ import Foundation
 
 /// Memory and swap usage from `host_statistics64` / `sysctl`.
 final class MemorySampler {
+    private(set) var activity = ActivityReadings()
+    private var previousVM: vm_statistics64_data_t?
+    private var previousAt: TimeInterval?
     let totalBytes: UInt64
 
     init() {
@@ -24,6 +27,25 @@ final class MemorySampler {
             }
         }
 
+        activity = ActivityReadings()
+        let now = ProcessInfo.processInfo.systemUptime
+        if result == KERN_SUCCESS {
+            if let old = previousVM, let at = previousAt, now > at {
+                let scale = Double(sysconf(_SC_PAGESIZE)) / (now - at)
+                func delta(_ current: UInt64, _ previous: UInt64) -> Double? {
+                    current >= previous ? Double(current - previous) * scale : nil
+                }
+                activity.swapInBytesPerSecond = delta(stats.swapins, old.swapins)
+                activity.swapOutBytesPerSecond = delta(stats.swapouts, old.swapouts)
+                activity.compressionBytesPerSecond = delta(stats.compressions, old.compressions)
+                activity.decompressionBytesPerSecond = delta(stats.decompressions, old.decompressions)
+            }
+            previousVM = stats; previousAt = now
+        } else {
+            activity.unavailable.append("VM statistics unavailable")
+            previousVM = nil; previousAt = nil
+        }
+
         var app: UInt64 = 0
         var wired: UInt64 = 0
         var comp: UInt64 = 0
@@ -36,11 +58,11 @@ final class MemorySampler {
 
         var swap = xsw_usage()
         var swapLen = MemoryLayout<xsw_usage>.size
-        sysctlbyname("vm.swapusage", &swap, &swapLen, nil, 0)
+        if sysctlbyname("vm.swapusage", &swap, &swapLen, nil, 0) != 0 { activity.unavailable.append("Swap occupancy unavailable") }
 
         var pressureLevel: Int32 = 1
         var pressureLen = MemoryLayout<Int32>.size
-        sysctlbyname("kern.memorystatus_vm_pressure_level", &pressureLevel, &pressureLen, nil, 0)
+        if sysctlbyname("kern.memorystatus_vm_pressure_level", &pressureLevel, &pressureLen, nil, 0) != 0 { activity.unavailable.append("Memory pressure unavailable") }
 
         return (app, wired, comp, swap.xsu_used, MemoryPressure(rawLevel: pressureLevel))
     }
