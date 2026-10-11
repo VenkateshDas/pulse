@@ -33,6 +33,8 @@ final class AgentModel {
     var memoryEnabled = AgentConfiguration.memoryEnabled
     @ObservationIgnored private let nativeToken = UUID().uuidString + UUID().uuidString
     @ObservationIgnored private var answerFlushTask: Task<Void, Never>?
+    @ObservationIgnored private var approvalExpiryTask: Task<Void, Never>?
+    @ObservationIgnored private var runExpiry = Date.distantFuture
     @ObservationIgnored private var shutdownTask: Task<Void, Never>?
     var hasApiKey = false
     @ObservationIgnored private var streamTask: Task<Void, Never>?
@@ -90,7 +92,7 @@ final class AgentModel {
         guard !message.isEmpty, state == .idle || state == .completed || state == .failed || state == .cancelled else { return }
         items.append(.init(id: UUID().uuidString, kind: .user, title: message, detail: ""))
         state = .running; status = "Working…"; lastSequence = 0; seenEventIDs.removeAll()
-        activeRunId = nil; ignoresCancelledEvents = false
+        activeRunId = nil; ignoresCancelledEvents = false; approvalExpiryTask?.cancel()
         pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll(); answerFlushTask?.cancel(); answerFlushTask = nil
         let generation = UUID(); streamGeneration = generation
         streamTask = Task {
@@ -123,6 +125,7 @@ final class AgentModel {
             appendOrUpdate(id: id, kind: .answer, title: "Ask Pulse", detail: text)
         }
         pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll(); answerFlushTask?.cancel(); answerFlushTask = nil
+        approvalExpiryTask?.cancel()
         ignoresCancelledEvents = true
         streamGeneration = UUID()
         let cancellationGeneration = streamGeneration
@@ -180,7 +183,7 @@ final class AgentModel {
         lastSequence = event.sequence; activeRunId = event.runId; sessionId = event.sessionId
         let text = event.payload["text"] ?? ""
         switch event.kind {
-        case "run.started": status = "Working…"; state = .running
+        case "run.started": runExpiry = .now.addingTimeInterval(900); status = "Working…"; state = .running
         case "reasoning.summary.delta": appendOrUpdate(id: "reasoning-\(event.runId)", kind: .progress, title: "Working on it", detail: text)
         case "answer.delta":
             removeProgress(runId: event.runId)
@@ -197,6 +200,14 @@ final class AgentModel {
             else { items.append(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"])) }
         case "approval.requested":
             approvalId = event.payload["approval_id"]
+            approvalExpiryTask?.cancel()
+            let expected = approvalId
+            let wait = max(0, min(900, runExpiry.timeIntervalSinceNow))
+            approvalExpiryTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(wait))
+                guard let self, !Task.isCancelled, self.state == .awaitingApproval, self.approvalId == expected else { return }
+                self.cancel()
+            }
             state = .awaitingApproval; status = "Approval required"
             items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"]))
         case "run.completed": approvalId = nil; Task { sessions = (try? await AgentClient.shared.fetchSessions()) ?? sessions }; removeProgress(runId: event.runId); state = .completed; status = "Complete"
@@ -293,7 +304,7 @@ final class AgentModel {
         } else { items.append(.init(id: id, kind: kind, title: title, detail: detail)) }
     }
 
-    private func fail(_ detail: String) { state = .failed; status = "Something went wrong"; items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent run failed", detail: detail)) }
+    private func fail(_ detail: String) { state = .failed; status = "Something went wrong"; items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent run failed", detail: detail)); if !surfaceVisible { scheduleShutdown() } }
 }
 
 struct AgentMemoryItem: Codable, Identifiable {
