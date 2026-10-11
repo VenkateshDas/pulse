@@ -1,5 +1,4 @@
 import Foundation
-import Darwin
 import Observation
 import PulseKit
 
@@ -261,8 +260,6 @@ final class AgentModel {
             guard let self, !Task.isCancelled, !self.surfaceVisible, !self.isBusy else { return }
             await AgentDaemonManager.shared.shutdown()
             await AgentNativeBridge.shared.stop()
-            // Release unused allocator pages after WebKit/sidecar teardown.
-            _ = await Task.detached(priority: .utility) { malloc_zone_pressure_relief(nil, 0) }.value
         }
     }
 
