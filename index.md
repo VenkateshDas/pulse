@@ -4,6 +4,8 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Components
 
+- **Ask Pulse harness upgrade (2026-10-11, researched proposal):** [Design, source research and architecture options](docs/superpowers/specs/2026-10-11-pulse-agent-harness-design.md) and [implementation sequence](docs/superpowers/plans/2026-10-11-pulse-agent-harness.md). Recommends Agno context offloading, isolated runs, user-scoped memory, native tools and assistant-ui embedded in WKWebView. Branch `feat/pulse-agent-harness` starts from `main` at `a5fdf0d`; design approval precedes implementation. Performance targets are unmeasured.
+
 ### [Pulse App](file:///Users/venkateshmurugadas/software_codes/mac-monitor/pulse/README.md)
 The main application: a native macOS command center for performance and storage built with Swift 6.
 - **Location:** `pulse/`
