@@ -4,6 +4,17 @@ import PulseKit
 
 @MainActor
 struct AgentModelTests {
+    @Test func toolIdentityIsScopedToItsRun() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "first", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "reused"]))
+        model.apply(.init(sequence: 2, runId: "second", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "reused"]))
+        model.apply(.init(sequence: 3, runId: "second", sessionId: "session", kind: "tool.completed", payload: ["tool_call_id": "reused", "detail": "Second result"]))
+        #expect(model.items.count == 2)
+        #expect(model.items[0].isRunning)
+        #expect(model.items[1].detail == "Second result")
+        #expect(model.items[0].id != model.items[1].id)
+    }
+
     @Test func startedRunRetainsConversationIdentity() {
         let model = AgentModel()
         model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "run.started", payload: [:]))

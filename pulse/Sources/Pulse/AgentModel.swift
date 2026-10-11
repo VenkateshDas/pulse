@@ -193,9 +193,9 @@ final class AgentModel {
             removeProgress(runId: event.runId)
             clearPendingAnswer(runId: event.runId)
             replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
-        case "tool.started": items.append(.init(id: event.payload["tool_call_id"] ?? event.eventId, kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
+        case "tool.started": items.append(.init(id: "tool-\(event.runId)-\(event.payload["tool_call_id"] ?? event.eventId)", kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
         case "tool.completed", "tool.failed":
-            let id = event.payload["tool_call_id"] ?? event.eventId
+            let id = "tool-\(event.runId)-\(event.payload["tool_call_id"] ?? event.eventId)"
             if let index = items.firstIndex(where: { $0.id == id }) { items[index].detail = event.payload["detail"] ?? text; items[index].isRunning = false }
             else { items.append(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"])) }
         case "approval.requested":
