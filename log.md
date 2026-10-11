@@ -127,3 +127,5 @@ Final recovery refinement: make test passed 354 tests in 80 suites; Battery over
 Accessibility checkpoint validation: make test passes 354 tests in 80 suites. Activity/Startup release layout and final cadence CPU/RSS remain pending.
 
 ## [2026-10-11] Clarify performance test and recorded attention | Replaced unsupported benchmark ratings with adaptive measurements and method/effect explanations. Home/menu-bar summaries distinguish recorded attention from clear current readings. Added three regressions; 357 tests in 81 suites pass.
+
+## [2026-10-11] Guard stale conversation-stop replies | Cancellation acknowledgement is scoped to its run generation. Controlled out-of-order regression passes; make test passes 358 tests in 82 suites.

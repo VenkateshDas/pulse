@@ -99,3 +99,7 @@ Release runtime now exposes brightness as a settable slider with a monitor-speci
 ### Performance test and condition wording
 
 Replaced the benchmark rating table and crowded fixed row with an effects explanation, native Start action, explicit running state, adaptive result facts, comparison limits and expandable fixed-reference method. Synthetic scores no longer claim a hardware class or thermal diagnosis. Debug build passes. Home/menu-bar condition summaries now acknowledge recorded attention even when current diagnosis is clear; added three regressions. `make test` passes 357 tests in 81 suites. These latest pages still require release runtime verification.
+
+### Conversation-stop race
+
+Cancellation acknowledgements now carry the generation of the stopped run, so an older acknowledgement cannot overwrite a later conversation’s stop status. Added a controlled two-request asynchronous regression with no provider/network traffic. `make test` passes 358 tests in 82 suites.

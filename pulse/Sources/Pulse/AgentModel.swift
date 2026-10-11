@@ -27,6 +27,11 @@ final class AgentModel {
     @ObservationIgnored private var streamTask: Task<Void, Never>?
     @ObservationIgnored private var streamGeneration = UUID()
     @ObservationIgnored private var ignoresCancelledEvents = false
+    @ObservationIgnored private let cancelRun: @Sendable (String) async throws -> Void
+
+    init(cancelRun: @escaping @Sendable (String) async throws -> Void = { try await AgentClient.shared.cancel(runId: $0) }) {
+        self.cancelRun = cancelRun
+    }
 
     var isBusy: Bool { state == .running || state == .awaitingApproval || state == .starting }
 
@@ -96,6 +101,7 @@ final class AgentModel {
         pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll()
         ignoresCancelledEvents = true
         streamGeneration = UUID()
+        let cancellationGeneration = streamGeneration
         streamTask?.cancel(); streamTask = nil
         state = .cancelled
         status = "Stopped waiting. Already started actions may still finish."
@@ -103,10 +109,10 @@ final class AgentModel {
         if let runId = activeRunId {
             Task {
                 do {
-                    try await AgentClient.shared.cancel(runId: runId)
-                    if state == .cancelled { status = "Stop requested. Check completed actions before trying again." }
+                    try await cancelRun(runId)
+                    if state == .cancelled && cancellationGeneration == streamGeneration { status = "Stop requested. Check completed actions before trying again." }
                 } catch {
-                    if state == .cancelled { status = "Could not confirm a stop. Already started actions may still finish." }
+                    if state == .cancelled && cancellationGeneration == streamGeneration { status = "Could not confirm a stop. Already started actions may still finish." }
                 }
             }
         }

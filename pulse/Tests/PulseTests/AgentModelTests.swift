@@ -72,3 +72,38 @@ struct ConversationControlTests {
         #expect(model.items.count == 1)
     }
 }
+
+private actor CancellationFixture {
+    private var requests: [String: CheckedContinuation<Void, any Error>] = [:]
+    func cancel(_ id: String) async throws {
+        try await withCheckedThrowingContinuation { requests[id] = $0 }
+    }
+    var count: Int { requests.count }
+    func finish(_ id: String) { requests.removeValue(forKey: id)?.resume() }
+}
+
+@Suite("Cancellation responses")
+@MainActor
+struct CancellationResponseTests {
+    @Test func olderStopResponseCannotReplaceNewerStopStatus() async throws {
+        let fixture = CancellationFixture()
+        let model = AgentModel(cancelRun: { try await fixture.cancel($0) })
+        model.state = .running; model.activeRunId = "first"; model.cancel()
+        model.newConversation()
+        model.state = .running; model.activeRunId = "second"; model.cancel()
+        for _ in 0..<100 where await fixture.count < 2 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let requested = await fixture.count
+        #expect(requested == 2)
+        let secondStatus = model.status
+        await fixture.finish("first")
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(model.status == secondStatus)
+        await fixture.finish("second")
+        for _ in 0..<100 where model.status == secondStatus {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.status == "Stop requested. Check completed actions before trying again.")
+    }
+}
