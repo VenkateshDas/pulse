@@ -24,9 +24,10 @@ Design: ../specs/2026-10-11-pulse-agent-harness-design.md
 
 ### Local results (October 11)
 
-- Final native suite: 367 tests in 86 suites pass; agent suite: 19 tests pass. CLI fixture smoke, React build/typecheck and signed release bundle pass.
+- Final native suite: 367 tests in 86 suites pass; agent suite: 20 tests pass. CLI fixture smoke, React build/typecheck and signed release bundle pass.
 - Ten deterministic Agno runs with temporary SQLite, memory disabled and synthetic native RPC: first construction 23.0 ms, warm construction median 4.4 ms, first answer median 17.6 ms, completed median 21.4 ms. These exclude imports, network/model inference, UI rendering and real native collection; they are harness overhead measurements only.
 - CUA reported that the Mac is locked and automatic unlock failed. User was asked to unlock. Actual WKWebView appearance, cold/warm startup, long-history scrolling, repeated reopen/teardown and functional review remain pending.
 - An uncontrolled locked-session launch on Home measured 1.77% CPU over 30 seconds and 68.3→66.9 MiB RSS. Window visibility could not be controlled, so this is not proof of the required hidden-background budget. It exceeds the numerical targets and must not be presented as compliance. No Python agent was started in that launch. A main-thread Keychain wait found during the earlier inspection was corrected; automatic reads now avoid prompting, Settings reads are asynchronous.
 - Lock notifications now gate the renderer explicitly (lock does not reliably change window occlusion). Native approval expiry also releases a hidden idle runtime. The sidecar observes parent exit without launching a process.
 - PR: https://github.com/VenkateshDas/pulse/pull/85. Required CI is running; no merge authorized by the earlier design approval.
+- Actual Agno human approval integration verified: a mutation pauses before native RPC, retains RunOutput, then executes exactly once after the matching requirement is approved (temporary model/native fixtures only).

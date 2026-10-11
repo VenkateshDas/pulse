@@ -39,3 +39,26 @@ class AgnoIntegrationTests(unittest.IsolatedAsyncioTestCase):
             messages=stored.get_messages(skip_roles=['system','tool'])
             users=[m for m in messages if m.role=='user']
             self.assertEqual(4,len(users))
+
+    async def test_actual_agno_approval_pauses_and_resumes_once(self):
+        class ApprovalModel(FixtureModel):
+            async def ainvoke_stream(self, messages, assistant_message, **kwargs):
+                if messages[-1].role == 'user':
+                    yield ModelResponse(role='assistant',tool_calls=[ChoiceDeltaToolCall(index=0,id='fixture-action',type='function',function={'name':'set_keep_awake','arguments':'{"until_seconds":60}'})])
+                else: yield ModelResponse(role='assistant',content='Approved fixture action completed.')
+        with tempfile.TemporaryDirectory() as d:
+            sid,rid=str(uuid.uuid4()),str(uuid.uuid4())
+            instance=create_pulse_agent(session_id=sid,run_id=rid,db_path=d+'/agent.db',model=ApprovalModel(id='fixture'),configuration=ProviderConfiguration(memory_enabled=False))
+            r=server.Run(rid,sid,instance,ProviderConfiguration());r.message='Enable fixture keep awake'
+            server.runs[rid]=r;server.session_writers[sid]=rid
+            try:
+                with patch('pulse_toolkit.native_request',new=AsyncMock(return_value={'json':'{"ok":true}','exit_code':0})) as rpc:
+                    lines=[line async for line in server.serve(r)]
+                    self.assertIsNotNone(r.paused);self.assertIsNotNone(r.approval_id)
+                    self.assertTrue(any('approval.requested' in line for line in lines))
+                    self.assertEqual(0,rpc.await_count)
+                    response=await server.continue_run(rid,server.ContinueRequest(approved=True,approval_id=r.approval_id))
+                    continued=[line async for line in response.body_iterator]
+                    self.assertTrue(r.terminal);self.assertEqual(1,rpc.await_count)
+                    self.assertTrue(any('run.completed' in line for line in continued))
+            finally: server.runs.pop(rid,None);server.session_writers.pop(sid,None)
