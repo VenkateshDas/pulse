@@ -75,7 +75,7 @@ actor AgentNativeBridge {
         connection.start(queue: queue)
         receive(connection, id: id, buffer: Data())
         // Slow/incomplete senders cannot occupy all connections indefinitely.
-        queue.asyncAfter(deadline: .now() + 660) { connection.cancel() }
+        queue.asyncAfter(deadline: .now() + 660) { [weak connection] in connection?.cancel() }
     }
 
     private func receive(_ connection: NWConnection, id: UUID, buffer: Data) {

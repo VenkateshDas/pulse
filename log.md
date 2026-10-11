@@ -173,3 +173,5 @@ Cold launch correction: user opening Ask Pulse requests interactive existing-Key
 Live restart regression verified: the real DeepSeek provider recalled the original “Pulse live provider connected.” response after reopening the persisted conversation and corrected its earlier missing-history answer.
 
 ## [2026-10-11] Keep proven chat-only teardown | Removed whole-window navigation teardown after close/reopen became unreliable, and removed allocator pressure relief without controlled evidence of a benefit. Retain renderer/owned-sidecar teardown and bounded conversation state. Later resource sampling overlapped the user’s live native-tool questions; those samples are invalid idle evidence. Strict RSS compliance remains unresolved.
+
+## [2026-10-11] Release closed native tool connections | Connection timeout closures captured every NWConnection strongly for 660 seconds, even after cancellation and removal from the bridge. Use a weak capture so completed tool sockets can release immediately. Keep the existing timeout and connection limits.
