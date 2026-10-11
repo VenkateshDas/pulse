@@ -1,6 +1,6 @@
 # Ask Pulse: production harness and assistant-ui
 
-Status: researched proposal; implementation awaits design approval.
+Status: approved by user; implementation in progress.
 Date: October 11, 2026. Base: main at a5fdf0d. Branch: feat/pulse-agent-harness.
 
 ## Goal

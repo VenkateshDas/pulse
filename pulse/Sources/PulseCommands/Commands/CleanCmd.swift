@@ -47,7 +47,7 @@ public enum CleanCmd {
             if let target = parser.stringOption("target") { return item.id == target }
             return item.grade == "safe" && item.refusal == nil
         }
-        guard !selected.isEmpty else { output.printError("No eligible target; copy an exact ID from clean --scan"); exit(1) }
+        guard !selected.isEmpty else { output.printError("No eligible target; copy an exact ID from clean --scan"); output.finish(1); return }
         // Remove nested duplicates: trashing a parent already includes its children.
         selected = selected.filter { item in !selected.contains { $0.path != item.path && CLISafety.contains($0.path, item.path) } }
         var report = TrashReport(dryRun: parser.isDryRun)
@@ -69,6 +69,6 @@ public enum CleanCmd {
             print("\(report.bytesMovedToTrash) bytes \(parser.isDryRun ? "selected" : "moved"). Space is freed only when Trash is emptied.")
             for id in report.undoIDs { print("Undo: pulse undo restore \(id)") }
         }
-        if !report.failures.isEmpty { exit(1) }
+        if !report.failures.isEmpty { output.finish(1); return }
     }
 }

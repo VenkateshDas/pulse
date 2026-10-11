@@ -11,6 +11,7 @@ struct RootView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
     @Environment(TimelineModel.self) private var timeline
+    @State private var agentModel = AgentModel()
     @State private var selection: SidebarItem = .dashboard
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
@@ -38,7 +39,7 @@ struct RootView: View {
             GeometryReader { geometry in
             Group {
                 switch selection {
-                case .agent: AgentView()
+                case .agent: AgentView(model: agentModel, visible: windowVisible)
                 case .storage: DiskView()
                 case .timeline: TimelineView()
                 case .optimize: OptimizeView()

@@ -1,6 +1,6 @@
 # Ask Pulse implementation sequence
 
-Status: proposed sequence accompanying the design; code work awaits design approval.
+Status: approved design implemented; validation and user review in progress.
 Design: ../specs/2026-10-11-pulse-agent-harness-design.md
 
 1. Pin the runtime and inspect installed Agno APIs. Lock dependencies; unify development and bundled bootstrap; define the protocol migration and storage migration. Preserve current native frontend until the replacement works.
@@ -13,4 +13,11 @@ Design: ../specs/2026-10-11-pulse-agent-harness-design.md
 8. Build and required CI through make; measure cold/warm startup, render latency, long histories and app/Python/WebKit resources. Reopen repeatedly and verify background budget after teardown. Record observed measurements and any unmet target.
 9. Update index.md/log.md/product decisions, commit, push and open a PR into main. Wait for required macOS CI, then hand off the running packaged app for user visual/functional review. Merge only with explicit user approval.
 
-No claimed implementation or performance results are recorded yet.
+## Validation record
+
+- `make assistant`: typecheck and production build pass; packaged JS 751 kB / 227 kB gzip, CSS 11 kB. No remote runtime assets.
+- `make agent-test`: actual Agno fixtures cover streaming, native tools, four persisted turns and checkpoint summary, plus contract tests for budgets, memory, providers, cancellation, previews and replay.
+- `make build`, `make test`, `make cli-smoke`: native build and compatibility checks pass; final rerun recorded before PR.
+- No paid provider calls or destructive operations on real user files are used for validation.
+- Token counting is a conservative estimate; arbitrary providers still enforce their own token limits. Memory evidence is agent supplied, not an independent verifier.
+- Cold/warm startup, actual WKWebView visual checks and resource measurements are recorded below as they complete. Background budget compliance is not assumed from passing tests.

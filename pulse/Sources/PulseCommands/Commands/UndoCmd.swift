@@ -5,6 +5,7 @@ public struct UndoEntryDTO: Codable, Sendable {
     public let id: String
     public let op: String
     public let date: Date
+    public let affectedPaths: [String]
     public let itemCount: Int
     public let bytesFreed: Int64
     public let bytesFreedFormatted: String
@@ -13,6 +14,7 @@ public struct UndoEntryDTO: Codable, Sendable {
         self.id = entry.id.uuidString
         self.op = entry.op
         self.date = entry.date
+        self.affectedPaths = entry.items.map(\.originalPath)
         self.itemCount = entry.items.count
         self.bytesFreed = entry.bytesFreed
         self.bytesFreedFormatted = CLIOutput.bytes(entry.bytesFreed)
@@ -25,7 +27,7 @@ public enum UndoCmd {
         let journal = UndoJournal.shared
         let allEntries: [UndoEntry]
         do { allEntries = try await journal.snapshot() }
-        catch { output.printError(error.localizedDescription); exit(1) }
+        catch { output.printError(error.localizedDescription); output.finish(1); return }
 
         if action == "list" || action.isEmpty {
             let entries = allEntries.map { UndoEntryDTO(entry: $0) }
@@ -53,13 +55,13 @@ public enum UndoCmd {
         if action == "restore" {
             guard let idStr = parser.positional.dropFirst().first else {
                 output.printError("Missing entry ID to restore. Usage: pulse undo restore <id>")
-                exit(2)
+                output.finish(2); return
             }
 
             let matches = allEntries.filter { $0.id.uuidString.lowercased().hasPrefix(idStr.lowercased()) }
             guard matches.count == 1, let matched = matches.first else {
                 output.printError("Undo ID missing or ambiguous; use the full ID from undo list")
-                exit(1)
+                output.finish(1); return
             }
 
             do {
@@ -72,15 +74,15 @@ public enum UndoCmd {
                 } else {
                     output.printSuccess("Restored \(restoredCount) item(s) from operation: \(output.bold(matched.op))")
                 }
-                if remaining > 0 || restoredCount != matched.items.count { exit(1) }
+                if remaining > 0 || restoredCount != matched.items.count { output.finish(1); return }
             } catch {
                 output.printError("Failed to restore entry: \(error.localizedDescription)")
-                exit(1)
+                output.finish(1); return
             }
             return
         }
 
         output.printError("Unknown undo action '\(action)'. Use 'list' or 'restore <id>'.")
-        exit(2)
+        output.finish(2); return
     }
 }

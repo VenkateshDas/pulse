@@ -4,6 +4,13 @@ import PulseKit
 
 @MainActor
 struct AgentModelTests {
+    @Test func startedRunRetainsConversationIdentity() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "run.started", payload: [:]))
+        #expect(model.sessionId == "session")
+        #expect(model.activeRunId == "run")
+    }
+
     @Test func duplicateEnvelopeDoesNotDuplicateTimeline() {
         let model = AgentModel()
         let event = AgentEnvelope(eventId: "once", sequence: 1, runId: "run", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "tool", "title": "Reading system vitals"])
