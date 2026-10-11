@@ -7,9 +7,10 @@ import PulseKit
 @MainActor
 struct AgentWebView: NSViewRepresentable {
     let model: AgentModel
+    let snapshot: Snapshot
     @Binding var failure: String?
 
-    func makeCoordinator() -> Coordinator { Coordinator(model: model, failure: $failure) }
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, snapshot: snapshot, failure: $failure) }
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
@@ -27,6 +28,7 @@ struct AgentWebView: NSViewRepresentable {
     }
     func updateNSView(_ view: WKWebView, context: Context) {
         context.coordinator.model = model
+        context.coordinator.snapshot = snapshot
         context.coordinator.publish()
     }
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
@@ -38,32 +40,36 @@ struct AgentWebView: NSViewRepresentable {
         view.loadHTMLString("", baseURL: nil)
     }
 
+    struct Snapshot: Encodable {
+        let items: [AgentTimelineItem]; let sessions: [AgentSessionItem]; let sessionId: String?
+        let status: String; let busy: Bool; let ready: Bool; let state: String; let model: String; let provider: String
+        let memories: [AgentMemoryItem]; let memoryEnabled: Bool; let memoryStatus: String; let largerText: Bool; let hasEarlier: Bool
+    }
+
+    static func snapshot(for model: AgentModel, largerText: Bool) -> Snapshot {
+        let items = model.items.map { item -> AgentTimelineItem in
+            var item = item
+            if item.kind == .approval { item.isRunning = model.state == .awaitingApproval && item.approvalID == model.approvalId }
+            return item
+        }
+        return Snapshot(items: items, sessions: model.sessions, sessionId: model.sessionId,
+            status: model.status, busy: model.isBusy, ready: model.hasApiKey, state: String(describing: model.state),
+            model: AgentConfiguration.model, provider: AgentConfiguration.provider,
+            memories: model.memories, memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
+            largerText: largerText, hasEarlier: model.hasEarlier)
+    }
+
     @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
         var model: AgentModel
+        var snapshot: Snapshot
         let failure: Binding<String?>
         weak var view: WKWebView?
         var ready = false
         var active = true
         private var previous: Data?
-        init(model: AgentModel, failure: Binding<String?>) { self.model = model; self.failure = failure }
+        init(model: AgentModel, snapshot: Snapshot, failure: Binding<String?>) { self.model = model; self.snapshot = snapshot; self.failure = failure }
 
         func publish() {
-            // Read observable state even before readiness, so SwiftUI tracks it.
-            let items = model.items.map { item -> AgentTimelineItem in
-                var item = item
-                if item.kind == .approval { item.isRunning = model.state == .awaitingApproval && item.approvalID == model.approvalId }
-                return item
-            }
-            struct Snapshot: Encodable {
-                let items: [AgentTimelineItem]; let sessions: [AgentSessionItem]; let sessionId: String?
-                let status: String; let busy: Bool; let ready: Bool; let state: String; let model: String; let provider: String
-                let memories: [AgentMemoryItem]; let memoryEnabled: Bool; let memoryStatus: String; let largerText: Bool; let hasEarlier: Bool
-            }
-            let snapshot = Snapshot(items: items, sessions: model.sessions, sessionId: model.sessionId,
-                status: model.status, busy: model.isBusy, ready: model.hasApiKey, state: String(describing: model.state),
-                model: AgentConfiguration.model, provider: AgentConfiguration.provider,
-                memories: model.memories, memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
-                largerText: ThemeManager.shared.largerText, hasEarlier: model.hasEarlier)
             guard ready, active, let data = try? JSONEncoder().encode(snapshot), data != previous,
                   let state = try? JSONSerialization.jsonObject(with: data) else { return }
             previous = data

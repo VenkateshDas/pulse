@@ -17,7 +17,9 @@ struct AgentView: View {
                     Button("Reload interface") { self.webFailure = nil }
                 }
             } else if visible {
-                AgentWebView(model: model, failure: $webFailure)
+                // Evaluate in body while visible: updateNSView alone does not
+                // establish SwiftUI's Observation dependencies.
+                AgentWebView(model: model, snapshot: AgentWebView.snapshot(for: model, largerText: ThemeManager.shared.largerText), failure: $webFailure)
             } else { Color.clear }
         }
         .background(Halo.void)

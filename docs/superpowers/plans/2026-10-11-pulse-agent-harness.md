@@ -24,7 +24,7 @@ Design: ../specs/2026-10-11-pulse-agent-harness-design.md
 
 ### Local results (October 11)
 
-- Final native suite: 368 tests in 86 suites pass; agent suite: 20 tests pass. CLI fixture smoke, React build/typecheck and signed release bundle pass.
+- Final native suite: 369 tests in 86 suites pass; agent suite: 20 tests pass. CLI fixture smoke, React build/typecheck and signed release bundle pass.
 - Ten deterministic Agno runs with temporary SQLite, memory disabled and synthetic native RPC: first construction 23.0 ms, warm construction median 4.4 ms, first answer median 17.6 ms, completed median 21.4 ms. These exclude imports, network/model inference, UI rendering and real native collection; they are harness overhead measurements only.
 - CUA reported that the Mac is locked and automatic unlock failed. User was asked to unlock. Actual WKWebView appearance, cold/warm startup, long-history scrolling, repeated reopen/teardown and functional review remain pending.
 - An uncontrolled locked-session launch on Home measured 1.77% CPU over 30 seconds and 68.3→66.9 MiB RSS. Window visibility could not be controlled, so this is not proof of the required hidden-background budget. It exceeds the numerical targets and must not be presented as compliance. No Python agent was started in that launch. A main-thread Keychain wait found during the earlier inspection was corrected; automatic reads now avoid prompting, Settings reads are asynchronous.
@@ -37,4 +37,5 @@ Design: ../specs/2026-10-11-pulse-agent-harness-design.md
 - Actual WKWebView renders the dark chat surface, keyboard composer, streamed Markdown table, collapsed native tool card and memory inspection dialog. Two local fixture turns stay in one named conversation. No paid request or mutation was sent.
 - Close/reopen recreates the renderer and retains conversation state. Closing the dashboard removes the owned WebKit content process and gracefully stops the Python sidecar (confirmed process IDs and runtime shutdown log).
 - First controlled closed-window sample: 30.02 seconds, 0.80% CPU, RSS 54.4→45.6 MiB, settling to 42.4 MiB afterward. CPU and settled RSS meet the background targets in this observation; immediate post-close RSS briefly exceeds 50 MiB. This is not a guarantee under every workload or OS memory condition.
-- A provider reusing the same tool ID across turns exposed a collision. Tool IDs are now scoped by run, with a regression test. Native suite now contains 368 tests across 86 suites. Final packaged repeat and CI recorded at delivery.
+- A provider reusing the same tool ID across turns exposed a collision. Tool IDs are now scoped by run, with a regression test. Native suite now contains 369 tests across 86 suites. Final packaged repeat and CI recorded at delivery.
+- Repeated startup found an Observation registration issue: reads inside updateNSView were insufficient. Snapshot reads now happen in the visible SwiftUI body and the coordinator receives the immutable result; a regression test covers readiness tracking. Startup controls and tool-only copy actions were corrected.

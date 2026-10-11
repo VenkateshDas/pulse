@@ -1,9 +1,20 @@
 import Testing
+import Observation
+import os
 @testable import Pulse
 import PulseKit
 
 @MainActor
 struct AgentModelTests {
+    @Test func rendererSnapshotTracksReadyState() {
+        let model = AgentModel()
+        let changed = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = AgentWebView.snapshot(for: model, largerText: false) } onChange: { changed.withLock { $0 = true } }
+        model.hasApiKey = true
+        #expect(changed.withLock { $0 })
+        #expect(AgentWebView.snapshot(for: model, largerText: false).ready)
+    }
+
     @Test func toolIdentityIsScopedToItsRun() {
         let model = AgentModel()
         model.apply(.init(sequence: 1, runId: "first", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "reused"]))
