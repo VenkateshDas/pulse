@@ -20,7 +20,7 @@ public actor AgentDaemonManager {
         process?.terminate(); process = nil
     }
 
-    public func ensureRunning() async -> Bool {
+    public func ensureRunning(apiKey: String? = nil) async -> Bool {
         await AgentClient.shared.configure(bearerToken: token, port: port)
         if await AgentClient.shared.checkStatus().isOnline { return true }
         guard !isStarting else { return await waitForStatus() }
@@ -30,13 +30,15 @@ public actor AgentDaemonManager {
         let runtimeDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("Pulse/agent", isDirectory: true)
         try? FileManager.default.createDirectory(at: runtimeDirectory, withIntermediateDirectories: true)
+        let selectedKey: String
+        if let apiKey { selectedKey = apiKey } else { selectedKey = await AgentConfiguration.loadAPIKey() }
         let process = Process()
         process.executableURL = script; process.currentDirectoryURL = script.deletingLastPathComponent()
         process.environment = ProcessInfo.processInfo.environment.merging([
             "PULSE_PARENT_PID": String(ProcessInfo.processInfo.processIdentifier),
             "PULSE_AGENT_TOKEN": token,
             "PULSE_AGENT_PORT": "\(port)",
-            "OPENAI_API_KEY": AgentConfiguration.apiKey,
+            "OPENAI_API_KEY": selectedKey,
             "OPENAI_BASE_URL": AgentConfiguration.baseURL,
             "PULSE_MODEL_ID": AgentConfiguration.model,
             "PULSE_PROVIDER": AgentConfiguration.provider,

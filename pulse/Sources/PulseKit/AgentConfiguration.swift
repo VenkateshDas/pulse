@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import os
 
 /// User-selected provider fields. The API key remains in Keychain; UserDefaults
 /// stores only non-secret endpoint and model selections.
@@ -51,14 +52,52 @@ public enum AgentConfiguration {
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: modelKey) }
     }
 
+    private struct CredentialRead: Sendable {
+        let id = UUID()
+        let task: Task<String, Never>
+    }
+    private static let pendingReads = OSAllocatedUnfairLock(initialState: [String: CredentialRead]())
+    private static let credentialEndpointKey = "PulseAgentCredentialEndpoint"
+
+    public static func credentialsMatch(selectedEndpoint: String, storedEndpoint: String) -> Bool {
+        selectedEndpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == storedEndpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
     public static func loadAPIKey(interactive: Bool = false) async -> String {
-        await Task.detached(priority: .userInitiated) { readAPIKey(interactive: interactive) }.value
+        if interactive { return await Task.detached(priority: .userInitiated) { readAPIKey(interactive: true) }.value }
+        let endpoint = baseURL
+        let read = pendingReads.withLock { reads -> CredentialRead? in
+            if let existing = reads[endpoint] { return existing }
+            guard reads.count < 8 else { return nil }
+            let item = CredentialRead(task: Task.detached(priority: .userInitiated) { readAPIKey(interactive: false) })
+            reads[endpoint] = item; return item
+        }
+        guard let read else { return "" }
+        // Legacy macOS Keychain calls can wait for securityd despite no-UI.
+        // Coalesce pending reads and bound UI startup without blocking an actor.
+        return await withCheckedContinuation { continuation in
+            let completed = OSAllocatedUnfairLock(initialState: false)
+            Task {
+                let value = await read.task.value
+                pendingReads.withLock { if $0[endpoint]?.id == read.id { $0[endpoint] = nil } }
+                if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: value) }
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: "") }
+            }
+        }
     }
     public static func saveAPIKey(_ value: String) async -> Bool {
         await Task.detached(priority: .userInitiated) { apiKey = value; return apiKey == value }.value
     }
 
     private static func readAPIKey(interactive: Bool) -> String {
+        // Never forward a saved provider's secret to a newly selected endpoint.
+        // Legacy keys belong to the endpoint in the persisted app settings.
+        let persisted = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "com.pulse.app")
+        let savedEndpoint = UserDefaults.standard.string(forKey: credentialEndpointKey) ?? persisted?[baseURLKey] as? String ?? "https://openrouter.ai/api/v1"
+        guard credentialsMatch(selectedEndpoint: baseURL, storedEndpoint: savedEndpoint) else { return "" }
         var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
                                        kSecAttrAccount: account, kSecReturnData: true]
         if !interactive { query[kSecUseAuthenticationUI] = kSecUseAuthenticationUIFail }
@@ -75,15 +114,17 @@ public enum AgentConfiguration {
             let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
                                            kSecAttrAccount: account]
             if newValue.isEmpty {
-                SecItemDelete(query as CFDictionary)
+                if SecItemDelete(query as CFDictionary) == errSecSuccess { UserDefaults.standard.removeObject(forKey: credentialEndpointKey) }
                 return
             }
             let update = [kSecValueData: data] as CFDictionary
-            if SecItemUpdate(query as CFDictionary, update) == errSecItemNotFound {
+            var status = SecItemUpdate(query as CFDictionary, update)
+            if status == errSecItemNotFound {
                 var insert = query; insert[kSecValueData] = data
                 insert[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-                SecItemAdd(insert as CFDictionary, nil)
+                status = SecItemAdd(insert as CFDictionary, nil)
             }
+            if status == errSecSuccess { UserDefaults.standard.set(baseURL, forKey: credentialEndpointKey) }
         }
     }
 }

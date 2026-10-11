@@ -76,7 +76,7 @@ final class AgentModel {
             let port = try await AgentNativeBridge.shared.start(token: nativeToken)
             await AgentDaemonManager.shared.configureNativeBridge(port: port, token: nativeToken)
         } catch { state = .failed; status = "Native tools could not start"; return }
-        guard await AgentDaemonManager.shared.ensureRunning() else {
+        guard await AgentDaemonManager.shared.ensureRunning(apiKey: key) else {
             state = .failed; status = "Pulse Agent could not start"
             items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent unavailable", detail: "Check that the local agent runtime is installed."))
             return
