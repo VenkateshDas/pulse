@@ -4,6 +4,17 @@ import Security
 /// User-selected provider fields. The API key remains in Keychain; UserDefaults
 /// stores only non-secret endpoint and model selections.
 public enum AgentConfiguration {
+    /// Provider credentials require TLS except for a service on this Mac.
+    public static func providerURL(_ value: String) -> URL? {
+        guard let components = URLComponents(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let host = components.host?.lowercased(), !host.isEmpty,
+              components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil else { return nil }
+        let local = ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host)
+        guard components.scheme?.lowercased() == "https" || (components.scheme?.lowercased() == "http" && local) else { return nil }
+        return components.url
+    }
+
     private static let service = "com.pulse.app.agent"
     private static let account = "provider-api-key"
     private static let baseURLKey = "PulseAgentBaseURL"

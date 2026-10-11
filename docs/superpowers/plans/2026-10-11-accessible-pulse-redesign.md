@@ -103,3 +103,7 @@ Replaced the benchmark rating table and crowded fixed row with an effects explan
 ### Conversation-stop race
 
 Cancellation acknowledgements now carry the generation of the stopped run, so an older acknowledgement cannot overwrite a later conversation’s stop status. Added a controlled two-request asynchronous regression with no provider/network traffic. `make test` passes 358 tests in 82 suites.
+
+### Provider setup and investigation lifecycle
+
+Provider fields now have explicit accessibility labels; saving verifies the Keychain value before claiming success, prevents duplicate saves, and accepts remote HTTPS or HTTP on explicit loopback hosts only (no URL credentials/query/fragment). Existing invalid saved endpoints are blocked before starting Ask Pulse. Two pure endpoint tests cover accepted/rejected addresses without credentials or network calls. Investigation/inspector captions now follow shared 12pt/Larger text typography; investigation occlusion handling matches the renamed Pulse window. `make test` passes 360 tests in 83 suites; the final disabled-Save affordance is a subsequent UI-only change. Runtime confirms renamed Home condition copy, named Startup switches/read-only explanations, and adaptive Performance test facts/method disclosure. No actual helper or benchmark operation was invoked.

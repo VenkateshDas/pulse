@@ -92,4 +92,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Diagnostic investigation:** native VM/storage rates, readable PID coverage and shared CPU accounting. `observe`, `process`, `network`, `history`, `startup`, and identity-bound `quit` share core evidence with Monitor → Investigate. Monitor supports app grouping and process role/footprint details. New anomaly start tokens and CPU/pressure/swap/temperature/battery minute histories support gap-honest correlation. See `docs/pulse-cli.md`.
 - **Diagnostic upgrade plan:** `docs/superpowers/specs/2026-10-10-pulse-diagnostics-design.md` — shared native observation, reliable telemetry, app/CLI/skill parity and targeted remedies.
 
+- **Ask Pulse provider setup:** explicit field labels, remote HTTPS/loopback HTTP validation, verified Keychain save feedback and duplicate-save guard. Invalid endpoints are blocked before starting the optional agent.
 - **Ask Pulse stop lifecycle:** generation-scoped stream and cancellation acknowledgements prevent stale events/status from changing a later conversation; controlled cancellation fixtures cover out-of-order replies.

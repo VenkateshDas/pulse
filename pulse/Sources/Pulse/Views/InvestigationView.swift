@@ -70,7 +70,7 @@ struct InvestigationView: View {
                 Button("Done") { model.stop(); dismiss() }.keyboardShortcut(.cancelAction)
             }
             HStack {
-                if let date = model.contextCapturedAt { Text("Context captured " + date.formatted()).font(.caption).foregroundStyle(.secondary) }
+                if let date = model.contextCapturedAt { Text("Context captured " + date.formatted()).font(Halo.font(size: 12)).foregroundStyle(.secondary) }
                 Spacer()
                 Button("Refresh context") { Task { await model.load() } }
             }
@@ -88,7 +88,7 @@ struct InvestigationView: View {
         .task { await model.load() }
         .onDisappear { model.stop() }
          .onReceive(NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification)) { note in
-            if let window = note.object as? NSWindow, window.title == "Pulse — Command Center", !window.occlusionState.contains(.visible) { model.stop() }
+            if let window = note.object as? NSWindow, window.title == "Pulse", !window.occlusionState.contains(.visible) { model.stop() }
         }
         .onReceive(DistributedNotificationCenter.default().publisher(for: Notification.Name("com.apple.screenIsLocked"))) { _ in model.stop() }
     }
@@ -135,7 +135,7 @@ struct InvestigationView: View {
                                 Text(String(format: "mean %.1f%% · peak %.1f%% · peak RSS %@", row.meanCPUPercent, row.peakCPUPercent, ByteFormat.string(row.peakResidentBytes))).monospacedDigit()
                             }
                             if let identity = row.representative {
-                                Text("PID \(identity.pid) · \(identity.role)").font(.caption).foregroundStyle(.secondary)
+                                Text("PID \(identity.pid) · \(identity.role)").font(Halo.font(size: 12)).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -148,7 +148,7 @@ struct InvestigationView: View {
                         }
                     }
                     Text("Inspect a contributor in Monitor. For a browser renderer, match its PID in the browser’s Task Manager to find the tab or extension.").foregroundStyle(.secondary)
-                    DisclosureGroup("Measurement limits") { ForEach(report.limitations, id: \.self) { Text($0).font(.caption) } }
+                    DisclosureGroup("Measurement limits") { ForEach(report.limitations, id: \.self) { Text($0).font(Halo.font(size: 12)) } }
                 } else if !model.observing {
                     Text("Start an observation to distinguish brief spikes from persistent load. Missing measurements are shown as unavailable.").foregroundStyle(.secondary)
                 }
@@ -157,7 +157,7 @@ struct InvestigationView: View {
     }
     private func rate(_ title: String, _ bytes: Double?) -> some View {
         VStack(alignment: .leading) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(title).font(Halo.font(size: 12)).foregroundStyle(.secondary)
             Text(bytes.map { ByteFormat.string(UInt64(max(0, $0))) + "/s" } ?? "Unavailable").monospacedDigit()
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -183,7 +183,7 @@ struct InvestigationView: View {
                         Text("\(probe.host) · HTTP \(probe.statusCode) · \(Int(probe.elapsedMillis)) ms total")
                         Text("DNS \(milliseconds(probe.dnsMillis)) · connection \(milliseconds(probe.connectMillis)) · TLS \(milliseconds(probe.tlsMillis)) · response \(milliseconds(probe.responseMillis))").monospacedDigit()
                     }
-                    ForEach(network.limitations, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                    ForEach(network.limitations, id: \.self) { Text($0).font(Halo.font(size: 12)).foregroundStyle(.secondary) }
                 }
             }.padding(16)
         }
@@ -203,7 +203,7 @@ struct InvestigationView: View {
                                     Text(Date(timeIntervalSince1970: Double(entry.minute * 60)).formatted())
                                     Spacer()
                                     Text(metric(entry.value, name: key)).monospacedDigit()
-                                }.font(.caption)
+                                }.font(Halo.font(size: 12))
                             }
                         }
                     }
@@ -216,8 +216,8 @@ struct InvestigationView: View {
                     ForEach(history.anomalies.prefix(30), id: \.id) { event in
                         Text("\(event.date.formatted()) · \(event.processName) · \(event.kind == .memoryLeak ? "memory growth" : "CPU") · \(Int(event.sustainedSeconds))s")
                     }
-                    ForEach(history.unavailable, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
-                    ForEach(history.limitations, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                    ForEach(history.unavailable, id: \.self) { Text($0).font(Halo.font(size: 12)).foregroundStyle(.secondary) }
+                    ForEach(history.limitations, id: \.self) { Text($0).font(Halo.font(size: 12)).foregroundStyle(.secondary) }
                 }
             }.padding(16)
         }
@@ -245,11 +245,11 @@ struct InvestigationView: View {
                     ForEach(inventory.items) { item in
                         VStack(alignment: .leading) {
                             Text(item.label + (item.disabled ? " · disabled" : "") + (item.executableExists == false ? " · executable missing" : ""))
-                            Text(item.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                            Text(item.path).font(Halo.font(size: 12)).foregroundStyle(.secondary).textSelection(.enabled)
                         }
                     }
-                    ForEach(inventory.unreadablePaths, id: \.self) { Text("Unreadable: " + $0).font(.caption) }
-                    ForEach(inventory.limitations, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
+                    ForEach(inventory.unreadablePaths, id: \.self) { Text("Unreadable: " + $0).font(Halo.font(size: 12)) }
+                    ForEach(inventory.limitations, id: \.self) { Text($0).font(Halo.font(size: 12)).foregroundStyle(.secondary) }
                 }
             }.padding(16)
         }

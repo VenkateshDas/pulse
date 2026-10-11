@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var agentAPIKey = AgentConfiguration.apiKey
     @State private var agentModel = AgentConfiguration.model
     @State private var agentStatus: String?
+    @State private var savingAgentSettings = false
 
     private static let autoHideOptions: [TimeInterval] = [0, 5, 10, 15, 30]
     private static let maxItemsOptions = [1, 2, 3, 4, 5]
@@ -197,7 +198,7 @@ struct SettingsView: View {
 
     private var agentSection: some View {
         section(
-            "Pulse Agent", icon: "sparkles", tint: Halo.interactive,
+            "Ask Pulse provider", icon: "sparkles", tint: Halo.interactive,
             footnote: "The API key is stored in this Mac’s Keychain. Your provider receives questions and requested diagnostic results. Provider charges may apply."
         ) {
             settingsRow(title: "Provider", detail: "OpenRouter-compatible OpenAI endpoint.") {
@@ -211,6 +212,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Base URL").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 TextField("https://openrouter.ai/api/v1", text: $agentBaseURL)
+                    .accessibilityLabel("Provider base URL")
                     .textFieldStyle(.roundedBorder)
                     .font(Halo.font(size: 12, design: .monospaced))
             }
@@ -218,6 +220,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("API Key").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 SecureField("sk-or-v1-…", text: $agentAPIKey)
+                    .accessibilityLabel("Provider API key")
                     .textFieldStyle(.roundedBorder)
                     .font(Halo.font(size: 12, design: .monospaced))
             }
@@ -225,12 +228,14 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Model").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 TextField("openai/gpt-4.1-mini", text: $agentModel)
+                    .accessibilityLabel("Provider model")
                     .textFieldStyle(.roundedBorder)
                     .font(Halo.font(size: 12, design: .monospaced))
             }
             HStack {
-                Button("Save Agent Settings") { saveAgentSettings() }
+                Button(savingAgentSettings ? "Saving provider…" : "Save provider settings") { saveAgentSettings() }
                     .buttonStyle(.borderedProminent)
+                    .disabled(savingAgentSettings)
                     .foregroundStyle(Halo.onAccent).tint(Halo.interactive)
                 if let agentStatus { Text(agentStatus).font(Halo.font(size: 11)).foregroundStyle(Halo.textDim) }
             }
@@ -241,16 +246,22 @@ struct SettingsView: View {
     private func saveAgentSettings() {
         let baseURL = agentBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = agentModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: baseURL), ["https", "http"].contains(url.scheme?.lowercased()),
-              url.host != nil, !model.isEmpty, !agentAPIKey.isEmpty else {
-            agentStatus = "Enter a valid HTTP(S) base URL, API key, and model."
+        guard !savingAgentSettings else { return }
+        guard AgentConfiguration.providerURL(baseURL) != nil, !model.isEmpty, !agentAPIKey.isEmpty else {
+            agentStatus = "Enter an HTTPS provider URL, API key and model. HTTP is allowed only for localhost, 127.0.0.1 or ::1. Omit URL credentials, queries and fragments."
+            return
+        }
+        AgentConfiguration.apiKey = agentAPIKey
+        guard AgentConfiguration.apiKey == agentAPIKey else {
+            agentStatus = "The key could not be saved to Keychain. Unlock this Mac and try again."
             return
         }
         AgentConfiguration.baseURL = baseURL
         AgentConfiguration.model = model
-        AgentConfiguration.apiKey = agentAPIKey
         agentStatus = "Saved to Keychain"
+        savingAgentSettings = true
         Task {
+            defer { savingAgentSettings = false }
             guard await AgentDaemonManager.shared.ensureRunning() else { return }
             do {
                 try await AgentClient.shared.updateConfiguration(baseURL: baseURL, apiKey: agentAPIKey, model: model)

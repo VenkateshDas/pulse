@@ -436,12 +436,12 @@ private struct ProcessDetailCard: View {
 
         if let identity = model.selectedIdentity {
             Text(identity.role).font(.callout)
-            Text(identity.executable).font(.caption).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+            Text(identity.executable).font(Halo.font(size: 12)).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
             Text("Footprint: " + (identity.footprintBytes.map(ByteFormat.string) ?? "Unavailable")).font(.callout).monospacedDigit()
-            Text("Started " + identity.startedAt.formatted()).font(.caption).foregroundStyle(.secondary)
+            Text("Started " + identity.startedAt.formatted()).font(Halo.font(size: 12)).foregroundStyle(.secondary)
             if identity.parentPID > 1 { Button("Inspect parent (\(identity.parentPID))") { model.select(identity.parentPID) } }
         }
-        Text("CPU 100% = one core. Memory is RSS; page-ins are not all page faults.").font(.caption).foregroundStyle(.secondary)
+        Text("CPU 100% = one core. Memory is RSS; page-ins are not all page faults.").font(Halo.font(size: 12)).foregroundStyle(.secondary)
         Spacer()
 
         if let feedback = model.actionFeedback {

@@ -50,6 +50,10 @@ final class AgentModel {
         guard !isBusy else { return }
         hasApiKey = !AgentConfiguration.apiKey.isEmpty
         guard hasApiKey else { status = "Set up an AI provider to ask Pulse"; return }
+        guard AgentConfiguration.providerURL(AgentConfiguration.baseURL) != nil else {
+            state = .failed; status = "Review the provider URL in Settings before asking Pulse"
+            return
+        }
         state = .starting; status = "Starting local agent…"
         guard await AgentDaemonManager.shared.ensureRunning() else {
             state = .failed; status = "Pulse Agent could not start"
