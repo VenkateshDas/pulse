@@ -204,7 +204,7 @@ struct SettingsView: View {
     private var agentSection: some View {
         section(
             "Ask Pulse provider", icon: "sparkles", tint: Halo.interactive,
-            footnote: "The API key is stored in this Mac’s Keychain. Your provider receives questions and requested diagnostic results. Provider charges may apply."
+            footnote: "The API key is stored in this Mac’s Keychain. Your provider receives questions, a cached performance snapshot and requested diagnostic results. Provider charges may apply."
         ) {
             settingsRow(title: "Provider", detail: "Choose the API transport your model supports.") {
                 Picker("Provider transport", selection: $agentProvider) {
