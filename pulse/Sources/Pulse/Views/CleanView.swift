@@ -15,8 +15,7 @@ struct CleanView: View {
         VStack(alignment: .leading, spacing: 16) {
             header
             PermissionHelp(permission: .fullDiskAccess)
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+            List {
                     if storage.scanState == .scanning && storage.scan == nil {
                         scanning
                     } else if let scan = storage.scan {
@@ -44,9 +43,10 @@ struct CleanView: View {
                         hiddenSpaceSection(protectedItems: [])
                     }
                     AutoCleanCard()
-                }
-                .padding(.bottom, 8)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .listRowSeparator(.hidden)
             .scrollIndicators(.never)
 
             CleanFooter()
@@ -93,10 +93,8 @@ struct CleanView: View {
             .sorted { lhs, rhs in
                 lhs.value.reduce(0) { $0 + $1.sizeBytes } > rhs.value.reduce(0) { $0 + $1.sizeBytes }
             }
-        LazyVStack(spacing: 12) {
-            ForEach(groups, id: \.key) { category, group in
-                categorySection(category, group)
-            }
+        ForEach(groups, id: \.key) { category, group in
+            categorySection(category, group)
         }
     }
 
@@ -104,7 +102,11 @@ struct CleanView: View {
         let subtotal = items.reduce(0) { $0 + $1.sizeBytes }
         let collapsed = collapsedCategories.contains(category)
         let selectedCount = items.filter { storage.selection.contains($0.id) }.count
-        return LazyVStack(alignment: .leading, spacing: 4) {
+        return Section {
+            if !collapsed {
+                ForEach(items) { item in row(item) }
+            }
+        } header: {
             Button {
                 withAnimation(Halo.Motion.snappy) {
                     if collapsed { collapsedCategories.remove(category) } else { collapsedCategories.insert(category) }
@@ -130,11 +132,6 @@ struct CleanView: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 4)
-            if !collapsed {
-                ForEach(items) { item in
-                    row(item)
-                }
-            }
         }
     }
 
@@ -167,7 +164,7 @@ struct CleanView: View {
                 .padding(.horizontal, 4)
 
                 if hasProtected {
-                    LazyVStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Image(systemName: "shield.fill")
                                 .font(Halo.font(size: 10))
