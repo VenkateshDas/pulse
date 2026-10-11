@@ -135,3 +135,5 @@ Accessibility checkpoint validation: make test passes 354 tests in 80 suites. Ac
 ## [2026-10-11] Open draft redesign PR and measure release | PR #84 attached; 60s visible-page CPU 0.749%, RSS 62,928–79,984 KiB. User delegated target interpretation; strict budget applies to background monitoring, with separate interactive measurements. Closed-window proof and required CI remain pending.
 
 ## [2026-10-11] Correct repeated visibility events | Closed-window CPU/RSS missed the budget; found shared appearance counter over-counted repeated window events. Replaced with idempotent window/popover states and added overlap/repeat regressions. Runtime remeasurement required.
+
+## [2026-10-11] Fix collapsed menu-bar popover | User screenshot showed a thin blue strip. MenuBarContent used only maxHeight on a ScrollView, allowing its intrinsic panel height to collapse. Set an explicit 620pt viewport; release bundle passes with stable signing and rebuilt app relaunched. Direct menu-popover visual verification remains pending.

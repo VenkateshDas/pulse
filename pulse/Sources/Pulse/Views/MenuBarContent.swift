@@ -55,7 +55,9 @@ struct MenuBarContent: View {
                 actions
             }.padding(18)
         }
-        .frame(maxHeight: 620)
+        // MenuBarExtra sizes its panel from the content; a ScrollView has no
+        // intrinsic height, so a maximum alone can collapse it to a thin strip.
+        .frame(height: 620)
         .onAppear {
             model.viewAppeared()
             storage.refreshTrashInfo()
