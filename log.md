@@ -137,3 +137,5 @@ Accessibility checkpoint validation: make test passes 354 tests in 80 suites. Ac
 ## [2026-10-11] Correct repeated visibility events | Closed-window CPU/RSS missed the budget; found shared appearance counter over-counted repeated window events. Replaced with idempotent window/popover states and added overlap/repeat regressions. Runtime remeasurement required.
 
 ## [2026-10-11] Fix collapsed menu-bar popover | User screenshot showed a thin blue strip. MenuBarContent used only maxHeight on a ScrollView, allowing its intrinsic panel height to collapse. Set an explicit 620pt viewport; release bundle passes with stable signing and rebuilt app relaunched. Direct menu-popover visual verification remains pending.
+
+## [2026-10-11] Simplify popover readings | Removed introductory explanation and readings/menu-bar disclosures. Attention shows its concrete title and review action; network shows last download/upload test with named retest/stop icons, progress and failure feedback. Existing bounded speed-test model reused.

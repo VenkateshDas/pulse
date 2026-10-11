@@ -36,13 +36,11 @@ struct MenuBarContent: View {
                         infoRow("Storage available", ByteFormat.string(snapshot.diskFreeBytes), color: Halo.textPrimary)
                         if let battery = snapshot.battery { batteryRow(battery) }
                     }
-                    DisclosureGroup("More readings") {
-                        VStack(spacing: 12) {
-                            metricRow("Memory used", ByteFormat.string(snapshot.memoryUsedBytes), fraction: snapshot.memoryUsedFraction, spark: model.memoryHistory)
-                            thermalRow(snapshot)
-                            networkRow(snapshot)
-                            topProcesses(snapshot)
-                        }.padding(.top, 8)
+                    VStack(spacing: 12) {
+                        metricRow("Memory used", ByteFormat.string(snapshot.memoryUsedBytes), fraction: snapshot.memoryUsedFraction, spark: model.memoryHistory)
+                        thermalRow(snapshot)
+                        networkRow(snapshot)
+                        topProcesses(snapshot)
                     }
                     DisplaysPopoverSection()
                 } else {
@@ -50,7 +48,7 @@ struct MenuBarContent: View {
                 }
                 Divider()
                 keepAwakeRow
-                DisclosureGroup("Organise menu bar icons") { menuBarManagerRow.padding(.top, 8) }
+                menuBarManagerRow
                 Divider()
                 actions
             }.padding(18)
@@ -159,11 +157,13 @@ struct MenuBarContent: View {
                 Spacer()
                 Button("Open Pulse") { navigate(to: .dashboard) }.buttonStyle(.bordered)
             }
-            Label(condition.title, systemImage: condition.symbol)
-                .font(Halo.font(size: 14, weight: .semibold))
-            Text(condition.explanation).font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let item = topAttentionItem { attentionRow(item) }
+            if let item = topAttentionItem {
+                Text(item.title).font(Halo.font(size: 14, weight: .semibold))
+                attentionRow(item)
+            } else {
+                Label(condition.title, systemImage: condition.symbol)
+                    .font(Halo.font(size: 14, weight: .semibold))
+            }
         }
     }
 
@@ -291,7 +291,32 @@ struct MenuBarContent: View {
             case .other: ("Connected", Halo.textPrimary)
             case .none: ("Offline", Halo.textDim)
             }
-        return infoRow("Network", value, color: color)
+        return VStack(spacing: 8) {
+            infoRow("Network", value, color: color)
+            HStack {
+                if let result = network.lastResult {
+                    Text(String(format: "↓ %.0f · ↑ %.0f Mbps", result.downloadMbps, result.uploadMbps))
+                        .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
+                        .accessibilityLabel(String(format: "Last speed test: download %.0f, upload %.0f megabits per second", result.downloadMbps, result.uploadMbps))
+                } else {
+                    Text("Speed not tested").font(Halo.font(size: 12))
+                }
+                Spacer()
+                if network.isTesting {
+                    ProgressView().controlSize(.small)
+                    Button { network.cancelSpeedTest() } label: { Image(systemName: "stop.circle") }
+                        .accessibilityLabel("Stop speed test")
+                } else {
+                    Button { network.runSpeedTest() } label: { Image(systemName: "arrow.clockwise") }
+                        .accessibilityLabel("Test network speed")
+                        .help("Test download and upload speed. Uses up to 18 MB of network data.")
+                }
+            }
+            if case .failed(let message) = network.speedTestState {
+                Text(message).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     /// Compact label/value row (no bar/sparkline) for the secondary metrics.
