@@ -43,6 +43,16 @@ enum NotificationPreferences {
 
 }
 
+/// Visibility is a state, not a count: AppKit can repeat occlusion events.
+struct DashboardVisibility {
+    enum Surface: Hashable { case window, popover }
+    private(set) var surfaces: Set<Surface> = []
+    var isVisible: Bool { !surfaces.isEmpty }
+    mutating func set(_ surface: Surface, visible: Bool) {
+        if visible { surfaces.insert(surface) } else { surfaces.remove(surface) }
+    }
+}
+
 /// Owns the sampling loop and publishes the latest snapshot to the UI.
 /// One loop for the whole app (menu bar + dashboard share it) — sampling
 /// cost stays constant no matter how many views are open.
@@ -151,7 +161,7 @@ final class DashboardModel {
     // observable mutation re-runs its layout (~4% CPU measured). So full
     // snapshots are only published while at least one view is visible;
     // the menu bar integer updates regardless.
-    @ObservationIgnored private var visibleViews = 0
+    @ObservationIgnored private var visibility = DashboardVisibility()
     /// Lock screen does NOT change NSWindow occlusion state, so it needs
     /// its own signal — otherwise the dashboard burns CPU all night.
     @ObservationIgnored private var screenLocked = false
@@ -214,12 +224,18 @@ final class DashboardModel {
     }
 
     func viewAppeared() {
-        visibleViews += 1
+        visibility.set(.popover, visible: true)
         publishLatest()
     }
 
     func viewDisappeared() {
-        visibleViews = max(0, visibleViews - 1)
+        visibility.set(.popover, visible: false)
+    }
+
+    func windowVisibilityChanged(_ visible: Bool) {
+        let wasVisible = visibility.isVisible
+        visibility.set(.window, visible: visible)
+        if !wasVisible && visibility.isVisible { publishLatest() }
     }
 
     func start() {
@@ -241,7 +257,7 @@ final class DashboardModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 let locked = self.screenLocked
-                let dashboardOpen = self.visibleViews > 0 && !locked
+                let dashboardOpen = self.visibility.isVisible && !locked
                 self.tickCount += 1
                 // Locked: skip process enumeration entirely — nobody can see
                 // the result, and it's the most expensive part of a sample.
@@ -459,7 +475,7 @@ final class DashboardModel {
         if readings != menuBarReadings {
             menuBarReadings = readings
         }
-        if visibleViews > 0 && !screenLocked {
+        if visibility.isVisible && !screenLocked {
             publishLatest()
         }
     }
@@ -520,7 +536,7 @@ final class DashboardModel {
             Task { @MainActor in
                 guard let self else { return }
                 self.screenLocked = false
-                if self.visibleViews > 0 { self.publishLatest() }
+                if self.visibility.isVisible { self.publishLatest() }
                 // The loop may be mid-30s locked sleep — restart it so the
                 // menu bar integer refreshes promptly on unlock.
                 if self.loop != nil {

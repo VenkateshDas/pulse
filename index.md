@@ -11,7 +11,7 @@ The main application: a native macOS command center for performance and storage 
 - **Sidebar Sections (redesign branch):** Home, Free up space, Apps, Battery & energy, Internet, Displays, Activity; Ask Pulse and Settings; expandable Advanced tools for App activity, Maintenance, Startup helpers, Performance test and Diagnostics.
 - **Menu Bar Popover:** Readable condition summary, expandable readings, Displays and Keep awake. Cleanup and maintenance open review; Empty Trash retains explicit confirmation and in-place results.
 - **Command Palette (⌘K):** Fuzzy-searchable navigation and quick actions.
-- **Sampling:** native unlocked snapshots every 2 seconds; expensive process enumeration remains sparse, publishing only while visible.
+- **Sampling:** native unlocked snapshots every 2 seconds; expensive process enumeration remains sparse, publishing only while an explicit window or popover state is visible. Idempotent surface states prevent repeated AppKit occlusion events from leaking visibility.
 - **Diagnosis + Health Score (F1):** `DiagnosisEngine` (CPU→mem→disk→battery→thermal cascade, culprit attribution) + `HealthScore` (weighted 0–100, piecewise penalty curve). Plain-language Home and menu-bar condition summaries; numerical health score remains in advanced details.
 - **Maintenance (redesign branch):** reviewed task selection in `OptimizeModel`; native saved-window-state Trash moves skip active apps. Legacy shell-backed operations remain visibly unavailable with macOS guidance; no privilege prompt is launched.
 - **Orphan Scanner (F3):** Leftover helper files of deleted apps, reviewed Trash moves and auto-rescan after uninstall. Removing a helper file affects its next launch; running jobs are not unloaded.

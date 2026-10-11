@@ -41,14 +41,14 @@ struct PulseApp: App {
                     cleanModel.start()
                     networkModel.start()
                     KeybindingActions.networkModel = networkModel
-                    model.viewAppeared()
+                    model.windowVisibilityChanged(true)
                     Self.scheduleWeeklyReport()
                     // Promote to a Dock-visible, focusable app while open and
                     // bring the window forward (also activates from .accessory).
                     AppActivation.shared.windowDidAppear()
                 }
                 .onDisappear {
-                    model.viewDisappeared()
+                    model.windowVisibilityChanged(false)
                     // Window closed — return Pulse to the menu bar (no Dock).
                     AppActivation.shared.windowDidDisappear()
                 }

@@ -128,7 +128,7 @@ struct RootView: View {
             else { return }
             let visible = window.occlusionState.contains(.visible)
             windowVisible = visible
-            visible ? model.viewAppeared() : model.viewDisappeared()
+            model.windowVisibilityChanged(visible)
             monitorModel.windowVisibilityChanged(visible)
             healthModel.windowVisibilityChanged(visible)
         }

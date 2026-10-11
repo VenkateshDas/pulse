@@ -111,3 +111,7 @@ Provider fields now have explicit accessibility labels; saving verifies the Keyc
 ### Draft PR and timed measurement
 
 Draft PR #84 is open and attached: https://github.com/VenkateshDas/pulse/pull/84 . Required CI is being checked; no merge approval exists. A 60-second visible Performance-test-page measurement (no test workload) reported redesigned CPU 0.749%, RSS 62,928–79,984 KiB. The existing Pulse instance reported 3.311%, RSS 38,864–113,328 KiB; its window state/build provenance is not sufficient for a formal baseline claim. The source tree of its worktree commit matches main, but the running artifact was not rebuilt as a controlled baseline. User delegated budget interpretation; selected strict background-monitoring target, with explicit interactive-cost reporting. Window-close measurement is running, not yet proven.
+
+### Closed-window measurement and visibility correction
+
+Before the visibility correction, a 60-second measurement after the native close-window action reported CPU 1.015%, RSS 49,008–61,952 KiB. This fails the chosen background target; it is not treated as compliant. CUA accessibility observation reopens closed windows, so subsequent measurement avoided AX calls; process remained alive after the close action. Source audit found AppKit occlusion events and SwiftUI lifecycle both incremented the same count, allowing repeated visible events to keep publishing after close. Replaced the count with idempotent explicit window/popover states; three regressions cover repeats and overlapping surfaces. Verification running.
