@@ -14,14 +14,33 @@ enum NotificationPreferences {
     private static let weeklyKey = "PulseNotifyWeeklyReport"
 
     static var notifyCriticalAlerts: Bool {
-        get { UserDefaults.standard.object(forKey: criticalKey) as? Bool ?? true }
+        get { UserDefaults.standard.object(forKey: criticalKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: criticalKey) }
     }
 
     static var notifyWeeklyReport: Bool {
-        get { UserDefaults.standard.object(forKey: weeklyKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: weeklyKey) }
+        get { UserDefaults.standard.object(forKey: weeklyKey) as? Bool ?? false }
+        set {
+            UserDefaults.standard.set(newValue, forKey: weeklyKey)
+            updateWeeklyReminder()
+        }
     }
+
+    static func updateWeeklyReminder() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let center = UNUserNotificationCenter.current()
+        let id = "com.pulse.weekly-report"
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+        guard notifyWeeklyReport else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Check in on your Mac"
+        content.body = "Open Pulse to review recorded activity, storage and battery readings."
+        var components = DateComponents()
+        components.weekday = 2; components.hour = 9; components.minute = 0
+        center.add(UNNotificationRequest(identifier: id, content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: true)))
+    }
+
 }
 
 /// Owns the sampling loop and publishes the latest snapshot to the UI.
@@ -207,21 +226,12 @@ final class DashboardModel {
         guard loop == nil else { return }
         observeScreenLock()
         observeDisplaySleep()
-        requestNotificationAuthorization()
-        
+
         batteryTrend = batteryHistory.entries
         batterySessions = batterySessionStore.allSessions
 
-        Task { [weak self] in
-            guard let self else { return }
-            if self.batteryHistory.entries.isEmpty || self.batterySessionStore.allSessions.isEmpty {
-                let (history, sessions) = await backfillBatteryDataFromSystemLog()
-                self.batteryHistory.mergeParsedEntries(history)
-                self.batteryTrend = self.batteryHistory.entries
-                self.batterySessionStore.mergeBackfilled(sessions)
-                self.batterySessions = self.batterySessionStore.allSessions
-            }
-        }
+        // Battery history is recorded from native samples while Pulse runs.
+        // Keep existing history; do not launch pmset for retrospective data.
 
         startSamplingLoop()
     }
@@ -457,12 +467,6 @@ final class DashboardModel {
     /// UNUserNotificationCenter traps when the process has no bundle (bare
     /// SwiftPM `make run`) — every call stays behind this guard.
     private var notificationsAvailable: Bool { Bundle.main.bundleIdentifier != nil }
-
-    private func requestNotificationAuthorization() {
-        guard notificationsAvailable else { return }
-        UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .badge]) { _, _ in }
-    }
 
     /// Posts a system notification for each critical alert, rate-limited to
     /// once per 30 min per alert id so a sustained condition doesn't spam.

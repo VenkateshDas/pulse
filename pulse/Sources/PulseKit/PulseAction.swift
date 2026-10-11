@@ -15,23 +15,23 @@ public enum PulseAction: String, CaseIterable, Codable, Sendable, Identifiable {
 
     public var displayName: String {
         switch self {
-        case .optimize: "Optimize"
-        case .emptyTrash: "Empty Trash"
+        case .optimize: "Review maintenance"
+        case .emptyTrash: "Review Trash"
         case .syncBrightness: "Sync Brightness"
         case .toggleKeepAwake: "Toggle Keep Awake"
         case .toggleMenuBarChevron: "Toggle Menu Bar Chevron"
-        case .runSpeedTest: "Run Speed Test"
+        case .runSpeedTest: "Review internet test"
         }
     }
 
     public var detail: String {
         switch self {
-        case .optimize: "Runs safe optimization tasks."
-        case .emptyTrash: "Empties the Trash (with confirmation)."
+        case .optimize: "Opens maintenance tasks for selection and review."
+        case .emptyTrash: "Opens Trash for review; permanent deletion needs confirmation."
         case .syncBrightness: "Toggles adaptive brightness sync across displays."
         case .toggleKeepAwake: "Turns Keep Awake on or off."
         case .toggleMenuBarChevron: "Collapses or expands hidden menu-bar icons."
-        case .runSpeedTest: "Measures internet speed (~20 s) and notifies with the result."
+        case .runSpeedTest: "Opens Internet so you can review bandwidth use before starting a test."
         }
     }
 

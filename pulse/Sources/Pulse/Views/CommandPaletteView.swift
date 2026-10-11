@@ -16,7 +16,7 @@ struct CommandPaletteView: View {
 
     /// One palette entry.
     struct Command: Identifiable {
-        let id = UUID()
+        var id: String { title }
         let title: String
         let subtitle: String
         let symbol: String
@@ -26,24 +26,23 @@ struct CommandPaletteView: View {
     private var commands: [Command] {
         var list: [Command] = SidebarItem.allCases.map { item in
             Command(
-                title: "Go to \(item.rawValue)",
-                subtitle: "Open the \(item.rawValue) section",
+                title: item.title,
+                subtitle: item == .displays ? "Adjust screen brightness and synchronization" : "Open \(item.title) · \(item.rawValue)",
                 symbol: item.symbol
             ) { selection = item }
         }
         list.append(
             Command(
-                title: "Ask Pulse Agent", subtitle: "Diagnose and act using natural language",
+                title: "Ask about your Mac", subtitle: "Get help using an optional AI provider",
                 symbol: "sparkles"
             ) { selection = .agent })
         list.append(
             Command(
-                title: "Run Quick Clean", subtitle: "Move the safe tier to Trash",
+                title: "Review cleanup", subtitle: "Find files to remove and review them before moving to Trash",
                 symbol: "sparkles"
             ) {
                 storage.pendingDiskTab = 1  // land on Reclaim, where the result shows
                 selection = .storage
-                clean.runNow()
             })
         list.append(
             Command(
@@ -67,9 +66,9 @@ struct CommandPaletteView: View {
             })
         list.append(
             Command(
-                title: "Run Benchmark", subtitle: "CPU + disk + memory micro-benchmark",
+                title: "Review performance test", subtitle: "Measure processor, memory and storage performance",
                 symbol: "gauge.with.needle"
-            ) { selection = .health; health.runBenchmark() })
+            ) { selection = .benchmark })
         list.append(
             Command(
                 title: "Rescan Storage", subtitle: "Re-walk the disk for large + cleanable files",
@@ -97,16 +96,17 @@ struct CommandPaletteView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Halo.textDim)
-                TextField("Search commands…", text: $query)
+                TextField("Search tasks, such as cleanup or brightness…", text: $query)
+                    .accessibilityLabel("Search tasks")
                     .textFieldStyle(.plain)
-                    .font(.system(size: 15))
+                    .font(Halo.font(size: 15))
                     .foregroundStyle(Halo.textPrimary)
                     .focused($searchFocused)
                     .onSubmit { runHighlighted() }
                     .onKeyPress(.downArrow) { move(1) }
                     .onKeyPress(.upArrow) { move(-1) }
                 Text("esc")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(Halo.font(size: 10, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 4))
@@ -116,9 +116,13 @@ struct CommandPaletteView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 2) {
+                        if filtered.isEmpty {
+                            EmptyState(icon: "magnifyingglass", title: "No matching tasks", hint: "Try words such as storage, apps, battery, internet or brightness.")
+                        }
                         ForEach(Array(filtered.enumerated()), id: \.element.id) { index, command in
-                            row(command, active: index == highlighted)
-                                .onTapGesture { run(command) }
+                            Button { run(command) } label: { row(command, active: index == highlighted) }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(index == highlighted ? .isSelected : [])
                                 .id(index)
                         }
                     }
@@ -133,7 +137,6 @@ struct CommandPaletteView: View {
         .frame(width: 500)
         .background(Halo.surface1, in: RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Halo.Radius.xl, style: .continuous).strokeBorder(Halo.borderSubtle, lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.2), radius: 30, y: 10)
         .onChange(of: query) { _, _ in highlighted = 0 }
         .onAppear { searchFocused = true }
     }
@@ -145,15 +148,15 @@ struct CommandPaletteView: View {
                     .fill((active ? Halo.ion : Halo.textDim).opacity(0.12))
                     .frame(width: 28, height: 28)
                 Image(systemName: command.symbol)
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(active ? Halo.ion : Halo.textDim)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(command.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Halo.font(size: 13, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 Text(command.subtitle)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             Spacer()

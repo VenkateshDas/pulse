@@ -2,6 +2,8 @@ import PulseKit
 import SwiftUI
 
 struct HealthView: View {
+    enum Scope { case battery, startup, benchmark }
+    var scope: Scope = .battery
     @Environment(HealthModel.self) private var model
     @Environment(DashboardModel.self) private var dashboardModel
 
@@ -10,58 +12,45 @@ struct HealthView: View {
             VStack(alignment: .leading, spacing: Halo.Space.lg) {
                 header
 
-                // Summary row: overall score beside live battery state.
-                HStack(alignment: .top, spacing: Halo.Space.lg) {
-                    HealthScoreCard()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if !model.batteryUnavailable {
+                if scope == .battery {
+                    if model.batteryUnavailable {
+                        EmptyState(icon: "desktopcomputer", title: "This Mac has no battery reading",
+                                   hint: "Desktop Macs do not have an internal battery. Available connected-device batteries appear below.")
+                    } else {
                         BatteryCard()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        BatteryLevelCard().frame(minHeight: 170)
+                        BatteryDrainCard()
+                        DisclosureGroup("Battery history and details") {
+                            VStack(spacing: Halo.Space.lg) {
+                                batteryTrendCard
+                                BatteryConsumptionCard()
+                                BatterySessionsCard()
+                            }.padding(.top, 12)
+                        }
                     }
+                    if !model.bluetoothDevices.isEmpty { BluetoothCard() }
+                    DisclosureGroup("Overall condition details") { HealthScoreCard().padding(.top, 12) }
+
                 }
-                .frame(height: 200)
-
-                if !model.batteryUnavailable {
-                    // Battery over time: 60-day capacity trend beside daily use.
-                    HStack(alignment: .top, spacing: Halo.Space.lg) {
-                        batteryTrendCard
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        BatteryConsumptionCard()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .frame(height: 175)
-
-                    // Battery % across the last 24h with charging windows
-                    // shaded — the intraday discharge-rate view.
-                    BatteryLevelCard()
-                        .frame(height: 150)
-
-                    // Which apps cost the most battery this week — rollup of
-                    // the per-session shares below.
-                    BatteryDrainCard()
-
-                    // Per-session detail (unplug window, charge drop, app energy).
-                    BatterySessionsCard()
-                }
-
-                // Bluetooth peripherals: a slim full-width strip.
-                if !model.bluetoothDevices.isEmpty {
-                    BluetoothCard()
-                        .frame(height: 90)
-                }
-
+                if scope == .startup {
                 // Startup agents: full width so the ITEM/KIND/STATUS columns breathe.
                 // Grows with its content; the page scrolls, the card doesn't.
                 StartupItemsCard()
 
+                }
+                if scope == .benchmark {
                 BenchmarkCard()
-                    .frame(height: 180)
+                    .frame(minHeight: 180)
+                }
             }
             .padding(Halo.Space.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
-        .onAppear { model.appeared() }
+        .background(Halo.void)
+        .onAppear {
+            if scope == .battery { model.appeared() }
+            if scope == .startup { model.refreshStartupItems() }
+        }
         .onDisappear { model.disappeared() }
     }
 
@@ -79,13 +68,13 @@ struct HealthView: View {
 
     private var header: some View {
         PageHeader(
-            "Health",
-            subtitle: "Battery, startup agents, and repeatable performance benchmarks."
+            scope == .battery ? "Battery & energy" : (scope == .startup ? "Startup helpers" : "Performance test"),
+            subtitle: scope == .battery ? "Understand your battery and how your Mac uses energy." : (scope == .startup ? "Review background helpers that start when you sign in." : "Measure processor, memory and storage performance. Close other busy apps for a fair comparison.")
         ) {
             // Battery/bluetooth re-sample every 5s on their own — startup
             // items are the cached bit worth a manual refresh.
-            RefreshButton(help: "Refresh startup items") {
-                model.refreshStartupItems()
+            if scope == .startup {
+                RefreshButton(help: "Refresh startup helpers") { model.refreshStartupItems() }
             }
         }
         .padding(.bottom, 4)
@@ -110,20 +99,19 @@ private struct HealthScoreCard: View {
             VStack(spacing: 6) {
                 HealthScoreRing(score: score, diameter: 96, labelMode: .scoreOnly)
                 Text(model.diagnosis.line)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Halo.font(size: 11, weight: .medium))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
             }
             .frame(width: 150)
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("WHAT'S COSTING YOU")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.5)
+                Text("Factors in the estimated score")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 if factors.isEmpty {
-                    Text("Nothing — every metric is in the green.")
-                        .font(.system(size: 12))
+                    Text("No factors are currently reducing this estimated score.")
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                 } else {
                     ForEach(factors, id: \.key) { factor, lost in
@@ -136,7 +124,7 @@ private struct HealthScoreCard: View {
         .padding(20)
         .frame(maxWidth: .infinity)
         .premiumCard(padding: 0)
-        
+
     }
 
     private func factorRow(_ factor: HealthFactor, lost: Double) -> some View {
@@ -144,7 +132,7 @@ private struct HealthScoreCard: View {
         let fraction = min(1, lost / factor.weight)
         return HStack(spacing: 10) {
             Text(factor.label)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 60, alignment: .leading)
             GeometryReader { geo in
@@ -157,7 +145,7 @@ private struct HealthScoreCard: View {
             }
             .frame(height: 6)
             Text(String(format: "−%.0f pts", lost))
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 52, alignment: .trailing)
         }
@@ -171,16 +159,15 @@ private struct BatteryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("BATTERY")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
+            Text("Current charge")
+                .font(Halo.font(size: 10, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
 
             if let battery = model.battery {
                 detail(battery)
             } else {
                 Text(model.batteryUnavailable ? "No battery — desktop Mac" : "Reading battery…")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -197,44 +184,36 @@ private struct BatteryCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(battery.currentChargePercent)%")
-                        .font(.system(size: 26, weight: .bold, design: .monospaced))
+                        .font(Halo.font(size: 26, weight: .bold, design: .monospaced))
                         .foregroundStyle(Halo.textPrimary)
                     Text(stateText(battery))
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Halo.font(size: 11, weight: .semibold))
                         .foregroundStyle(stateColor(battery))
                 }
                 if let event = eventText(battery) {
                     Text(event)
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textDim)
                 }
             }
             Spacer()
         }
 
-        // 6-fact grid: row 1 = capacity / cycles / condition; row 2 = power / cycles left / thermal
-        let cols = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-        LazyVGrid(columns: cols, alignment: .leading, spacing: 10) {
-            fact("CAPACITY", "\(battery.capacityPercent)% of design",
-                 battery.capacityPercent >= 80 ? Halo.textPrimary : Halo.amber)
-            fact("CYCLES", "\(battery.cycleCount)", Halo.textPrimary)
-            fact("CONDITION", battery.condition,
-                 battery.condition == "Normal" ? Halo.pulseGreen : Halo.amber)
-
-            // |InstantAmperage| × Voltage measures battery current in either
-            // direction — while charging it's power INTO the battery, not the
-            // machine's consumption, so label it as such.
-            let powerLabel = battery.isCharging ? "CHARGING AT" : "POWER DRAW"
-            if let watts = battery.powerWatts {
-                fact(powerLabel, String(format: "%.1f W", watts),
-                     battery.isCharging ? Halo.pulseGreen : Halo.ion)
-            } else {
-                fact(powerLabel, "—", Halo.textDim)
-            }
-            let left = battery.cyclesRemaining
-            fact("CYCLES LEFT", "\(left)",
-                 left > 500 ? Halo.pulseGreen : left > 150 ? Halo.amber : Halo.flare)
-            thermalFact()
+        Text("Battery condition: \(battery.condition)")
+            .font(Halo.font(size: 14, weight: .medium))
+        DisclosureGroup("Battery hardware details") {
+            let cols = [GridItem(.adaptive(minimum: 160), alignment: .leading)]
+            LazyVGrid(columns: cols, alignment: .leading, spacing: 14) {
+                fact("Maximum capacity", "\(battery.capacityPercent)% of original capacity", Halo.textPrimary)
+                fact("Charge cycles", "\(battery.cycleCount)", Halo.textPrimary)
+                if let watts = battery.powerWatts {
+                    fact(battery.isCharging ? "Charging power" : "Battery power use",
+                         String(format: "%.1f W", watts), Halo.textPrimary)
+                }
+                thermalFact()
+            }.padding(.top, 10)
+            Text("Battery life estimates change with your work. A charge cycle is cumulative use of a full battery, not a count of plugs or a fixed expiry date.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
         }
     }
 
@@ -250,7 +229,7 @@ private struct BatteryCard: View {
             }
             if battery.isCharging {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(Halo.font(size: 11, weight: .bold))
                     .foregroundStyle(Halo.void)
                     .padding(.leading, 8)
             }
@@ -265,9 +244,9 @@ private struct BatteryCard: View {
     }
 
     private func stateText(_ battery: BatteryHealth) -> String {
-        if battery.isCharging { return "CHARGING" }
-        if battery.isOnAC { return "ON AC" }
-        return "ON BATTERY"
+        if battery.isCharging { return "Charging" }
+        if battery.isOnAC { return "Connected to power" }
+        return "Using battery"
     }
 
     private func stateColor(_ battery: BatteryHealth) -> Color {
@@ -298,16 +277,14 @@ private struct BatteryCard: View {
     private func fact(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
                 // Half-width card → narrow columns; keep long values like
                 // "Service Recommended" on one line by scaling down a touch.
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
         }
     }
 }
@@ -320,31 +297,30 @@ private struct BluetoothCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("BLUETOOTH PERIPHERALS")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
+                .font(Halo.font(size: 10, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
 
             HStack(spacing: 20) {
                 ForEach(model.bluetoothDevices) { device in
                     HStack(spacing: 8) {
                         Image(systemName: "b.square.fill")
-                            .font(.system(size: 16))
+                            .font(Halo.font(size: 16))
                             .foregroundStyle(Halo.ion)
-                        
+
                         VStack(alignment: .leading, spacing: 2) {
                             Text(device.name)
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(Halo.font(size: 11, weight: .semibold))
                                 .foregroundStyle(Halo.textPrimary)
                                 .lineLimit(1)
-                            
+
                             if let battery = device.batteryPercent {
                                 Text("\(battery)%")
-                                    .font(.system(size: 10, design: .monospaced))
+                                    .font(Halo.font(size: 10, design: .monospaced))
                                     .foregroundStyle(battery > 20 ? Halo.pulseGreen : Halo.flare)
                             } else {
                                 Text("3rd party · connection only")
-                                    .font(.system(size: 9))
-                                    .foregroundStyle(Halo.textDim.opacity(0.8))
+                                    .font(Halo.font(size: 9))
+                                    .foregroundStyle(Halo.textDim)
                             }
                         }
                     }
@@ -423,18 +399,17 @@ private struct BatteryStatsCard: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(color)
                 Text(title)
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
             }
             Text(value)
-                .font(.system(size: 22, weight: .bold, design: .monospaced))
+                .font(Halo.font(size: 22, weight: .bold, design: .monospaced))
                 .foregroundStyle(color)
             Text(subtitle)
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
                 .lineLimit(2)
         }
@@ -452,13 +427,12 @@ private struct CapacityTrendCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("BATTERY CAPACITY · 60-DAY TREND")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 if let latest = readings.last {
                     Text("\(latest)% of design")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(latest >= 80 ? Halo.pulseGreen : Halo.amber)
                 }
             }
@@ -480,7 +454,7 @@ private struct CapacityTrendCard: View {
                     Spacer()
                     Text("\(Int(floorValue))%")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 40, alignment: .trailing)
                 HistoryChart(values: series, color: Halo.volt, maxValue: scale)
@@ -514,20 +488,19 @@ private struct BatteryConsumptionCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("BATTERY USE · DAILY")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 if let today = recent.last, Calendar.current.isDateInToday(today.date) {
                     Text(String(format: "%.1f h today", today.timeOnBattery / 3600))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(hoursColor(today.timeOnBattery / 3600))
                 }
             }
 
             if recent.isEmpty {
                 Text("No data yet. Using on battery will populate this.")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -551,10 +524,9 @@ private struct BatteryConsumptionCard: View {
                     let fraction = min(hours / scaleMax, 1)
                     VStack(spacing: 2) {
                         Text(hours >= 0.05 ? String(format: "%.1f", hours) : "")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundStyle(hoursColor(hours))
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
                         RoundedRectangle(cornerRadius: 3, style: .continuous)
                             .fill(barGradient(hours))
                             .frame(height: max(barMax * fraction, 3))
@@ -584,7 +556,7 @@ private struct BatteryConsumptionCard: View {
             Spacer()
             if recent.count > 1, let last = recent.last { Text(formatDate(last.date)) }
         }
-        .font(.system(size: 9, design: .monospaced))
+        .font(Halo.font(size: 9, design: .monospaced))
         .foregroundStyle(Halo.textDim)
     }
 
@@ -633,19 +605,20 @@ private struct BatteryDrainCard: View {
         let items = consumers
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("TOP ENERGY CONSUMERS · 7 DAYS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Estimated app energy use · 7 days")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
-                Text("share of tracked on-battery drain · approx")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Halo.textDim.opacity(0.7))
+                Text("Estimate based on processor activity")
+                    .font(Halo.font(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
             }
 
+            Text("Pulse estimates each app’s share using processor activity during recorded battery sessions. It does not directly measure an app’s power use; display, graphics and other hardware also consume energy.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
             if items.isEmpty {
                 Text("No on-battery app data in the last 7 days. Unplug and use the Mac to populate this.")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .padding(.vertical, 8)
             } else {
@@ -670,7 +643,7 @@ private struct BatteryDrainCard: View {
             : BatterySessionsCard.palette[index % BatterySessionsCard.palette.count]
         return HStack(spacing: 10) {
             Text(item.name)
-                .font(.system(size: 12, weight: .medium))
+                .font(Halo.font(size: 12, weight: .medium))
                 .foregroundStyle(isOther ? Halo.textDim : Halo.textPrimary)
                 .lineLimit(1)
                 .frame(width: 170, alignment: .leading)
@@ -681,11 +654,13 @@ private struct BatteryDrainCard: View {
                     .frame(maxHeight: .infinity, alignment: .center)
             }
             .frame(height: 6)
-            Text(String(format: "%.0f%% of drain", item.fraction * 100))
-                .font(.system(size: 10, design: .monospaced))
+            .accessibilityHidden(true)
+            Text(String(format: "~%.0f%% share", item.fraction * 100))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
-                .frame(width: 90, alignment: .trailing)
+                .frame(width: 110, alignment: .trailing)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -698,16 +673,15 @@ private struct BatteryLevelCard: View {
         let series = dashboardModel.batteryDayHistory
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("BATTERY LEVEL — 24H")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Battery level · 24 hours")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 HStack(spacing: 4) {
-                    Image(systemName: "bolt.fill").font(.system(size: 7))
+                    Image(systemName: "bolt.fill").font(Halo.font(size: 7))
                     Text("charging")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.pulseGreen.opacity(0.8))
             }
 
@@ -716,6 +690,9 @@ private struct BatteryLevelCard: View {
                     chargingBands
                     HistoryChart(values: series, color: Halo.pulseGreen, maxValue: 100)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Battery level history over 24 hours")
+                .accessibilityValue(batteryChartSummary(series))
                 HStack {
                     Text("24h ago")
                     Spacer()
@@ -723,11 +700,11 @@ private struct BatteryLevelCard: View {
                     Spacer()
                     Text("now")
                 }
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(Halo.textDim.opacity(0.7))
+                .font(Halo.font(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
             } else {
                 Text("Collecting battery levels — the curve fills in as Pulse runs.")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .frame(maxHeight: .infinity)
             }
@@ -735,6 +712,12 @@ private struct BatteryLevelCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+    }
+
+    private func batteryChartSummary(_ series: [Double?]) -> String {
+        let values = series.compactMap { $0 }
+        guard let low = values.min(), let high = values.max(), let last = values.last else { return "No recorded readings" }
+        return String(format: "Recorded charge from %.0f to %.0f percent. Latest recorded charge %.0f percent. Gaps are periods without readings.", low, high, last)
     }
 
     /// Green shading behind the curve wherever a charge session overlaps the
@@ -796,18 +779,17 @@ private struct BatterySessionsCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text("BATTERY SESSIONS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 Text("energy = share of active compute · approx")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Halo.textDim.opacity(0.7))
+                    .font(Halo.font(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
             }
 
             if dashboardModel.batterySessions.isEmpty {
                 Text("No unplugged sessions in the last 60 days. Run on battery and each unplug will appear here.")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .padding(.vertical, 8)
             } else {
@@ -829,7 +811,7 @@ private struct BatterySessionsCard: View {
                     ) {
                         showAllSessions.toggle()
                     }
-                    .font(.system(size: 10, weight: .medium))
+                    .font(Halo.font(size: 10, weight: .medium))
                     .foregroundStyle(Halo.ion)
                     .buttonStyle(.plain)
                 }
@@ -872,11 +854,11 @@ private struct BatterySessionsCard: View {
             .compactMap { $0 }.joined(separator: " · ")
         return HStack(alignment: .firstTextBaseline) {
             Text(dayLabel(group.day))
-                .font(.system(size: 11, weight: .semibold))
+                .font(Halo.font(size: 11, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
             Spacer()
             Text("\(parts)\(parts.isEmpty ? "" : " · ")\(count) session\(count == 1 ? "" : "s")")
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
         }
         .padding(.top, 6)
@@ -906,7 +888,7 @@ private struct BatterySessionsCard: View {
                     legend(shares)
                 } else {
                     Text(session.isCharge ? "Charging…" : "Measuring app activity…")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
             }
@@ -926,29 +908,29 @@ private struct BatterySessionsCard: View {
         HStack(spacing: 8) {
             if expandable {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(Halo.font(size: 8, weight: .bold))
                     .foregroundStyle(Halo.textDim)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
             if session.isCharge {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .foregroundStyle(Halo.pulseGreen)
             }
             Text(windowText(session))
-                .font(.system(size: 11, design: .monospaced))
+                .font(Halo.font(size: 11, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
             if session.isLive {
                 Text("LIVE")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.pulseGreen)
                     .padding(.horizontal, 5).padding(.vertical, 1)
                     .background(Halo.pulseGreen.opacity(0.15), in: Capsule())
             }
             if session.isBackfilled {
                 Text("pmset")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Halo.textDim.opacity(0.7))
+                    .font(Halo.font(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
             }
             if (session.screenOnSeconds ?? 0) > 0 || (session.screenOffSeconds ?? 0) > 0 {
                 screenGlyphs(on: session.screenOnSeconds ?? 0, off: session.screenOffSeconds ?? 0)
@@ -956,7 +938,7 @@ private struct BatterySessionsCard: View {
             Spacer(minLength: 8)
             if let top = shares.first {
                 Text(top.app.name)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -964,20 +946,20 @@ private struct BatterySessionsCard: View {
             }
             if let rate = session.ratePerHour() {
                 Text(String(format: "%+.1f%%/h", rate))
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Halo.textDim.opacity(0.8))
+                    .font(Halo.font(size: 9, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
             }
             if session.isCharge {
                 Text("+\(session.chargeGain)%")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(Halo.font(size: 12, weight: .bold, design: .monospaced))
                     .foregroundStyle(Halo.pulseGreen)
             } else {
                 Text("−\(session.chargeDrop)%")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(Halo.font(size: 12, weight: .bold, design: .monospaced))
                     .foregroundStyle(dropColor(session.chargeDrop))
             }
             Text("\(session.startCharge)→\(session.endCharge)")
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
         }
         .contentShape(Rectangle())
@@ -1042,13 +1024,13 @@ private struct BatterySessionsCard: View {
                         .fill(color(for: entry.app.name, index: index))
                         .frame(width: 7, height: 7)
                     Text(entry.app.name)
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer(minLength: 4)
                     Text("\(Int((entry.fraction * 100).rounded()))%")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                 }
             }
@@ -1063,19 +1045,19 @@ private struct BatterySessionsCard: View {
     private func screenGlyphs(on: TimeInterval, off: TimeInterval) -> some View {
         HStack(spacing: 8) {
             HStack(spacing: 3) {
-                Image(systemName: "display").font(.system(size: 8))
+                Image(systemName: "display").font(Halo.font(size: 8))
                 Text(Self.shortDuration(on))
             }
             .foregroundStyle(Halo.ion)
             if off > 0 {
                 HStack(spacing: 3) {
-                    Image(systemName: "moon.fill").font(.system(size: 8))
+                    Image(systemName: "moon.fill").font(Halo.font(size: 8))
                     Text(Self.shortDuration(off))
                 }
                 .foregroundStyle(Halo.textDim)
             }
         }
-        .font(.system(size: 9, weight: .medium, design: .monospaced))
+        .font(Halo.font(size: 9, weight: .medium, design: .monospaced))
     }
 
     private static func shortDuration(_ s: TimeInterval) -> String {
@@ -1130,11 +1112,10 @@ private struct StartupItemsCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Text("STARTUP ITEMS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Text("\(model.startupItems.count)")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.ion)
                 Spacer()
                 if let feedback = model.actionFeedback {
@@ -1146,7 +1127,7 @@ private struct StartupItemsCard: View {
 
             if model.startupItems.isEmpty {
                 Text("No launch agents installed")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
@@ -1172,8 +1153,7 @@ private struct StartupItemsCard: View {
             Text("STATUS").frame(width: 76, alignment: .leading)
             Text("").frame(width: 60)
         }
-        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-        .tracking(1)
+        .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
         .foregroundStyle(Halo.textDim)
         .padding(.horizontal, 8)
     }
@@ -1187,14 +1167,14 @@ private struct StartupItemRow: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.label)
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if let program = item.program {
                     Text(program)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(Halo.textDim.opacity(0.8))
+                        .font(Halo.font(size: 9, design: .monospaced))
+                        .foregroundStyle(Halo.textDim)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -1202,7 +1182,7 @@ private struct StartupItemRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(item.kind == .userAgent ? "Launch Agent" : "Global Agent")
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 110, alignment: .leading)
 
@@ -1211,7 +1191,7 @@ private struct StartupItemRow: View {
                     .fill(item.isEnabled ? Halo.pulseGreen : Halo.textDim.opacity(0.5))
                     .frame(width: 5, height: 5)
                 Text(item.isEnabled ? "Enabled" : "Disabled")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(Halo.font(size: 10, design: .monospaced))
                     .foregroundStyle(item.isEnabled ? Halo.textPrimary : Halo.textDim)
             }
             .frame(width: 76, alignment: .leading)
@@ -1219,7 +1199,7 @@ private struct StartupItemRow: View {
             if item.kind == .userAgent {
                 Button(action: toggle) {
                     Text(item.isEnabled ? "Off" : "On")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(Halo.font(size: 10, weight: .bold))
                         .foregroundStyle(item.isEnabled ? Halo.flare : Halo.pulseGreen)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
@@ -1235,8 +1215,8 @@ private struct StartupItemRow: View {
                 .frame(width: 60)
             } else {
                 Image(systemName: "lock")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim.opacity(0.6))
+                    .font(Halo.font(size: 10))
+                    .foregroundStyle(Halo.textDim)
                     .help("System-wide agent — changing it needs admin rights")
                     .frame(width: 60)
             }
@@ -1255,13 +1235,12 @@ private struct BenchmarkCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("PERFORMANCE BENCHMARK")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 Text("CPU: SHA256 5s · Disk: 50 MB write · Memory: 256 MB copy")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Halo.textDim.opacity(0.8))
+                    .font(Halo.font(size: 10, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
             }
 
             HStack(alignment: .center, spacing: 24) {
@@ -1275,7 +1254,7 @@ private struct BenchmarkCard: View {
                     fact("MEM COPY", String(format: "%.1f GB/s", result.memCopyGBps))
                 } else if !model.benchmarkRunning {
                     Text("No runs yet — results persist across launches")
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textDim)
                 }
 
@@ -1306,10 +1285,10 @@ private struct BenchmarkCard: View {
                         .controlSize(.small)
                 } else {
                     Image(systemName: "gauge.with.needle")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(Halo.font(size: 11, weight: .bold))
                 }
                 Text(model.benchmarkRunning ? "Running…" : "Run Benchmark")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(Halo.font(size: 11, weight: .bold))
             }
             .foregroundStyle(model.benchmarkRunning ? Halo.textDim : Halo.void)
             .padding(.horizontal, 14)
@@ -1327,24 +1306,23 @@ private struct BenchmarkCard: View {
     private func scoreBlock(_ result: BenchmarkResult) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("SCORE")
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("\(result.score)")
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .font(Halo.font(size: 24, weight: .bold, design: .monospaced))
                     .foregroundStyle(Halo.ion)
                 if let previous = model.previousBenchmark, previous.score > 0 {
                     let delta = result.score - previous.score
                     Text(delta >= 0 ? "+\(delta)" : "\(delta)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(deltaColor(delta, baseline: previous.score))
                         .help("vs previous run (\(previous.score))")
                 }
             }
             Text(result.date.formatted(date: .abbreviated, time: .shortened))
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(Halo.textDim.opacity(0.8))
+                .font(Halo.font(size: 9, design: .monospaced))
+                .foregroundStyle(Halo.textDim)
         }
         .help("1000 ≈ base M1 — average of the three phases against fixed reference speeds")
     }
@@ -1359,11 +1337,10 @@ private struct BenchmarkCard: View {
     private func fact(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
         }
     }
@@ -1374,15 +1351,15 @@ private struct BenchmarkCard: View {
                 .fill(color)
                 .frame(width: 8, height: 8)
             Text(label)
-                .font(.system(size: 10, weight: .bold))
+                .font(Halo.font(size: 10, weight: .bold))
                 .foregroundStyle(color)
                 .frame(width: 45, alignment: .leading)
             Text(score)
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 60, alignment: .leading)
             Text(desc)
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
         }
     }

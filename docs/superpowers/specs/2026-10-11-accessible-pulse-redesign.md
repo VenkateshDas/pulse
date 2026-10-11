@@ -1,7 +1,7 @@
 # Pulse for everyday Mac users — research and redesign proposal
 
 Date: October 11, 2026
-Status: **Proposed; awaiting design approval before implementation.**
+Status: **Approved for implementation by the user's October 11 instruction.**
 Branch: `feat/accessible-pulse-redesign`
 Source baseline: `main` at `ef7ac5c` (PR #83, native performance investigations).
 
@@ -217,6 +217,6 @@ Usability targets to validate with at least five people outside software enginee
 
 Open the implementation PR into `main`, attach it to this chat, wait for required **Build & Test (macOS)** CI, and provide the running app for user visual/functional testing. **Never merge without explicit user approval.** The design approval needed now authorizes implementation, not merging.
 
-## Review requested
+## Design approval
 
-Approve the task-led native direction, proposed navigation, outcome summaries, and accessibility-first visual system. That approval also confirms the strategic product context for impeccable setup. All current capabilities remain reachable, technical detail becomes secondary, and automatic bandwidth-consuming tests become opt-in. Implementation follows after this design review.
+The user approved implementation in goal mode on October 11. This confirms the task-led native direction, proposed navigation, outcome summaries, and accessibility-first visual system, including the calmer theme discussed afterward. All current capabilities remain reachable, technical detail becomes secondary, and automatic bandwidth-consuming tests become opt-in. Merge still requires separate visual and functional approval.

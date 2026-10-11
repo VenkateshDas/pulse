@@ -26,7 +26,7 @@ final class MonitorModel {
 
     var sortKey: MonitorEngine.SortKey = .cpu { didSet { resample() } }
     var sortAscending = false { didSet { resample() } }
-    var groupMode = false
+    var groupMode = true
     var treeMode = false { didSet { resample() } }
     var filter = ""
 

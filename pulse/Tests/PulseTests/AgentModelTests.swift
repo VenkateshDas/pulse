@@ -49,3 +49,26 @@ struct AgentModelTests {
         #expect(model.items[0].kind == .answer)
     }
 }
+
+@Suite("Conversation controls")
+@MainActor
+struct ConversationControlTests {
+    @Test func stopBeforeRunIDIsAvailableStillStopsLocalState() {
+        let model = AgentModel()
+        model.state = .running
+        model.cancel()
+        #expect(model.state == .cancelled)
+        model.apply(.init(sequence: 1, runId: "late", sessionId: "session", kind: "run.started", payload: [:]))
+        #expect(model.state == .cancelled)
+        #expect(model.activeRunId == nil)
+    }
+
+    @Test func newConversationCannotDiscardAnActiveApproval() {
+        let model = AgentModel()
+        model.sessionId = "existing"
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "existing", kind: "approval.requested", payload: ["title": "Review removal"]))
+        model.newConversation()
+        #expect(model.sessionId == "existing")
+        #expect(model.items.count == 1)
+    }
+}

@@ -230,7 +230,7 @@ final class UninstallModel {
                     failedItems.append(PendingItem(path: item.path, label: item.label, sizeBytes: item.sizeBytes))
                 }
             }
-            
+
             if !trashedJournalItems.isEmpty {
                 await UndoJournal.shared.record(UndoEntry(op: "Uninstall Leftovers (\(appName))", items: trashedJournalItems, bytesFreed: Int64(trashedBytes)))
             }
@@ -340,10 +340,7 @@ final class UninstallModel {
             var trashedPaths: Set<String> = []
             var trashedBytes: UInt64 = 0
             for item in items {
-                // Unload a running user launch agent before trashing its plist,
-                // so the change takes effect now (not just next login). Daemons
-                // need root to bootout and are left to unload on reboot.
-                await Self.bootoutUserAgentIfNeeded(path: item.path)
+                // Moving a helper plist changes its next launch, not a running job.
                 do {
                     var trashedURL: NSURL?
                     try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: &trashedURL)
@@ -358,7 +355,7 @@ final class UninstallModel {
             }
             var report: String
             if !trashedPaths.isEmpty {
-                report = "\(trashedPaths.count) orphaned items (\(ByteFormat.string(trashedBytes))) moved to Trash."
+                report = "\(trashedPaths.count) of \(items.count) selected leftover items (\(ByteFormat.string(trashedBytes))) moved to Trash. Running helpers may continue until sign-out or restart; space stays used until Trash is emptied."
             } else {
                 report = "Nothing was removed — items may need Full Disk Access."
             }
@@ -377,16 +374,4 @@ final class UninstallModel {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
     }
 
-    /// `launchctl bootout` for a user LaunchAgent plist (gui domain, no root),
-    /// so disabling it unloads the running job immediately. No-op for system
-    /// `/Library` jobs (need root) and non-agent paths.
-    nonisolated static func bootoutUserAgentIfNeeded(path: String) async {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        guard path.hasPrefix(home), path.contains("/LaunchAgents/"),
-            path.hasSuffix(".plist"),
-            let plist = UninstallScanner.readLaunchPlist(URL(fileURLWithPath: path)),
-            let label = plist["Label"] as? String, !label.isEmpty
-        else { return }
-        _ = try? await Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
-    }
 }

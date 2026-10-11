@@ -10,6 +10,8 @@ final class ThemeManager {
     static let shared = ThemeManager()
 
     private(set) var selected: AppTheme
+    private(set) var largerText: Bool
+    nonisolated(unsafe) static var currentTextScale: CGFloat = 1
 
     /// Mirror of `selected.palette`, kept in sync on every `select(_:)`.
     /// `Halo`'s token accessors read this directly (not `shared.selected`)
@@ -24,7 +26,9 @@ final class ThemeManager {
     private init() {
         let theme = UserDefaults.standard.string(forKey: Self.key)
             .flatMap(AppTheme.init(rawValue:)) ?? .precision
+        largerText = UserDefaults.standard.bool(forKey: "pulse.largerText")
         selected = theme
+        Self.currentTextScale = largerText ? 1.15 : 1
         Self.currentPalette = theme.palette
         applyAppearance()
     }
@@ -35,6 +39,12 @@ final class ThemeManager {
         Self.currentPalette = theme.palette
         UserDefaults.standard.set(theme.rawValue, forKey: Self.key)
         applyAppearance()
+    }
+
+    func setLargerText(_ enabled: Bool) {
+        largerText = enabled
+        Self.currentTextScale = enabled ? 1.15 : 1
+        UserDefaults.standard.set(enabled, forKey: "pulse.largerText")
     }
 
     private func applyAppearance() {

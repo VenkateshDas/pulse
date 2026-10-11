@@ -99,6 +99,7 @@ public struct StorageScanner: Sendable {
             var childNodes: [StorageNode] = []
             
             while let entry = readdir(dir) {
+            if Task.isCancelled { break }
                 let ent = entry.pointee
                 var type = Int32(ent.d_type)
                 
@@ -154,12 +155,13 @@ public struct StorageScanner: Sendable {
     
     public func scanSizesStream(node: StorageNode) -> AsyncStream<StorageNode> {
         AsyncStream { continuation in
-            Task.detached(priority: .userInitiated) {
+            let sizingTask = Task.detached(priority: .userInitiated) {
                 let children = node.children ?? []
                 var resolvedBytes: UInt64 = 0
                 
                 await withTaskGroup(of: (Int, UInt64, Int).self) { group in
                     for (index, child) in children.enumerated() {
+                        if Task.isCancelled { break }
                         if child.isDirectory {
                             // Directories are summed in the newTotal loop below;
                             // adding them here too would double-count any that
@@ -181,6 +183,7 @@ public struct StorageScanner: Sendable {
                     var lastYieldTime = ContinuousClock.now
                     var pendingUpdates = 0
                     for await (index, size, count) in group {
+                        if Task.isCancelled { group.cancelAll(); break }
                         if size > 0 || count > 0 {
                             let child = currentChildren[index]
                             currentChildren[index] = StorageNode(id: child.id, name: child.name, path: child.path, sizeBytes: size, isDirectory: child.isDirectory, fileCount: count, children: child.children)
@@ -211,6 +214,7 @@ public struct StorageScanner: Sendable {
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { @Sendable _ in sizingTask.cancel() }
         }
     }
     
@@ -231,6 +235,7 @@ public struct StorageScanner: Sendable {
         var looseFilesBytes: UInt64 = 0
         
         while let entry = readdir(dir) {
+            if Task.isCancelled { break }
             let ent = entry.pointee
             var type = Int32(ent.d_type)
             
@@ -319,6 +324,7 @@ public struct StorageScanner: Sendable {
         var totalCount: Int = 0
         
         while let entry = readdir(dir) {
+            if Task.isCancelled { break }
             let ent = entry.pointee
             var type = Int32(ent.d_type)
             

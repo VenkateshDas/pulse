@@ -11,9 +11,13 @@ final class StorageModel {
     enum ScanState: Equatable {
         case idle
         case scanning
+        case stopped
         case done(Date)
     }
 
+    @ObservationIgnored private var collectionScanTask: Task<StorageScan, Never>?
+    @ObservationIgnored private var sizingScanTask: Task<Void, Never>?
+    @ObservationIgnored private var scanGeneration = UUID()
     private(set) var scanState: ScanState = .idle
     private(set) var scan: StorageScan?
     /// Deep-link handoff: which Disk tab to open on next appearance. Set by
@@ -161,7 +165,7 @@ final class StorageModel {
     private(set) var trashItems: [TrashItem] = []
     private(set) var trashAccessError: Bool = false
     private(set) var undoEntries: [UndoEntry] = []
-    
+
     @ObservationIgnored private var trashObserver: DispatchSourceFileSystemObject?
     @ObservationIgnored private var refreshTrashTask: Task<Void, Never>?
 
@@ -216,7 +220,7 @@ final class StorageModel {
         UserDefaults.standard.set(today, forKey: Self.rootBaselineDateKey)
         if rootBaseline.isEmpty { rootBaseline = sizes.mapValues { UInt64($0) } }
     }
-    
+
     private func startTrashObserver() {
         guard trashObserver == nil else { return }
         let trashPath = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash").path
@@ -280,10 +284,9 @@ final class StorageModel {
                 }
             }
             self.hiddenComponents = comps
-            let snap = try? await Shell.run("/usr/bin/tmutil", ["listlocalsnapshots", "/"])
-            let names = (snap?.stdout ?? "").split(separator: "\n").filter { $0.hasPrefix("com.apple") }
-            self.tmSnapshotCount = names.count { $0.contains("TimeMachine") }
-            self.stagedUpdatePinned = names.contains { $0.contains("os.update") }
+            // Snapshot enumeration is not available through a supported,
+            // unprivileged native interface. Do not report zero as a finding.
+
         }
     }
 
@@ -348,31 +351,36 @@ final class StorageModel {
         }
     }
 
-    func runScan() {
+    func runScan(preserveResult: Bool = false) {
         guard scanState != .scanning else { return }
+        let generation = UUID(); scanGeneration = generation
         scanState = .scanning
-        cleanReport = nil
-        
+        if !preserveResult { cleanReport = nil }
+
         let rootNodeInitial = StorageScanner().shallowScan(path: "/")
         if self.navigationPath.isEmpty {
             self.navigationPath = [rootNodeInitial]
         }
-        
+
         isStreamingSizes = true
-        Task {
+        sizingScanTask = Task {
             for await updatedNode in StorageScanner().scanSizesStream(node: rootNodeInitial) {
+                guard !Task.isCancelled, self.scanGeneration == generation else { return }
                 if self.navigationPath.first?.id == updatedNode.id {
                     self.navigationPath[0] = updatedNode
                 }
             }
+            guard !Task.isCancelled, self.scanGeneration == generation else { return }
             self.isStreamingSizes = false
             self.saveRootBaselineIfNewDay()
         }
 
+        let worker = Task.detached(priority: .userInitiated) { SmartScanner().scan() }
+        collectionScanTask = worker
         Task {
-            let result = await Task.detached(priority: .userInitiated) {
-                SmartScanner().scan()
-            }.value
+            let result = await worker.value
+            guard !worker.isCancelled, self.scanGeneration == generation else { return }
+            self.collectionScanTask = nil
             self.scan = result
             self.scanItemsByPath = Dictionary(result.items.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
             self.rootNode = self.navigationPath.first
@@ -380,6 +388,16 @@ final class StorageModel {
             self.selection = Set(
                 result.items.filter { $0.grade == .safe }.map(\.id))
         }
+    }
+
+    func cancelScan() {
+        guard scanState == .scanning || isStreamingSizes else { return }
+        scanGeneration = UUID()
+        collectionScanTask?.cancel(); collectionScanTask = nil
+        sizingScanTask?.cancel(); sizingScanTask = nil
+        isStreamingSizes = false
+        scanState = .stopped
+        cleanReport = "Scan stopped. Previous cleanup results are kept; folder sizes may be incomplete. Rescan when you are ready."
     }
 
     func toggleNode(_ id: String) {
@@ -436,7 +454,7 @@ final class StorageModel {
                 TrashSound.moveToTrash()
                 cleanModel.toggleExclusion(itemPath)
                 self.selection.remove(item.id)
-                self.runScan()
+                self.runScan(preserveResult: true)
             }
             self.refreshTrashInfo()
             self.refreshPurgeable()
@@ -450,14 +468,14 @@ final class StorageModel {
     var selectedBytes: UInt64 {
         selectedItems.reduce(0) { $0 + $1.sizeBytes }
     }
-    
+
     func pushDirectory(_ node: StorageNode) {
         guard node.isDirectory else { return }
         scanState = .scanning
-        
+
         let initialNode = StorageScanner().shallowScan(path: node.path)
         self.navigationPath.append(initialNode)
-        
+
         isStreamingSizes = true
         Task {
             for await updatedNode in StorageScanner().scanSizesStream(node: initialNode) {
@@ -469,7 +487,7 @@ final class StorageModel {
             self.scanState = .done(Date())
         }
     }
-    
+
     /// Miller-column drill: truncate to the clicked column, then open `node`
     /// as the next column. No-op when that column is already open.
     func openColumn(_ node: StorageNode, fromColumn index: Int) {
@@ -486,13 +504,13 @@ final class StorageModel {
     }
 
     private(set) var scanItemsByPath: [String: CleanItem] = [:]
-    
+
     func navigateTo(index: Int) {
         if index >= 0 && index < navigationPath.count {
             navigationPath = Array(navigationPath.prefix(index + 1))
         }
     }
-    
+
     func cleanNode(_ node: StorageNode) {
         guard !isCleaning else { return }
         isCleaning = true
@@ -555,7 +573,7 @@ final class StorageModel {
                     await UndoJournal.shared.record(UndoEntry(op: "Reclaim Clean", items: trashedItems, bytesFreed: Int64(trashedBytes)))
                 }
                 if count > 0 {
-                    rep = "Moved \(count) items (\(ByteFormat.string(trashedBytes))) to Trash"
+                    rep = "Moved \(count) of \(itemPaths.count) items (\(ByteFormat.string(trashedBytes))) to Trash. Space remains used until Trash is emptied."
                 } else {
                     rep = "Failed to move items to Trash"
                 }
@@ -566,8 +584,9 @@ final class StorageModel {
             if report.1 > 0 { TrashSound.moveToTrash() }
             self.selection.removeAll()
             self.refreshTrashInfo()
+            self.refreshUndoHistory()
             self.refreshPurgeable()
-            self.runScan()
+            self.runScan(preserveResult: true)
             if let current = self.navigationPath.last {
                 self.navigationPath.removeLast()
                 self.pushDirectory(current)
@@ -595,7 +614,7 @@ final class StorageModel {
                         log.error("empty Trash: couldn't remove \(url.lastPathComponent, privacy: .public): \(error, privacy: .public)")
                     }
                 }
-                return (count > 0 ? "Emptied \(count) items from Trash" : "Failed to empty Trash", count)
+                return (count == entries.count ? "Permanently removed \(count) items from Trash." : "Removed \(count) of \(entries.count) items. The remaining items are still in Trash.", count)
             }.value
             self.isCleaning = false
             self.cleanReport = report.0
@@ -622,20 +641,20 @@ final class StorageModel {
                 let restored = try await UndoJournal.shared.restore(entry.id)
                 switch restored {
                 case 0:
-                    self.cleanReport = "Nothing restored — items no longer in Trash"
+                    self.cleanReport = "Nothing restored. Items may be missing from Trash or their original locations may already be occupied."
                 case entry.items.count:
                     self.cleanReport = "Restored \(restored) items"
                 default:
-                    self.cleanReport = "Restored \(restored) of \(entry.items.count) items"
+                    self.cleanReport = "Restored \(restored) of \(entry.items.count) items. The remaining items could not be restored; check Trash and the original folders."
                 }
             } catch {
-                self.cleanReport = "Failed to restore items"
+                self.cleanReport = "Could not restore these items. Check that their original folders are writable and their names are not already in use."
             }
             self.isCleaning = false
             self.refreshTrashInfo()
             self.refreshUndoHistory()
             self.refreshPurgeable()
-            self.runScan()
+            self.runScan(preserveResult: true)
         }
     }
 
@@ -669,7 +688,7 @@ final class StorageModel {
                 items.sort { $0.sizeBytes > $1.sizeBytes }
                 return (entries.count, totalBytes, items, false)
             }.value
-            
+
             if !Task.isCancelled {
                 self.trashItemCount = count
                 self.trashBytes = bytes
@@ -721,96 +740,98 @@ final class StorageModel {
     private(set) var duplicateScanProgress: DuplicateScanner.ScanProgress?
     private(set) var duplicateStatusMessage: String?
 
+    @ObservationIgnored private var duplicateScanTask: Task<Void, Never>?
+    private(set) var didScanDuplicates = false
+    private(set) var duplicateRoots: [URL] = []
+    private(set) var isRemovingDuplicates = false
+
+    func retainDuplicate(groupId: String, fileId: String) {
+        guard !isRemovingDuplicates, let index = duplicateGroups.firstIndex(where: { $0.id == groupId }) else { return }
+        for i in duplicateGroups[index].files.indices {
+            duplicateGroups[index].files[i].isKeepCandidate = duplicateGroups[index].files[i].id == fileId
+            if duplicateGroups[index].files[i].isKeepCandidate { duplicateGroups[index].files[i].isSelectedForDeletion = false }
+        }
+    }
+
     func toggleDuplicateSelection(groupId: String, fileId: String, isSelected: Bool) {
-        guard let gIdx = duplicateGroups.firstIndex(where: { $0.id == groupId }) else { return }
-        guard let fIdx = duplicateGroups[gIdx].files.firstIndex(where: { $0.id == fileId }) else { return }
+        guard !isRemovingDuplicates, let gIdx = duplicateGroups.firstIndex(where: { $0.id == groupId }),
+              let fIdx = duplicateGroups[gIdx].files.firstIndex(where: { $0.id == fileId }),
+              !duplicateGroups[gIdx].files[fIdx].isKeepCandidate else { return }
         duplicateGroups[gIdx].files[fIdx].isSelectedForDeletion = isSelected
     }
 
-    func startDuplicateScan() {
-        guard !isDuplicateScanning else { return }
+    func startDuplicateScan(directories: [URL]? = nil) {
+        guard !isDuplicateScanning, !isRemovingDuplicates else { return }
+        let fm = FileManager.default
+        let roots = directories ?? [FileManager.SearchPathDirectory.downloadsDirectory, .documentDirectory, .desktopDirectory]
+            .compactMap { fm.urls(for: $0, in: .userDomainMask).first }
+        guard !roots.isEmpty else { return }
+        duplicateRoots = roots
         isDuplicateScanning = true
         duplicateScanProgress = nil
         duplicateStatusMessage = nil
-
-        let fileManager = FileManager.default
-        var searchDirs: [URL] = []
-
-        if let downloads = fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first {
-            searchDirs.append(downloads)
-        }
-        if let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            searchDirs.append(documents)
-        }
-        if let desktop = fileManager.urls(for: .desktopDirectory, in: .userDomainMask).first {
-            searchDirs.append(desktop)
-        }
-
-        Task {
+        duplicateScanTask = Task {
+            defer { isDuplicateScanning = false; duplicateScanTask = nil }
             do {
                 let scanner = DuplicateScanner()
-                let result = try await scanner.scan(directories: searchDirs) { prog in
+                let result = try await scanner.scan(directories: roots) { progress in
                     Task { @MainActor in
-                        self.duplicateScanProgress = prog
+                        if self.isDuplicateScanning { self.duplicateScanProgress = progress }
                     }
                 }
-                self.duplicateGroups = result
-                self.isDuplicateScanning = false
+                try Task.checkCancellation()
+                duplicateGroups = result.map { group in
+                    var reviewed = group
+                    for index in reviewed.files.indices { reviewed.files[index].isSelectedForDeletion = false }
+                    return reviewed
+                }
+                didScanDuplicates = true
+                duplicateStatusMessage = result.isEmpty ? "No identical files found in the selected folders." : "Scan complete. Review where each copy is used before choosing files to remove."
+            } catch is CancellationError {
+                duplicateStatusMessage = "Scan stopped. Previous results remain available."
             } catch {
-                self.duplicateStatusMessage = "Scan error: \(error.localizedDescription)"
-                self.isDuplicateScanning = false
+                duplicateStatusMessage = "The scan could not finish: \(error.localizedDescription)"
             }
         }
     }
 
+    func cancelDuplicateScan() { duplicateScanTask?.cancel() }
+
     func deleteSelectedDuplicates() {
-        var urlsToDelete: [URL] = []
-
-        for group in duplicateGroups {
-            for file in group.files where file.isSelectedForDeletion {
-                urlsToDelete.append(file.url)
-            }
-        }
-
-        guard !urlsToDelete.isEmpty else { return }
-
+        guard !isRemovingDuplicates, !isDuplicateScanning else { return }
+        let groups = duplicateGroups
+        guard groups.contains(where: { !$0.files.filter(\.isSelectedForDeletion).isEmpty }) else { return }
+        isRemovingDuplicates = true
         Task {
-            var trashedCount = 0
-            var bytesFreed: Int64 = 0
-            var itemsRecord: [TrashedItem] = []
-
-            for url in urlsToDelete {
-                do {
-                    let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-                    var trashedURL: NSURL?
-                    try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
-                    trashedCount += 1
-                    bytesFreed += Int64(size)
-                    if let trashedPath = trashedURL?.path {
-                        itemsRecord.append(TrashedItem(originalPath: url.path, trashPath: trashedPath))
+            let result = await Task.detached(priority: .userInitiated) {
+                var moved: Set<String> = []
+                var failed = 0
+                for group in groups {
+                    guard let keeper = group.files.first(where: { !$0.isSelectedForDeletion }),
+                          (try? DuplicateScanner.hashFile(at: keeper.url)) == group.id else {
+                        failed += group.files.filter(\.isSelectedForDeletion).count
+                        continue
                     }
-                } catch {
-                    // Skip if trash fails
+                    for file in group.files where file.isSelectedForDeletion {
+                        // Revalidate content and protection at the action boundary.
+                        guard !StorageScanner.isProtected(file.url.path),
+                              (try? DuplicateScanner.hashFile(at: file.url)) == group.id else { failed += 1; continue }
+                        do {
+                            _ = try await UndoJournal.shared.trashItem(at: file.url, operation: "Duplicate files", bytes: UInt64(max(0, file.fileSize)))
+                            moved.insert(file.id)
+                        } catch { failed += 1 }
+                    }
                 }
+                return (moved, failed)
+            }.value
+            for index in duplicateGroups.indices {
+                duplicateGroups[index].files.removeAll { result.0.contains($0.id) }
             }
-
-            if !itemsRecord.isEmpty {
-                let entry = UndoEntry(op: "Delete Duplicates", items: itemsRecord, bytesFreed: bytesFreed)
-                await UndoJournal.shared.record(entry)
-            }
-
-            var updatedGroups: [DuplicateScanner.DuplicateGroup] = []
-            for group in duplicateGroups {
-                let remainingFiles = group.files.filter { !urlsToDelete.contains($0.url) }
-                if remainingFiles.count > 1 {
-                    var updated = group
-                    updated.files = remainingFiles
-                    updatedGroups.append(updated)
-                }
-            }
-            self.duplicateGroups = updatedGroups
-            self.duplicateStatusMessage = "Moved \(trashedCount) duplicate files to Trash."
-            self.refreshTrashInfo()
+            duplicateGroups.removeAll { $0.files.count < 2 }
+            isRemovingDuplicates = false
+            duplicateStatusMessage = "Moved \(result.0.count) duplicate files to Trash. " + (result.1 > 0 ? "\(result.1) files could not be moved and remain in their folders." : "Space remains used until Trash is emptied.")
+            refreshTrashInfo()
+            refreshUndoHistory()
         }
     }
 }

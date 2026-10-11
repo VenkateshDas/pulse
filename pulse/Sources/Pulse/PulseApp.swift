@@ -23,7 +23,7 @@ struct PulseApp: App {
     // `.accessory` (menu-bar only) when closed. See AppActivation.swift.
 
     var body: some Scene {
-        Window("Pulse — Command Center", id: "dashboard") {
+        Window("Pulse", id: "dashboard") {
             RootView()
                 .environment(model)
                 .environment(storageModel)
@@ -53,7 +53,7 @@ struct PulseApp: App {
                     AppActivation.shared.windowDidDisappear()
                 }
         }
-        .defaultSize(width: 1220, height: 840)
+        .defaultSize(width: 1120, height: 760)
         .windowResizability(.contentMinSize)
 
         MenuBarExtra {
@@ -67,7 +67,7 @@ struct PulseApp: App {
                 // `@Observable` changes across window boundaries — force a
                 // full rebuild on theme change so the popover always shows
                 // the current preset immediately.
-                .id(ThemeManager.shared.selected)
+                .id("\(ThemeManager.shared.selected.rawValue)-\(ThemeManager.shared.largerText)")
         } label: {
             menuBarLabel
         }
@@ -76,19 +76,8 @@ struct PulseApp: App {
 
     /// Schedules a recurring Monday-morning Weekly Pulse notification. Guarded
     /// behind a bundle id — UNUserNotificationCenter traps in bare SwiftPM runs.
-    private static func scheduleWeeklyReport() {
-        guard Bundle.main.bundleIdentifier != nil, NotificationPreferences.notifyWeeklyReport else { return }
-        let center = UNUserNotificationCenter.current()
-        let id = "com.pulse.weekly-report"
-        let content = UNMutableNotificationContent()
-        content.title = "Your Weekly Pulse is ready"
-        content.body = "See how much space you reclaimed this week and your Mac's current health."
-        var when = DateComponents()
-        when.weekday = 2  // Monday
-        when.hour = 9
-        let trigger = UNCalendarNotificationTrigger(dateMatching: when, repeats: true)
-        center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
-    }
+    private static func scheduleWeeklyReport() { NotificationPreferences.updateWeeklyReminder() }
+
 
     private var menuBarLabel: some View {
         MenuBarLabel(model: model)

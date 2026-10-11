@@ -2,7 +2,7 @@ import SwiftUI
 
 struct DiskView: View {
     @Environment(StorageModel.self) private var storage
-    @State private var selectedTab = 0
+    @State private var selectedTab = 1
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +28,9 @@ struct DiskView: View {
             open(tab: 1)
         }
         // Cross-pane case: RootView stashed the target tab before this view existed.
+        .onChange(of: storage.pendingDiskTab) { _, tab in
+            if let tab { open(tab: tab) }
+        }
         .onAppear {
             if let tab = storage.pendingDiskTab { open(tab: tab) }
         }
@@ -41,7 +44,7 @@ struct DiskView: View {
     private var tabBar: some View {
         HStack {
             SegmentPicker(
-                options: [(0, "Browse"), (1, "Reclaim"), (2, "Trash"), (3, "Growth"), (4, "Duplicates")],
+                options: [(1, "Cleanup"), (0, "Files"), (4, "Duplicates"), (3, "Changes"), (2, "Trash")],
                 selection: $selectedTab,
                 style: .tab)
             Spacer()
@@ -49,7 +52,7 @@ struct DiskView: View {
         .padding(.horizontal, Halo.Space.xxl + 8)
         .padding(.top, Halo.Space.xxl)
         .padding(.bottom, Halo.Space.lg)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
+        .background(Halo.void)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Halo.borderSubtle).frame(height: 1)
         }

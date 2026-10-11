@@ -15,6 +15,7 @@ struct CleanView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             header
+            PermissionHelp(permission: .fullDiskAccess)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if storage.scanState == .scanning && storage.scan == nil {
@@ -28,8 +29,8 @@ struct CleanView: View {
                             CleanSchedule.isPathExcluded($0.path, in: cleanModel.schedule.excludedPaths)
                         }
                         if unprotectedItems.isEmpty {
-                            Text("No safe or careful items found.")
-                                .font(.system(size: 12))
+                            Text("No recommended items found. You can review larger files in the Files view.")
+                                .font(Halo.font(size: 12))
                                 .foregroundStyle(Halo.textDim)
                                 .padding(.vertical, 16)
                                 .frame(maxWidth: .infinity)
@@ -38,8 +39,8 @@ struct CleanView: View {
                         }
                         hiddenSpaceSection(protectedItems: protectedItems)
                     } else {
-                        Text("No scan yet.")
-                            .font(.system(size: 12))
+                        Text("Choose Rescan to look for cleanup candidates. Scanning does not remove files.")
+                            .font(Halo.font(size: 12))
                             .foregroundStyle(Halo.textDim)
                         hiddenSpaceSection(protectedItems: [])
                     }
@@ -53,7 +54,7 @@ struct CleanView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
+        .background(Halo.void)
         .onAppear {
             storage.appeared()
             if !insights.hasScanned { insights.scan() }
@@ -62,8 +63,8 @@ struct CleanView: View {
 
     private var header: some View {
         PageHeader(
-            "Reclaim",
-            subtitle: "Everything safe to remove, grouped by kind — safe items pre-selected, careful items opt-in."
+            "Cleanup",
+            subtitle: "Review files you no longer need. Recommended items are selected; other items need your choice."
         ) {
             RefreshButton(
                 help: "Rescan cleanable items",
@@ -72,7 +73,10 @@ struct CleanView: View {
                 storage.refreshAll()
                 insights.scan()
             }
-            Button("Select All Safe") {
+            if storage.scanState == .scanning || storage.isStreamingSizes {
+                Button("Stop scan") { storage.cancelScan() }.buttonStyle(.bordered)
+            }
+            Button("Select recommended") {
                 storage.selectAllSafe(excludedPaths: cleanModel.schedule.excludedPaths)
             }
             .buttonStyle(.bordered)
@@ -109,19 +113,18 @@ struct CleanView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(Halo.font(size: 9, weight: .bold))
                         .foregroundStyle(Halo.textDim)
                         .rotationEffect(.degrees(collapsed ? 0 : 90))
                     Text(category)
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(1.2)
+                        .font(Halo.font(size: 11, weight: .semibold))
                         .foregroundStyle(Halo.textPrimary)
                     Text("\(items.count) item\(items.count == 1 ? "" : "s")\(selectedCount > 0 ? " · \(selectedCount) selected" : "")")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                     Spacer()
                     Text(ByteFormat.string(subtotal))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                 }
                 .contentShape(Rectangle())
@@ -145,22 +148,21 @@ struct CleanView: View {
         if insights.isScanning && !hasInsights && !hasProtected {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Measuring hidden space…").font(.system(size: 11)).foregroundStyle(Halo.textDim)
+                Text("Measuring hidden space…").font(Halo.font(size: 11)).foregroundStyle(Halo.textDim)
             }
         } else if hasInsights || hasProtected {
             let totalBytes = UInt64(max(0, insights.totalBytes)) + protectedItems.reduce(0) { $0 + $1.sizeBytes }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text("WORTH A LOOK")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(2)
+                        .font(Halo.font(size: 10, weight: .semibold))
                         .foregroundStyle(Halo.amber)
                     Text("Big locations & protected items — real data Pulse never bulk-cleans.")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                     Spacer()
                     Text(ByteFormat.string(totalBytes))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                 }
                 .padding(.horizontal, 4)
@@ -169,14 +171,13 @@ struct CleanView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Image(systemName: "shield.fill")
-                                .font(.system(size: 10))
+                                .font(Halo.font(size: 10))
                                 .foregroundStyle(Halo.ion)
                             Text("PROTECTED ITEMS (\(protectedItems.count))")
-                                .font(.system(size: 9, weight: .semibold))
-                                .tracking(1.5)
+                                .font(Halo.font(size: 9, weight: .semibold))
                                 .foregroundStyle(Halo.textPrimary)
                             Text("Exempted from auto-clean & bulk deletion")
-                                .font(.system(size: 10))
+                                .font(Halo.font(size: 10))
                                 .foregroundStyle(Halo.textDim)
                         }
                         .padding(.horizontal, 4)
@@ -204,29 +205,29 @@ struct CleanView: View {
                 .frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(insight.label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                     .lineLimit(1)
                 Text(insight.reversibleHint)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
             }
             Spacer()
             Text(ByteFormat.string(UInt64(max(0, insight.bytes))))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
             Button {
                 insights.reveal(insight.path)
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             .buttonStyle(.plain)
             .help("Reveal in Finder — \(insight.path)")
-            .accessibilityLabel("Reveal in Finder")
+            .accessibilityLabel("Show \(insight.path) in Finder")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -240,7 +241,7 @@ struct CleanView: View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
             Text("Scanning for cleanable space…")
-                .font(.system(size: 12))
+                .font(Halo.font(size: 12))
                 .foregroundStyle(Halo.textDim)
         }
         .padding(.vertical, 16)
@@ -252,17 +253,12 @@ struct CleanView: View {
         let selectable = item.grade != .review && !isProtected
         return HStack(spacing: 10) {
             if !isProtected {
-                Button {
-                    storage.toggle(item)
-                } label: {
-                    Image(systemName: selected ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 13))
-                        .foregroundStyle(
-                            !selectable ? Halo.textDim.opacity(0.4)
-                                : (selected ? Halo.pulseGreen : Halo.textDim))
-                }
-                .buttonStyle(.plain)
-                .disabled(!selectable)
+                Toggle("Select \(item.label), \(item.path)", isOn: Binding(
+                    get: { selected }, set: { _ in storage.toggle(item) }
+                ))
+                .labelsHidden().toggleStyle(.checkbox)
+                .disabled(!selectable || storage.isCleaning)
+
             }
 
             Image(nsImage: FileIconCache.icon(forPath: item.path))
@@ -272,12 +268,12 @@ struct CleanView: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(item.label)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Halo.font(size: 12, weight: .semibold))
                         .foregroundStyle(Halo.textPrimary)
                         .lineLimit(1)
                     if isProtected {
                         Text("PROTECTED")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(Halo.font(size: 8, weight: .bold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(Halo.ion.opacity(0.15), in: Capsule())
@@ -285,14 +281,14 @@ struct CleanView: View {
                     }
                 }
                 Text(detailLine(item))
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
             }
             Spacer()
             if !isProtected { GradePill(grade: item.grade) }
             Text(ByteFormat.string(item.sizeBytes))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
 
@@ -301,23 +297,23 @@ struct CleanView: View {
                     cleanModel.toggleExclusion(item.path)
                 } label: {
                     Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
                 .buttonStyle(.plain)
-                .help("Restore to Reclaim categories")
-                .accessibilityLabel("Restore to Reclaim")
+                .help("Include in cleanup suggestions")
+                .accessibilityLabel("Include \(item.label) in cleanup suggestions")
 
                 Button {
                     storage.trashProtectedItem(item, cleanModel: cleanModel)
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.critical)
                 }
                 .buttonStyle(.plain)
                 .help("Move to Trash")
-                .accessibilityLabel("Move to Trash")
+                .accessibilityLabel("Move \(item.label) to Trash")
             } else {
                 Button {
                     if storage.selection.contains(item.id) {
@@ -326,24 +322,24 @@ struct CleanView: View {
                     cleanModel.toggleExclusion(item.path)
                 } label: {
                     Image(systemName: "shield.slash")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
                 .buttonStyle(.plain)
-                .help("Move to Worth a Look — protect from auto-clean")
-                .accessibilityLabel("Move to Worth a Look")
+                .help("Exclude from automatic cleanup")
+                .accessibilityLabel("Exclude \(item.label) from automatic cleanup")
             }
 
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.path)])
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             .buttonStyle(.plain)
             .help("Reveal in Finder — \(item.path)")
-            .accessibilityLabel("Reveal in Finder")
+            .accessibilityLabel("Show \(item.label) in Finder")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -364,15 +360,15 @@ struct CleanView: View {
 // MARK: - Auto Clean card
 
 struct AutoCleanCard: View {
+    @State private var reviewAutomaticCleanup = false
     @Environment(CleanModel.self) private var model
     @AppStorage(SmartScanner.developerModeKey) private var developerMode = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("AUTO CLEAN")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Automatic cleanup")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 frequencyPicker
@@ -393,8 +389,7 @@ struct AutoCleanCard: View {
 
             HStack(spacing: 10) {
                 Text("WHEN")
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 timePreferencePicker
                 Spacer()
@@ -404,21 +399,23 @@ struct AutoCleanCard: View {
 
             HStack(spacing: 24) {
                 toggleRow(
-                    title: "Auto-clean safe items",
-                    subtitle: "due runs stage the safe tier without asking",
+                    title: "Automatic cleanup",
+                    subtitle: "moves recommended items to Trash at scheduled times",
                     isOn: Binding(
                         get: { model.schedule.autoCleanSafeTier },
-                        set: { model.setAutoClean($0) }
+                        set: { enabled in
+                            if enabled { reviewAutomaticCleanup = true } else { model.setAutoClean(false) }
+                        }
                     ))
                 toggleRow(
                     title: "Notify on completion",
-                    subtitle: "one notification per run, never a nag",
+                    subtitle: "receive a result after scheduled cleanup",
                     isOn: Binding(
                         get: { model.schedule.notifyOnCompletion },
                         set: { model.setNotify($0) }
                     ))
                 toggleRow(
-                    title: "Developer Junk Mode",
+                    title: "Include developer caches",
                     subtitle: "scan Homebrew, Docker & Xcode simulator caches too",
                     isOn: Binding(
                         get: { developerMode },
@@ -433,6 +430,13 @@ struct AutoCleanCard: View {
         }
         .padding(16)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+        .onAppear { model.appeared() }
+        .confirmationDialog("Enable automatic cleanup?", isPresented: $reviewAutomaticCleanup, titleVisibility: .visible) {
+            Button("Enable automatic cleanup") { model.setAutoClean(true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("At scheduled times, Pulse will move recommended items from its cleanup scan to Trash without asking again. Excluded paths are skipped. Future scans can find different items; apps may need to rebuild removed caches. Restore files before emptying Trash. You can turn this off at any time.")
+        }
     }
 
     private var frequencyPicker: some View {
@@ -455,9 +459,9 @@ struct AutoCleanCard: View {
 
     static func timeLabel(_ preference: CleanSchedule.TimePreference) -> String {
         switch preference {
-        case .night: return "NIGHT · 3AM"
-        case .morning: return "MORNING · 9AM"
-        case .anytime: return "ANYTIME"
+        case .night: return "Night · 3 AM"
+        case .morning: return "Morning · 9 AM"
+        case .anytime: return "When idle"
         }
     }
 
@@ -470,40 +474,19 @@ struct AutoCleanCard: View {
     }
 
     private var runButton: some View {
-        Button {
-            model.runNow()
-        } label: {
-            HStack(spacing: 6) {
-                if model.isRunning {
-                    ProgressView().controlSize(.small)
-                }
-                if !model.isRunning {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                Text(model.isRunning ? "Cleaning…" : "Run Now")
-                    .font(.system(size: 13, weight: .bold))
-            }
-            .foregroundStyle(Halo.void)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 10)
-            .background(
-                model.isRunning ? AnyShapeStyle(Halo.textDim) : AnyShapeStyle(Halo.ion),
-                in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(model.isRunning)
-        .help("Scan and move every safe-tier item to the Trash now")
+        Button("Review cleanup candidates", systemImage: "checklist") {
+            PulseNavigation.open(.storage, diskTab: 1)
+        }.buttonStyle(.bordered)
+            .help("Review the candidate list and selected items before moving anything to Trash")
     }
 
     private func scheduleFact(label: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
         }
     }
@@ -512,10 +495,10 @@ struct AutoCleanCard: View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
         }

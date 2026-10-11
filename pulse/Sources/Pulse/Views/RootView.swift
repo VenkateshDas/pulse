@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Command Center shell: custom HALO sidebar + selected section.
+/// Task navigation and the currently selected page.
 struct RootView: View {
+    @Environment(\.openWindow) private var openWindow
     @Environment(DashboardModel.self) private var model
     @Environment(MonitorModel.self) private var monitorModel
     @Environment(HealthModel.self) private var healthModel
@@ -15,15 +16,26 @@ struct RootView: View {
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
     @State private var windowVisible = true
     @State private var showPalette = false
+    @State private var columns: NavigationSplitViewVisibility = .all
     @State private var showOnboarding = PermissionsGate.shouldPromptOnLaunch()
+
+    private func applyPendingNavigation() {
+        guard let route = PulseNavigation.takePending() else { return }
+        if let tab = route.diskTab { storage.pendingDiskTab = tab }
+        selection = route.destination
+    }
 
     var body: some View {
         // Registers an Observation dependency on the current theme so the
         // whole subtree re-renders (picking up fresh `Halo.*` values) when
         // the user switches presets in Settings.
         let _ = ThemeManager.shared.selected
-        HStack(spacing: 0) {
+        let _ = ThemeManager.shared.largerText
+        NavigationSplitView(columnVisibility: $columns) {
             SidebarView(selection: $selection)
+                .navigationSplitViewColumnWidth(min: 190, ideal: 218, max: 260)
+        } detail: {
+            GeometryReader { geometry in
             Group {
                 switch selection {
                 case .agent: AgentView()
@@ -35,16 +47,26 @@ struct RootView: View {
                 case .network: NetworkView()
                 case .displays: DisplaysView()
                 case .health: HealthView()
+                case .startup: HealthView(scope: .startup)
+                case .benchmark: HealthView(scope: .benchmark)
                 case .settings: SettingsView(selection: $selection)
                 case .diagnostics: DevModeView()
                 default: DashboardView()
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: geometry.size.width, height: geometry.size.height)
             .background(Halo.void)
-            .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
-        .frame(minWidth: 1080, minHeight: 720)
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 860, minHeight: 600)
+        .tint(Halo.interactive)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { showPalette = true } label: { Label("Search tasks", systemImage: "magnifyingglass") }
+                    .help("Search tasks (⌘K)")
+            }
+        }
         .background {
             // Hidden hotkeys (no visible chrome): ⌘K palette, ⌘1–9 sections,
             // ⌘, Settings.
@@ -61,12 +83,19 @@ struct RootView: View {
                     .keyboardShortcut(",", modifiers: .command)
             }
             .opacity(0)
+            .accessibilityHidden(true)
         }
         .overlay { commandPaletteOverlay }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(isPresented: $showOnboarding)
         }
         .onAppear {
+            applyPendingNavigation()
+            KeybindingActions.openReview = { destination, tab in
+                PulseNavigation.open(destination, diskTab: tab)
+                openWindow(id: "dashboard")
+                NSApp.activate(ignoringOtherApps: true)
+            }
             clean.start()
             // Record this build so a post-update re-prompt fires at most once.
             PermissionsGate.markPrompted()
@@ -76,6 +105,9 @@ struct RootView: View {
         // that day. RootView outlives every pane, so no completion is missed.
         .onChange(of: storage.scanState) { _, state in
             if case .done = state { timeline.recordToday(scan: storage.scan) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: PulseNavigation.notification)) { note in
+            applyPendingNavigation()
         }
         .onReceive(NotificationCenter.default.publisher(for: TimelineView.navigateToClean)) { _ in
             storage.pendingDiskTab = 1
@@ -92,7 +124,7 @@ struct RootView: View {
                 for: NSWindow.didChangeOcclusionStateNotification)
         ) { note in
             guard let window = note.object as? NSWindow,
-                window.title == "Pulse — Command Center"
+                window.title == "Pulse"
             else { return }
             let visible = window.occlusionState.contains(.visible)
             windowVisible = visible

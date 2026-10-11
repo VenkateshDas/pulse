@@ -19,19 +19,28 @@ struct StorageView: View {
     @State private var keyMonitor: Any?
     @State private var usagePathQuery: String = ""
     @State private var showHiddenBreakdown = false
+    @State private var showCompactDetails = false
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
             Rectangle().fill(Halo.surface2).frame(height: 1)
+            GeometryReader { geometry in
             HStack(spacing: 0) {
                 columnsArea
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                if selectedItem != nil {
+                if selectedItem != nil && geometry.size.width >= 850 {
                     Rectangle().fill(Halo.surface2).frame(width: 1)
-                    detailArea
-                        .frame(width: 280)
+                    ScrollView { detailArea }
+                        .frame(width: 300)
                 }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if selectedItem != nil && geometry.size.width < 850 {
+                    Button("View selected item details") { showCompactDetails = true }
+                        .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent).padding(12)
+                }
+            }
             }
             Rectangle().fill(Halo.surface2).frame(height: 1)
             bottomBar
@@ -39,6 +48,12 @@ struct StorageView: View {
         .background(Halo.void)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .quickLookPreview($previewURL)
+        .sheet(isPresented: $showCompactDetails) {
+            VStack(alignment: .trailing) {
+                Button("Close details") { showCompactDetails = false }.buttonStyle(.bordered).padding(12)
+                ScrollView { detailArea }
+            }.frame(width: 400, height: 570)
+        }
         .sheet(isPresented: Binding(
             get: { storage.verdictTarget != nil },
             set: { if !$0 { storage.dismissVerdict() } })
@@ -63,7 +78,7 @@ struct StorageView: View {
     private func startKeyMonitor() {
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            guard event.keyCode == 49, event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+            guard !(NSApp.keyWindow?.firstResponder is NSTextView), event.keyCode == 49, event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
                 let item = selectedItem, !item.isPseudo
             else { return event }
             previewURL = previewURL == nil ? URL(fileURLWithPath: item.node.path) : nil
@@ -81,13 +96,13 @@ struct StorageView: View {
                     selectedID = nil
                 } label: {
                     Image(systemName: "chevron.backward")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(Halo.font(size: 13, weight: .bold))
                         .foregroundStyle(Halo.textPrimary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
             }
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(Array(storage.navigationPath.enumerated()), id: \.offset) { index, node in
@@ -96,13 +111,13 @@ struct StorageView: View {
                             selectedID = nil
                         } label: {
                             Text(node.name)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(Halo.font(size: 13, weight: .semibold))
                                 .foregroundStyle(index == storage.navigationPath.count - 1 ? Halo.textPrimary : Halo.textDim)
                         }
                         .buttonStyle(.plain)
                         if index < storage.navigationPath.count - 1 {
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(Halo.font(size: 10, weight: .bold))
                                 .foregroundStyle(Halo.surface2)
                         }
                     }
@@ -120,11 +135,12 @@ struct StorageView: View {
     private var usagePathField: some View {
         HStack(spacing: 6) {
             Image(systemName: "questionmark.folder")
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
-            TextField("Can I delete… (paste a path)", text: $usagePathQuery)
+            TextField("Paste a folder path", text: $usagePathQuery)
+                .accessibilityLabel("Folder path to review")
                 .textFieldStyle(.plain)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 180)
                 .onSubmit {
@@ -147,7 +163,7 @@ struct StorageView: View {
                 VStack(spacing: 10) {
                     ProgressView()
                     Text("Scanning \(storage.navigationPath.last?.name ?? "disk")…")
-                        .font(.system(size: 12)).foregroundStyle(Halo.textDim)
+                        .font(Halo.font(size: 12)).foregroundStyle(Halo.textDim)
                 }
             } else if storage.navigationPath.isEmpty {
                 EmptyState(
@@ -187,7 +203,7 @@ struct StorageView: View {
             LazyVStack(spacing: 1) {
                 if children.isEmpty {
                     Text("Empty or restricted")
-                        .font(.system(size: 11)).foregroundStyle(Halo.textDim)
+                        .font(Halo.font(size: 11)).foregroundStyle(Halo.textDim)
                         .padding(.top, 24)
                 } else {
                     ForEach(children) { child in
@@ -273,36 +289,16 @@ struct StorageView: View {
                     value: ByteFormat.string(storage.purgeableBytes),
                     valueColor: Halo.amber)
             }
-            if storage.tmSnapshotCount > 0 {
-                HStack(spacing: 8) {
-                    pseudoRow(
-                        icon: "camera.on.rectangle",
-                        title: "Time Machine snapshots (\(storage.tmSnapshotCount))",
-                        subtitle: "Pin recently deleted data — safe to thin, hourly backups re-create them",
-                        value: "—",
-                        valueColor: Halo.textDim)
-                    Button {
-                        storage.thinLocalSnapshots()
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Halo.flare)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(storage.isCleaning)
-                    .padding(.trailing, 16)
-                    .help("Runs Apple's tmutil thinlocalsnapshots (admin password required) — the sanctioned way to purge local Time Machine snapshots. Your actual backups on the backup disk are untouched.")
-                    .accessibilityLabel("Thin Time Machine snapshots")
-                }
-            }
+            Text("Local snapshot counts are unavailable. macOS manages local Time Machine snapshots; review backups in System Settings when needed.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary).padding(.horizontal, 16)
             if storage.updateDownloadsBytes >= 50_000_000 {
                 updateDownloadsRow
             }
             // Volumes, snapshots and purgeable overlap each other and the
             // folder rows — attribution, not arithmetic that sums to the top.
             Text("Slices overlap — they explain the space, they don't sum to it.")
-                .font(.system(size: 9))
-                .foregroundStyle(Halo.textDim.opacity(0.7))
+                .font(Halo.font(size: 9))
+                .foregroundStyle(Halo.textDim)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 4)
         }
@@ -316,58 +312,41 @@ struct StorageView: View {
             pseudoRow(
                 icon: "arrow.down.circle.dotted",
                 title: "macOS update downloads",
-                subtitle: "Downloaded, not installed — re-downloads on demand",
+                subtitle: "Update files are managed by macOS; review Software Update in System Settings",
                 value: ByteFormat.string(storage.updateDownloadsBytes),
                 valueColor: Halo.amber)
-            if storage.updateDownloadsRestricted {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-                    .padding(.trailing, 16)
-                    .help("SIP-protected — no app (even with an admin password) can delete these. macOS removes them itself after the update installs or expires.")
-            } else {
-                Button {
-                    storage.clearUpdateDownloads()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.flare)
-                }
-                .buttonStyle(.plain)
-                .disabled(storage.isCleaning)
-                .padding(.trailing, 16)
-                .help("Deletes /Library/Updates downloads permanently (admin password required). Software Update re-downloads if you install later.")
-                .accessibilityLabel("Delete macOS update downloads")
-            }
+            Text("Managed by macOS")
+                .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary).padding(.trailing, 16)
+
         }
     }
 
     private func pseudoRow(icon: String, title: String, subtitle: String, value: String, valueColor: Color, delta: Int64? = nil) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(title)
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                     Spacer(minLength: 4)
                     // Same ▲/▼ daily-baseline chip the folder rows show.
                     if let delta, abs(delta) >= 100_000_000 {
                         Text("\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))")
-                            .font(.system(size: 9, design: .monospaced))
+                            .font(Halo.font(size: 9, design: .monospaced))
                             .foregroundStyle(delta >= 0 ? Halo.amber : Halo.pulseGreen)
                             .help("Changed \(ByteFormat.string(UInt64(abs(delta)))) since the last daily size check")
                     }
                     Text(value)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(Halo.font(size: 10, design: .monospaced))
                         .foregroundStyle(valueColor)
                 }
                 Text(subtitle)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Halo.textDim.opacity(0.7))
+                    .font(Halo.font(size: 9))
+                    .foregroundStyle(Halo.textDim)
             }
         }
         .padding(.horizontal, 16)
@@ -391,24 +370,24 @@ struct StorageView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(node.name)
-                            .font(.system(size: 12, weight: isOpen ? .semibold : .regular))
+                            .font(Halo.font(size: 12, weight: isOpen ? .semibold : .regular))
                             .foregroundStyle(Halo.textPrimary)
                             .lineLimit(1)
                         if info.isProtected {
                             Image(systemName: "lock.fill")
-                                .font(.system(size: 8))
+                                .font(Halo.font(size: 8))
                                 .foregroundStyle(Halo.textDim)
                         }
                         Spacer(minLength: 4)
                         // ▲/▼ vs the saved daily baseline — where growth is.
                         if let delta, abs(delta) >= 100_000_000 {
                             Text("\(delta >= 0 ? "▲" : "▼") \(ByteFormat.string(UInt64(abs(delta))))")
-                                .font(.system(size: 9, design: .monospaced))
+                                .font(Halo.font(size: 9, design: .monospaced))
                                 .foregroundStyle(delta >= 0 ? Halo.amber : Halo.pulseGreen)
                                 .help("Changed \(ByteFormat.string(UInt64(abs(delta)))) since the last daily size check")
                         }
                         Text(node.sizeBytes > 0 ? ByteFormat.string(node.sizeBytes) : "—")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(Halo.font(size: 10, design: .monospaced))
                             .foregroundStyle(Halo.textDim)
                     }
                     GeometryReader { geo in
@@ -428,7 +407,7 @@ struct StorageView: View {
                         storage.cleanNode(node)
                     } label: {
                         Image(systemName: "trash")
-                            .font(.system(size: 10))
+                            .font(Halo.font(size: 10))
                             .foregroundStyle(hoveredRowID == node.id ? Halo.flare : Halo.textDim)
                     }
                     .buttonStyle(.plain)
@@ -439,7 +418,7 @@ struct StorageView: View {
                 }
                 if node.isDirectory && !info.isPseudo {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(Halo.font(size: 9, weight: .bold))
                         .foregroundStyle(isOpen ? Halo.ion : Halo.textDim.opacity(0.6))
                 }
             }
@@ -459,7 +438,7 @@ struct StorageView: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: node.path)])
                 }
                 Button("Get Info") { selectedID = node.id }
-                Button("Can I delete this?") {
+                Button("Review folder") {
                     storage.inspect(path: node.path)
                 }
                 if !info.isProtected && info.grade != .review {
@@ -518,8 +497,8 @@ struct StorageView: View {
             HStack {
                 Image(systemName: "internaldrive.fill").foregroundStyle(Halo.ion)
                 Text(storage.navigationPath.last?.name ?? "Disk")
-                    .font(.system(size: 13, weight: .semibold))
-                
+                    .font(Halo.font(size: 13, weight: .semibold))
+
                 Button(action: {
                     storage.refreshAll()
                 }) {
@@ -530,20 +509,21 @@ struct StorageView: View {
                 .padding(.leading, 4)
                 .help("Rescan storage map and free space")
                 .accessibilityLabel("Rescan")
-                
+
                 if storage.isStreamingSizes || storage.scanState == .scanning {
                     ProgressView()
                         .controlSize(.small)
                         .scaleEffect(0.7)
                         .padding(.leading, 8)
-                    Text("Scanning sizes…").font(.system(size: 11)).foregroundStyle(Halo.textDim)
+                    Button("Stop scan") { storage.cancelScan() }.buttonStyle(.bordered)
+                    Text("Scanning sizes…").font(Halo.font(size: 11)).foregroundStyle(Halo.textDim)
                 } else if let report = storage.cleanReport {
-                    Text(report).font(.system(size: 12)).foregroundStyle(Halo.pulseGreen)
+                    Text(report).font(Halo.font(size: 12)).foregroundStyle(Halo.textPrimary)
                         .padding(.leading, 12)
                 }
-                
+
                 Spacer()
-                
+
                 // "Free" matches Finder and the dashboard/popover: it counts
                 // purgeable space as available (volumeAvailableCapacityForImportantUsage).
                 // Purgeable is still surfaced separately as a breakdown, not subtracted.
@@ -551,7 +531,7 @@ struct StorageView: View {
                 let total = model.snapshot?.diskTotalBytes ?? 0
                 let purgeable = storage.purgeableBytes
                 let used = total > finderFree ? total - finderFree : 0
-                
+
                 HStack(spacing: 12) {
                     Group {
                         Text("Used: ").foregroundStyle(Halo.textDim) +
@@ -573,7 +553,7 @@ struct StorageView: View {
                         Text(ByteFormat.string(total)).foregroundStyle(Halo.textPrimary)
                     }
                 }
-                .font(.system(size: 11, weight: .semibold))
+                .font(Halo.font(size: 11, weight: .semibold))
             }
             .padding(16)
             .background(Halo.surface1)

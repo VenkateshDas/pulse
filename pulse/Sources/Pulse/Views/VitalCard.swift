@@ -52,24 +52,21 @@ struct VitalCard: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .center, spacing: 4) {
                         Text(title)
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.5)
+                            .font(Halo.font(size: 10, weight: .semibold))
                         if cardTooltip != nil {
                             Image(systemName: "info.circle")
-                                .font(.system(size: 9))
+                                .font(Halo.font(size: 9))
                         }
                     }
                     .foregroundStyle(Halo.textDim)
                     Text(line1)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(Halo.textPrimary)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
                     Text(line2)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(Halo.font(size: 10, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
                 }
                 Spacer(minLength: 0)
             }
@@ -85,7 +82,7 @@ struct VitalCard: View {
                                 .fill(item.color)
                                 .frame(width: 8, height: 4)
                             Text(item.label)
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .font(Halo.font(size: 9, weight: .medium, design: .monospaced))
                                 .foregroundStyle(Halo.textDim)
                         }
                     }
@@ -97,14 +94,12 @@ struct VitalCard: View {
                     ForEach(Array(stats.enumerated()), id: \.offset) { _, stat in
                         HStack(spacing: 4) {
                             Text(stat.label)
-                                .font(.system(size: 9, weight: .semibold))
-                                .tracking(1)
-                                .foregroundStyle(Halo.textDim.opacity(0.7))
+                                .font(Halo.font(size: 9, weight: .semibold))
+                                .foregroundStyle(Halo.textDim)
                             Text(stat.value)
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .font(Halo.font(size: 9, weight: .medium, design: .monospaced))
                                 .foregroundStyle(stat.color ?? Halo.textPrimary)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.7)
                         }
                     }
                     Spacer(minLength: 0)
@@ -164,7 +159,7 @@ struct VitalCard: View {
                     .shadow(color: color.opacity(0.3), radius: 6)
             }
             Text(value)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(Halo.font(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(Halo.textPrimary)
         }
         .frame(width: 48, height: 48)

@@ -24,6 +24,16 @@ final class AgentModel {
     var status = "Ready"
     var activeRunId: String?
     var hasApiKey = false
+    @ObservationIgnored private var streamTask: Task<Void, Never>?
+    @ObservationIgnored private var streamGeneration = UUID()
+    @ObservationIgnored private var ignoresCancelledEvents = false
+
+    var isBusy: Bool { state == .running || state == .awaitingApproval || state == .starting }
+
+    func newConversation() {
+        guard !isBusy else { return }
+        sessionId = nil; items = []; state = .idle; status = "Ready"
+    }
     private var seenEventIDs = Set<String>()
     private var lastSequence = 0
     /// DeepSeek and similar providers can emit hundreds of tiny deltas per
@@ -32,6 +42,9 @@ final class AgentModel {
     private var pendingAnswerChunks: [String: Int] = [:]
 
     func start() async {
+        guard !isBusy else { return }
+        hasApiKey = !AgentConfiguration.apiKey.isEmpty
+        guard hasApiKey else { status = "Set up an AI provider to ask Pulse"; return }
         state = .starting; status = "Starting local agent…"
         guard await AgentDaemonManager.shared.ensureRunning() else {
             state = .failed; status = "Pulse Agent could not start"
@@ -48,30 +61,59 @@ final class AgentModel {
         guard !message.isEmpty, state == .idle || state == .completed || state == .failed || state == .cancelled else { return }
         items.append(.init(id: UUID().uuidString, kind: .user, title: message, detail: ""))
         state = .running; status = "Working…"; lastSequence = 0; seenEventIDs.removeAll()
-        Task {
+        activeRunId = nil; ignoresCancelledEvents = false
+        pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll()
+        let generation = UUID(); streamGeneration = generation
+        streamTask = Task {
             do {
-                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId) { apply(event) }
-            } catch { fail(error.localizedDescription) }
+                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId) {
+                    guard generation == streamGeneration, !Task.isCancelled else { return }
+                    apply(event)
+                }
+            } catch { if generation == streamGeneration, !Task.isCancelled { fail(error.localizedDescription) } }
         }
     }
 
     func resolveApproval(_ approved: Bool) {
-        guard let runId = activeRunId else { return }
+        guard state == .awaitingApproval, let runId = activeRunId else { return }
         state = .running; status = approved ? "Continuing…" : "Action declined"
-        Task {
+        let generation = streamGeneration
+        streamTask = Task {
             do {
-                for try await event in await AgentClient.shared.continueRun(runId: runId, approved: approved) { apply(event) }
-            } catch { fail(error.localizedDescription) }
+                for try await event in await AgentClient.shared.continueRun(runId: runId, approved: approved) {
+                    guard generation == streamGeneration, !Task.isCancelled else { return }
+                    apply(event)
+                }
+            } catch { if generation == streamGeneration, !Task.isCancelled { fail(error.localizedDescription) } }
         }
     }
 
     func cancel() {
-        guard let runId = activeRunId else { return }
-        Task { try? await AgentClient.shared.cancel(runId: runId) }
-        state = .cancelled; status = "Cancelled"
+        guard state == .running || state == .awaitingApproval else { return }
+        for (id, text) in pendingAnswerText where !text.isEmpty {
+            appendOrUpdate(id: id, kind: .answer, title: "Ask Pulse", detail: text)
+        }
+        pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll()
+        ignoresCancelledEvents = true
+        streamGeneration = UUID()
+        streamTask?.cancel(); streamTask = nil
+        state = .cancelled
+        status = "Stopped waiting. Already started actions may still finish."
+        for index in items.indices { items[index].isRunning = false }
+        if let runId = activeRunId {
+            Task {
+                do {
+                    try await AgentClient.shared.cancel(runId: runId)
+                    if state == .cancelled { status = "Stop requested. Check completed actions before trying again." }
+                } catch {
+                    if state == .cancelled { status = "Could not confirm a stop. Already started actions may still finish." }
+                }
+            }
+        }
     }
 
     func loadSession(_ id: String) async {
+        guard !isBusy else { return }
         sessionId = id; items = []; state = .starting; status = "Loading conversation…"
         do {
             let history = try await AgentClient.shared.fetchHistory(sessionId: id)
@@ -87,7 +129,7 @@ final class AgentModel {
     }
 
     func apply(_ event: AgentEnvelope) {
-        guard event.version == 1, seenEventIDs.insert(event.eventId).inserted, event.sequence > lastSequence else { return }
+        guard !ignoresCancelledEvents, event.version == 1, seenEventIDs.insert(event.eventId).inserted, event.sequence > lastSequence else { return }
         lastSequence = event.sequence; activeRunId = event.runId
         let text = event.payload["text"] ?? ""
         switch event.kind {

@@ -113,7 +113,7 @@ public actor AgentClient {
         let token = bearerToken, url = URL(string: path, relativeTo: baseURL)!
         let encodedBody = try? JSONSerialization.data(withJSONObject: body)
         return AsyncThrowingStream { continuation in
-            Task {
+            let streamTask = Task {
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"; request.timeoutInterval = 120
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -130,6 +130,7 @@ public actor AgentClient {
                     continuation.finish()
                 } catch { continuation.finish(throwing: error) }
             }
+            continuation.onTermination = { @Sendable _ in streamTask.cancel() }
         }
     }
 

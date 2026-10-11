@@ -6,34 +6,52 @@ import SwiftUI
 struct MonitorView: View {
     @Environment(MonitorModel.self) private var model
     @State private var investigating = false
+    @State private var showDetails = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top) { header; Button("Investigate…") { investigating = true } }
-            HStack(alignment: .top, spacing: 16) {
-                ProcessListCard()
-                ProcessDetailCard()
-                    .frame(width: 340)
+            header
+            GeometryReader { geometry in
+                HStack(alignment: .top, spacing: 16) {
+                    ProcessListCard()
+                    if geometry.size.width >= 900 {
+                        ScrollView { ProcessDetailCard() }.frame(width: 340)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if geometry.size.width < 900 {
+                        Button("Inspect selected app") { showDetails = true }
+                            .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
+                            .disabled(model.selectedPID == nil).padding(12)
+                    }
+                }
             }
-            .frame(maxHeight: .infinity)
-            NetworkCard()
-                .frame(height: 190)
+            DisclosureGroup("Network activity by connection") { NetworkCard().frame(height: 230) }
+
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
+        .background(Halo.void)
         .onChange(of: investigating) { _, showing in showing ? model.disappeared() : model.appeared() }
         .sheet(isPresented: $investigating) { InvestigationView() }
+        .sheet(isPresented: $showDetails) {
+            VStack(alignment: .trailing) {
+                Button("Close details") { showDetails = false }.buttonStyle(.bordered).padding(12)
+                ScrollView { ProcessDetailCard().padding(16) }
+            }.frame(width: 430, height: 570)
+        }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
     }
 
     private var header: some View {
         PageHeader(
-            "Monitor",
+            "App activity",
             subtitle:
-                "Every process with CPU, memory, threads and page-in rates, plus live per-interface network throughput. Per-process network needs private Apple entitlements — Pulse won't pretend otherwise."
-        )
+                "See which apps are busy. High use can be normal; review details and save your work before asking an app to quit."
+        ) {
+            Button("Measure a slowdown…") { investigating = true }.buttonStyle(.bordered)
+        }
     }
 }
 
@@ -48,15 +66,14 @@ private struct ProcessListCard: View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Text("PROCESSES")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Apps and processes")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
-                Text("\(model.rows.count)/\(model.coverage.enumerated)").help("Readable tasks / enumerated processes; some tasks may be denied or exited")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                Text("\(model.rows.count) readable of \(model.coverage.enumerated)").help("Readable tasks / enumerated processes; some tasks may be denied or exited")
+                    .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.ion)
                 Spacer()
-                Toggle("Apps", isOn: $model.groupMode).toggleStyle(.checkbox).help("Aggregate readable processes by owning app; CPU or memory ordering")
+                Toggle("Group by app", isOn: $model.groupMode).toggleStyle(.checkbox).help("Aggregate readable processes by owning app; CPU or memory ordering")
                 modePicker.disabled(model.groupMode)
                 sortMenu
             }
@@ -170,10 +187,9 @@ private struct ProcessListCard: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(Halo.font(size: 9, weight: .bold))
                     Text(Self.sortLabel(model.sortKey))
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
+                        .font(Halo.font(size: 10, weight: .bold))
                 }
                 .foregroundStyle(Halo.textDim)
                 .padding(.horizontal, 10)
@@ -189,7 +205,7 @@ private struct ProcessListCard: View {
                 model.sortAscending.toggle()
             } label: {
                 Image(systemName: model.sortAscending ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.textDim)
                     .padding(6)
                     .background(Halo.surface2, in: Circle())
@@ -215,11 +231,11 @@ private struct ProcessListCard: View {
         @Bindable var model = model
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
             TextField("Filter by name (⌘F)", text: $model.filter)
                 .textFieldStyle(.plain)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textPrimary)
                 .focused($filterFocused)
             if !model.filter.isEmpty {
@@ -227,7 +243,7 @@ private struct ProcessListCard: View {
                     model.filter = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
                 .buttonStyle(.plain)
@@ -247,8 +263,7 @@ private struct ProcessListCard: View {
             sortableColumn("THR", key: .threads).frame(width: 36, alignment: .trailing)
             sortableColumn("IN/S", key: .pageFaults).frame(width: 44, alignment: .trailing)
         }
-        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-        .tracking(1)
+        .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
         .foregroundStyle(Halo.textDim)
         .padding(.horizontal, 8)
     }
@@ -268,7 +283,7 @@ private struct ProcessListCard: View {
                     .foregroundStyle(isActive ? Halo.ion : Halo.textDim)
                 if isActive {
                     Image(systemName: model.sortAscending ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 7, weight: .bold))
+                        .font(Halo.font(size: 7, weight: .bold))
                         .foregroundStyle(Halo.ion)
                 }
             }
@@ -292,8 +307,8 @@ private struct ProcessRow: View {
                 HStack(spacing: 4) {
                     if depth > 0 {
                         Text(String(repeating: "  ", count: depth - 1) + "└")
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Halo.textDim.opacity(0.6))
+                            .font(Halo.font(size: 10, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
                     }
                     Circle()
                         .fill(activityColor)
@@ -302,7 +317,7 @@ private struct ProcessRow: View {
                         .resizable()
                         .frame(width: 14, height: 14)
                     Text(process.name)
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textPrimary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -318,7 +333,7 @@ private struct ProcessRow: View {
                 Text(faultText)
                     .frame(width: 44, alignment: .trailing)
             }
-            .font(.system(size: 11, design: .monospaced))
+            .font(Halo.font(size: 11, design: .monospaced))
             .foregroundStyle(Halo.textDim)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -384,13 +399,12 @@ private struct ProcessDetailCard: View {
     private func detail(_ process: ProcessExtendedSample) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(process.name.uppercased())
-                .font(.system(size: 12, weight: .bold))
-                .tracking(1)
+                .font(Halo.font(size: 12, weight: .bold))
                 .foregroundStyle(Halo.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
             Text("PID \(process.pid)")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
             Spacer()
         }
@@ -413,8 +427,7 @@ private struct ProcessDetailCard: View {
 
         VStack(alignment: .leading, spacing: 6) {
             Text("CPU · LAST 2 MIN")
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Sparkline(values: model.selectedCPUHistory)
                 .frame(height: 56)
@@ -440,9 +453,9 @@ private struct ProcessDetailCard: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "xmark.octagon")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(Halo.font(size: 10, weight: .bold))
                 Text("Send Quit")
-                    .font(.system(size: 11, weight: .bold))
+                    .font(Halo.font(size: 11, weight: .bold))
             }
             .foregroundStyle(Halo.flare)
             .padding(.horizontal, 12)
@@ -466,11 +479,10 @@ private struct ProcessDetailCard: View {
     private func fact(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -487,8 +499,7 @@ private struct NetworkCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 14) {
                 Text("NETWORK")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 legend("DOWNLOAD", Halo.ion)
@@ -499,7 +510,7 @@ private struct NetworkCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     if model.networks.isEmpty {
                         Text("No active interface")
-                            .font(.system(size: 11))
+                            .font(Halo.font(size: 11))
                             .foregroundStyle(Halo.textDim)
                     }
                     ForEach(model.networks) { sample in
@@ -525,8 +536,7 @@ private struct NetworkCard: View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
         }
     }
@@ -534,24 +544,24 @@ private struct NetworkCard: View {
     private func interfaceRow(_ sample: NetworkSample) -> some View {
         HStack(spacing: 10) {
             Text(sample.interfaceName)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 44, alignment: .leading)
             HStack(spacing: 3) {
                 Image(systemName: "arrow.down")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.ion)
                 Text(rateText(sample.bytesIn))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Halo.font(size: 11, design: .monospaced))
                     .foregroundStyle(Halo.textPrimary)
                     .frame(width: 76, alignment: .trailing)
             }
             HStack(spacing: 3) {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.volt)
                 Text(rateText(sample.bytesOut))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Halo.font(size: 11, design: .monospaced))
                     .foregroundStyle(Halo.textPrimary)
                     .frame(width: 76, alignment: .trailing)
             }

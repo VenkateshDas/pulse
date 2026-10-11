@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 
 /// Outcome of running one optimize task.
 public struct OptimizeResult: Sendable, Equatable {
@@ -70,25 +71,6 @@ public enum OptimizeEngine {
          "Interrupts active connections and degrades the user experience."),
     ]
 
-    // MARK: VPN detection (mole tasks.sh:119-131)
-
-    /// Bare utun presence over-reports VPNs (iCloud Private Relay, Continuity
-    /// also create utun). Use two narrow signals: an scutil network service
-    /// reporting Connected, OR the default route running over utun*.
-    public static func vpnActive() async -> Bool {
-        if let out = try? await Shell.run("/usr/sbin/scutil", ["--nc", "list"]),
-           out.stdout.contains("(Connected)") {
-            return true
-        }
-        if let out = try? await Shell.run("/sbin/route", ["-n", "get", "default"]) {
-            for line in out.stdout.split(separator: "\n") {
-                let t = line.trimmingCharacters(in: .whitespaces)
-                if t.hasPrefix("interface:"), t.contains("utun") { return true }
-            }
-        }
-        return false
-    }
-
     // MARK: Tasks
 
     public static let tasks: [OptimizeTask] = inProcessTasks + privilegedTasks
@@ -97,8 +79,8 @@ public enum OptimizeEngine {
     static let inProcessTasks: [OptimizeTask] = [
         OptimizeTask(
             id: "saved_state_cleanup",
-            label: "Clear old saved app state",
-            detail: "Move stale ~/Library/Saved Application State windows to the Trash (reversible).",
+            label: "Remove saved window state",
+            detail: "Move saved window state for closed apps to Trash. Those apps may stop reopening their previous windows. Restore before emptying Trash.",
             risk: .safe, needsSudo: false,
             skipCheck: {
                 let bytes = await dirBytes(savedStateDir)
@@ -110,77 +92,30 @@ public enum OptimizeEngine {
             },
             run: { await trashContents(of: savedStateDir, label: "saved app state") }),
 
-        OptimizeTask(
-            id: "quicklook_cache",
-            label: "Reset QuickLook thumbnails",
-            detail: "Rebuild the QuickLook thumbnail cache (fixes blank/stale previews).",
-            risk: .safe, needsSudo: false,
-            preview: { "Would run: qlmanage -r cache" },
-            run: {
-                let out = try await Shell.run("/usr/bin/qlmanage", ["-r", "cache"])
-                return OptimizeResult(success: out.ok,
-                                      summary: out.ok ? "QuickLook cache reset" : "qlmanage failed")
-            }),
-
-        OptimizeTask(
-            id: "dns_flush",
-            label: "Flush DNS cache",
-            detail: "Clear the directory-services DNS cache (dscacheutil).",
-            risk: .safe, needsSudo: false,
-            preview: { "Would run: dscacheutil -flushcache" },
-            run: {
-                let out = try await Shell.run("/usr/bin/dscacheutil", ["-flushcache"])
-                return OptimizeResult(success: out.ok,
-                                      summary: out.ok ? "DNS cache flushed" : "Flush failed")
-            }),
-
-        OptimizeTask(
-            id: "launch_services_rebuild",
-            label: "Rebuild \u{201C}Open With\u{201D} menu",
-            detail: "Re-register apps so the Launch Services database drops duplicate/stale entries.",
-            risk: .safe, needsSudo: false,
-            preview: { "Would run: lsregister -kill -r (user domain)" },
-            run: {
-                let out = try await Shell.run(lsregisterPath,
-                    ["-kill", "-r", "-domain", "local", "-domain", "user"])
-                return OptimizeResult(success: out.ok,
-                                      summary: out.ok ? "Launch Services rebuilt" : "Rebuild failed")
-            }),
+        unavailableTask(id: "quicklook_cache", label: "Reset file previews",
+            detail: "For blank Finder previews, reopen Finder or restart your Mac.", needsSudo: false),
+        unavailableTask(id: "dns_flush", label: "Reset network name cache",
+            detail: "For connection problems, review Internet readings and macOS Network settings.", needsSudo: false),
+        unavailableTask(id: "launch_services_rebuild", label: "Repair the Open With menu",
+            detail: "Review app associations in Finder’s Get Info window.", needsSudo: false),
     ]
 
-    /// Elevation-required. Routed through Authorization Services (an admin
-    /// password prompt) via PrivilegedRunner — works in any signed/unsigned build.
+    /// Kept visible with guidance, but never executes shell-backed maintenance.
     static let privilegedTasks: [OptimizeTask] = [
-        OptimizeTask(
-            id: "memory_pressure_relief",
-            label: "Free inactive memory",
-            detail: "Run `purge` to release inactive/cached memory back to the OS.",
-            risk: .careful, needsSudo: true,
-            preview: { "Would run: sudo purge (asks for your password)" },
-            run: { await PrivilegedRunner.run(.purgeMemory) }),
-
-        OptimizeTask(
-            id: "network_stack_optimize",
-            label: "Optimize network stack",
-            detail: "Flush the route table and ARP cache. Skipped while a VPN is active.",
-            risk: .careful, needsSudo: true,
-            skipCheck: { await vpnActive() ? "VPN active — network reset skipped" : nil },
-            preview: { "Would flush routes + arp -a -d (asks for your password)" },
-            run: { await PrivilegedRunner.run(.flushNetworkStack) }),
-
-        OptimizeTask(
-            id: "spotlight_index_optimize",
-            label: "Rebuild Spotlight index",
-            detail: "Reindex the boot volume — only when Spotlight reports slow or disabled.",
-            risk: .careful, needsSudo: true,
-            skipCheck: {
-                guard let out = try? await Shell.run("/usr/bin/mdutil", ["-s", "/"]) else { return nil }
-                // "Indexing enabled." means healthy → skip.
-                return out.stdout.contains("Indexing enabled") ? "Spotlight already healthy" : nil
-            },
-            preview: { "Would run: sudo mdutil -E / (asks for your password)" },
-            run: { await PrivilegedRunner.run(.rebuildSpotlightIndex) }),
+        unavailableTask(id: "memory_pressure_relief", label: "Release cached memory",
+            detail: "macOS manages cached memory. Review busy apps before closing anything.", needsSudo: true),
+        unavailableTask(id: "network_stack_optimize", label: "Reset network connections",
+            detail: "This can interrupt active work. Use macOS Network settings when needed.", needsSudo: true),
+        unavailableTask(id: "spotlight_index_optimize", label: "Rebuild Spotlight search",
+            detail: "Use Spotlight privacy settings to control indexing. Reindexing can take time and energy.", needsSudo: true),
     ]
+
+    private static func unavailableTask(id: String, label: String, detail: String, needsSudo: Bool) -> OptimizeTask {
+        OptimizeTask(id: id, label: label, detail: detail, risk: needsSudo ? .careful : .safe, needsSudo: needsSudo,
+            skipCheck: { "Unavailable: no supported native operation in Pulse." },
+            preview: { detail },
+            run: { OptimizeResult(success: false, summary: "Not run: no supported native operation in Pulse.") })
+    }
 
     /// Runs all safe (no-sudo) tasks sequentially, skipping any that report
     /// nothing to do. Returns a human-readable summary.
@@ -217,11 +152,6 @@ public enum OptimizeEngine {
         home.appendingPathComponent("Library/Saved Application State")
     }
 
-    /// CoreServices lsregister — stable path across recent macOS releases.
-    static let lsregisterPath =
-        "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/"
-        + "LaunchServices.framework/Support/lsregister"
-
     static func dirBytes(_ url: URL) async -> Int64 {
         await Task.detached(priority: .utility) {
             let fm = FileManager.default
@@ -244,7 +174,11 @@ public enum OptimizeEngine {
             return OptimizeResult(success: false, summary: "Couldn't read \(label)")
         }
         var movedBytes: Int64 = 0, moved = 0, failed = 0
+        let runningIDs = await MainActor.run { Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)) }
+        var skipped = 0
         for entry in entries {
+            let appID = entry.lastPathComponent.replacingOccurrences(of: ".savedState", with: "")
+            if runningIDs.contains(appID) { skipped += 1; continue }
             let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .fileAllocatedSizeKey])
             let bytes = values?.isDirectory == true ? await dirBytes(entry) : Int64(values?.fileAllocatedSize ?? 0)
             do {
@@ -253,7 +187,7 @@ public enum OptimizeEngine {
             } catch { failed += 1 }
         }
         return OptimizeResult(success: failed == 0,
-            summary: "Moved \(moved) \(label) item(s) to Trash; \(failed) failed. Space remains allocated.",
+            summary: "Moved \(moved) \(label) item(s) to Trash; \(failed) failed; \(skipped) active app(s) skipped. Space remains allocated.",
             trashed: moved > 0, bytesMovedToTrash: movedBytes)
     }
 }

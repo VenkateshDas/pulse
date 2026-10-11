@@ -49,6 +49,6 @@ final class DisplayModeManager {
     /// them to `.pro` so nothing changes underfoot. A fresh install (no
     /// onboarding-complete flag either) defaults to `.simple`.
     static func defaultMode(onboardingAlreadyComplete: Bool) -> DisplayMode {
-        onboardingAlreadyComplete ? .pro : .simple
+        .simple
     }
 }

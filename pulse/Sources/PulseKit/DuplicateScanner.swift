@@ -112,7 +112,7 @@ public final class DuplicateScanner: @unchecked Sendable {
         let rawGroups = try await buildFullHashGroups(headTailBuckets: headTailBuckets, progress: progress)
 
         // Stage 4: APFS Inode & Smart Auto-Selection Analysis
-        let finalGroups = processFinalGroups(rawGroups)
+        let finalGroups = try processFinalGroups(rawGroups)
         progress(ScanProgress(phase: .completed, processedFiles: totalCandidateFiles, totalFiles: totalCandidateFiles, foundDuplicates: finalGroups.count))
 
         return finalGroups
@@ -129,6 +129,7 @@ public final class DuplicateScanner: @unchecked Sendable {
         defer { pulse_blake3_free(ctx) }
 
         while let chunk = try handle.read(upToCount: 65536), !chunk.isEmpty {
+            try Task.checkCancellation()
             chunk.withUnsafeBytes { buffer in
                 if let ptr = buffer.baseAddress {
                     pulse_blake3_update(ctx, ptr, buffer.count)
@@ -188,6 +189,7 @@ public final class DuplicateScanner: @unchecked Sendable {
         let fileManager = FileManager.default
 
         for directory in directories {
+            try Task.checkCancellation()
             guard let enumerator = fileManager.enumerator(
                 at: directory,
                 includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey, .isPackageKey],
@@ -195,6 +197,7 @@ public final class DuplicateScanner: @unchecked Sendable {
             ) else { continue }
 
             while let fileURL = enumerator.nextObject() as? URL {
+                try Task.checkCancellation()
                 do {
                     let values = try fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey, .isPackageKey])
                     guard values.isRegularFile == true,
@@ -224,6 +227,7 @@ public final class DuplicateScanner: @unchecked Sendable {
 
         for (fileSize, urls) in sizeBuckets {
             for url in urls {
+                try Task.checkCancellation()
                 do {
                     let hash = try Self.hashHeadTail(at: url, fileSize: fileSize)
                     let key = "\(fileSize)_\(hash)"
@@ -252,6 +256,7 @@ public final class DuplicateScanner: @unchecked Sendable {
 
         for (_, urls) in headTailBuckets {
             for url in urls {
+                try Task.checkCancellation()
                 do {
                     let attributesBefore = try FileManager.default.attributesOfItem(atPath: url.path)
                     let modificationBefore = attributesBefore[.modificationDate] as? Date ?? .distantPast
@@ -279,7 +284,7 @@ public final class DuplicateScanner: @unchecked Sendable {
     }
 
     // Helper: Stage 4 APFS & Smart Selection Analysis
-    private func processFinalGroups(_ rawGroups: [String: [URL]]) -> [DuplicateGroup] {
+    private func processFinalGroups(_ rawGroups: [String: [URL]]) throws -> [DuplicateGroup] {
         var groups: [DuplicateGroup] = []
 
         for (hash, urls) in rawGroups {
@@ -289,6 +294,7 @@ public final class DuplicateScanner: @unchecked Sendable {
             var allCloneIDsKnown = true
 
             for url in urls {
+                try Task.checkCancellation()
                 var statBuf = stat()
                 if stat(url.path, &statBuf) == 0 {
                     let inode = UInt64(statBuf.st_ino)

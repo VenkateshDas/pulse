@@ -1,203 +1,132 @@
+import AppKit
 import SwiftUI
 import PulseKit
 
 struct DuplicateView: View {
     @Environment(StorageModel.self) private var storage
-    @State private var hasAutoScanned: Bool = false
+    @State private var directories: [URL] = [FileManager.SearchPathDirectory.downloadsDirectory, .documentDirectory, .desktopDirectory]
+        .compactMap { FileManager.default.urls(for: $0, in: .userDomainMask).first }
+    @State private var confirmRemoval = false
 
-    private var totalReclaimableBytes: Int64 {
-        storage.duplicateGroups.reduce(0) { $0 + $1.totalReclaimableBytes }
-    }
-
-    private var totalSelectedCount: Int {
-        storage.duplicateGroups.reduce(0) { count, group in
-            count + group.files.filter(\.isSelectedForDeletion).count
-        }
+    private var selectedCount: Int {
+        storage.duplicateGroups.reduce(0) { $0 + $1.files.filter(\.isSelectedForDeletion).count }
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerSection
-            
+        VStack(alignment: .leading, spacing: 16) {
+            PageHeader("Duplicate files", subtitle: "Find identical files. Keep the copies you need in their original locations.")
+            HStack {
+                Button("Choose folders…") { chooseFolders() }.buttonStyle(.bordered)
+                    .disabled(storage.isDuplicateScanning || storage.isRemovingDuplicates)
+                Text(directories.map(\.lastPathComponent).joined(separator: ", "))
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary).lineLimit(2)
+                Spacer()
+                if storage.isDuplicateScanning {
+                    Button("Stop scan") { storage.cancelDuplicateScan() }.buttonStyle(.bordered)
+                } else {
+                    Button("Find duplicates") { storage.startDuplicateScan(directories: directories) }
+                        .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
+                        .disabled(directories.isEmpty || storage.isRemovingDuplicates)
+                }
+            }
+            if let result = storage.duplicateStatusMessage { FeedbackBadge(message: result) }
             if storage.isDuplicateScanning {
-                progressSection
+                HStack(spacing: 12) {
+                    ProgressView().controlSize(.small)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(phaseTitle(storage.duplicateScanProgress?.phase)).font(Halo.font(size: 14, weight: .medium))
+                        if let progress = storage.duplicateScanProgress {
+                            Text("\(progress.processedFiles) files checked").font(Halo.font(size: 12)).monospacedDigit()
+                        }
+                    }
+                }
+                Spacer()
             } else if storage.duplicateGroups.isEmpty {
-                emptyStateSection
+                EmptyState(icon: "doc.on.doc", title: storage.didScanDuplicates ? "No duplicate groups to review" : "Choose where to look",
+                           hint: "Scanning does not remove files. Some protected or unreadable files may not be included.")
             } else {
-                resultsListSection
-            }
-        }
-        .padding(Halo.Space.lg)
-        .onAppear {
-            if !hasAutoScanned && storage.duplicateGroups.isEmpty && !storage.isDuplicateScanning {
-                hasAutoScanned = true
-                storage.startDuplicateScan()
-            }
-        }
-    }
-
-    private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Duplicate Finder")
-                    .font(.headline)
-                    .foregroundColor(Halo.textPrimary)
-                Text("BLAKE3 4-stage scan with APFS Copy-on-Write clone detection")
-                    .font(.caption)
-                    .foregroundColor(Halo.textDim)
-            }
-            Spacer()
-
-            if !storage.duplicateGroups.isEmpty && !storage.isDuplicateScanning {
-                Button(action: { storage.deleteSelectedDuplicates() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                        Text("Delete Selected (\(ByteFormat.string(UInt64(max(0, totalReclaimableBytes)))))")
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        ForEach(storage.duplicateGroups) { group in duplicateGroup(group) }
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(totalSelectedCount > 0 ? Color.red : Color.gray)
-                    .cornerRadius(Halo.Radius.medium)
                 }
-                .disabled(totalSelectedCount == 0)
-            }
-
-            Button(action: { storage.startDuplicateScan() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: storage.isDuplicateScanning ? "arrow.clockwise" : "magnifyingglass")
-                    Text(storage.isDuplicateScanning ? "Scanning..." : "Scan Duplicates")
-                }
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Halo.surface1)
-                .cornerRadius(Halo.Radius.medium)
-                .overlay(RoundedRectangle(cornerRadius: Halo.Radius.medium).stroke(Halo.borderSubtle, lineWidth: 1))
-            }
-            .disabled(storage.isDuplicateScanning)
-        }
-        .padding(.bottom, Halo.Space.md)
-    }
-
-    private var progressSection: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            ProgressView()
-                .scaleEffect(1.2)
-            
-            if let progress = storage.duplicateScanProgress {
-                VStack(spacing: 6) {
-                    Text(phaseTitle(progress.phase))
-                        .font(.headline)
-                        .foregroundColor(Halo.textPrimary)
-                    Text("\(progress.processedFiles) files processed · \(progress.foundDuplicates) duplicates found")
-                        .font(.subheadline)
-                        .foregroundColor(Halo.textDim)
+                HStack {
+                    Text("\(selectedCount) copies selected · removals go to Trash")
+                        .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                    Spacer()
+                    Button(storage.isRemovingDuplicates ? "Moving…" : "Review removal") { confirmRemoval = true }
+                        .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
+                        .disabled(selectedCount == 0 || storage.isRemovingDuplicates)
                 }
             }
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(24)
+        .background(Halo.void)
+        .confirmationDialog("Move \(selectedCount) duplicate copies to Trash?", isPresented: $confirmRemoval, titleVisibility: .visible) {
+            Button("Move to Trash") { storage.deleteSelectedDuplicates() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("One copy stays in each group. Pulse checks the contents again before moving selected copies. Review in Trash or Recent removals to recover them; storage is not freed until Trash is emptied.")
+        }
     }
 
-    private var emptyStateSection: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "doc.on.doc")
-                .font(.system(size: 44))
-                .foregroundColor(Halo.textDim)
-            Text("No Duplicates Found")
-                .font(.headline)
-                .foregroundColor(Halo.textPrimary)
-            Text("Click 'Scan Duplicates' to scan Downloads, Documents, and Desktop folders.")
-                .font(.subheadline)
-                .foregroundColor(Halo.textDim)
-                .multilineTextAlignment(.center)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var resultsListSection: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(storage.duplicateGroups) { group in
-                    VStack(alignment: .leading, spacing: 8) {
+    private func duplicateGroup(_ group: DuplicateScanner.DuplicateGroup) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(group.files.first?.url.lastPathComponent ?? "Identical files")
+                .font(Halo.font(size: 16, weight: .semibold)).foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if group.isAPFSClone {
+                Text("These copies share storage. Removing a copy may not increase available space.")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+            }
+            Text("Identical content can still be needed in different folders. Review each location.")
+                .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+            ForEach(group.files) { file in
+                HStack(alignment: .top, spacing: 12) {
+                    Toggle("Select \(file.url.lastPathComponent) in \(file.url.deletingLastPathComponent().path) for removal", isOn: Binding(
+                        get: { file.isSelectedForDeletion },
+                        set: { storage.toggleDuplicateSelection(groupId: group.id, fileId: file.id, isSelected: $0) }
+                    ))
+                    .labelsHidden().toggleStyle(.checkbox)
+                    .disabled(file.isKeepCandidate || storage.isRemovingDuplicates)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(file.url.path).font(Halo.font(size: 13)).foregroundStyle(Halo.textPrimary)
+                            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                        Text(ByteFormat.string(UInt64(max(0, file.fileSize)))).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
                         HStack {
-                            Text(group.files.first?.url.lastPathComponent ?? "Duplicate Group")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundColor(Halo.textPrimary)
-                            Spacer()
-                            if group.isAPFSClone {
-                                Text("APFS Clone (0B Reclaim)")
-                                    .font(.caption2.weight(.medium))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.2))
-                                    .foregroundColor(.blue)
-                                    .cornerRadius(4)
+                            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([file.url]) }.buttonStyle(.borderless)
+                            if file.isKeepCandidate {
+                                Label("Keeping this copy", systemImage: "checkmark.circle").foregroundStyle(Halo.nominal)
                             } else {
-                                Text("Reclaim: \(ByteFormat.string(UInt64(max(0, group.totalReclaimableBytes))))")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundColor(.green)
+                                Button("Keep this copy") { storage.retainDuplicate(groupId: group.id, fileId: file.id) }.buttonStyle(.borderless)
+                                    .disabled(storage.isRemovingDuplicates)
                             }
-                        }
-
-                        Divider()
-
-                        ForEach(group.files) { file in
-                            HStack(spacing: 10) {
-                                Toggle("", isOn: Binding(
-                                    get: { file.isSelectedForDeletion },
-                                    set: { newValue in
-                                        storage.toggleDuplicateSelection(groupId: group.id, fileId: file.id, isSelected: newValue)
-                                    }
-                                ))
-                                .labelsHidden()
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(file.url.path)
-                                        .font(.caption.monospaced())
-                                        .foregroundColor(Halo.textPrimary)
-                                        .lineLimit(1)
-                                        .truncationMode(.middle)
-                                    Text(ByteFormat.string(UInt64(max(0, file.fileSize))))
-                                        .font(.caption2)
-                                        .foregroundColor(Halo.textDim)
-                                }
-                                Spacer()
-
-                                if file.isKeepCandidate {
-                                    Text("KEEP")
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundColor(.green)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.green.opacity(0.15))
-                                        .cornerRadius(4)
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
+                        }.font(Halo.font(size: 12))
                     }
-                    .padding(Halo.Space.md)
-                    .background(Halo.surface1)
-                    .cornerRadius(Halo.Radius.medium)
-                    .overlay(RoundedRectangle(cornerRadius: Halo.Radius.medium).stroke(Halo.borderSubtle, lineWidth: 1))
                 }
+                Divider()
             }
         }
+        .accessibilityElement(children: .contain)
     }
 
-    private func phaseTitle(_ phase: DuplicateScanner.ScanProgress.Phase) -> String {
+    private func chooseFolders() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Choose folders"
+        if panel.runModal() == .OK { directories = panel.urls }
+    }
+
+    private func phaseTitle(_ phase: DuplicateScanner.ScanProgress.Phase?) -> String {
         switch phase {
-        case .indexing: return "Indexing directory files..."
-        case .sizeBucketing: return "Filtering by byte size..."
-        case .headTailHashing: return "Checking head & tail fingerprints..."
-        case .fullHashing: return "Streaming BLAKE3 hashes..."
-        case .completed: return "Scan Completed"
+        case .indexing: "Finding files…"
+        case .sizeBucketing: "Comparing file sizes…"
+        case .headTailHashing: "Checking possible matches…"
+        case .fullHashing: "Comparing file contents…"
+        case .completed: "Scan complete"
+        case nil: "Starting scan…"
         }
     }
 }
