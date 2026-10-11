@@ -1194,135 +1194,68 @@ private struct BenchmarkCard: View {
     @Environment(HealthModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("PERFORMANCE BENCHMARK")
-                    .font(Halo.font(size: 10, weight: .semibold))
-                    .foregroundStyle(Halo.textDim)
-                Spacer()
-                Text("CPU: SHA256 5s · Disk: 50 MB write · Memory: 256 MB copy")
-                    .font(Halo.font(size: 10, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Measure this Mac")
+                .font(Halo.font(size: 16, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+            Text("This short test deliberately makes your Mac busy: it uses one processor core for 5 seconds, writes a temporary 50 MB file, and copies a 256 MB memory buffer. Save your work and avoid running it during a call or other demanding task.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                model.runBenchmark()
+            } label: {
+                Label(model.benchmarkRunning ? "Testing performance…" : "Start performance test",
+                      systemImage: "gauge.with.needle")
             }
-
-            HStack(alignment: .center, spacing: 24) {
-                runButton
-
-                if let result = model.latestBenchmark {
-                    scoreBlock(result)
-                    Divider().overlay(Halo.surface2).frame(height: 48)
-                    fact("CPU HASH", String(format: "%.0f MB/s", result.cpuHashMBps))
-                    fact("DISK WRITE", String(format: "%.0f MB/s", result.diskWriteMBps))
-                    fact("MEM COPY", String(format: "%.1f GB/s", result.memCopyGBps))
-                } else if !model.benchmarkRunning {
-                    Text("No runs yet — results persist across launches")
-                        .font(Halo.font(size: 11))
-                        .foregroundStyle(Halo.textDim)
-                }
-
-                Spacer()
-
-                VStack(alignment: .leading, spacing: 4) {
-                    baselineFact("GOOD", "> 1000", "M1+ Class", color: Halo.pulseGreen)
-                    baselineFact("FAIR", "500-1000", "Older Intel", color: Halo.amber)
-                    baselineFact("LOW", "< 500", "Thermal Throttling", color: Halo.flare)
-                }
-                .padding(.leading, 16)
-                .frame(maxHeight: .infinity)
+            .buttonStyle(.borderedProminent)
+            .disabled(model.benchmarkRunning)
+            if model.benchmarkRunning {
+                ProgressView("Measuring processor, storage and memory…")
+                    .font(Halo.font(size: 13))
+                Text("The test finishes automatically. The previous result remains available below.")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
             }
-            .frame(maxHeight: .infinity)
+            if let result = model.latestBenchmark {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Last result · \(result.date.formatted(date: .abbreviated, time: .shortened))")
+                        .font(Halo.font(size: 14, weight: .medium))
+                    Text("Comparison score: \(result.score)")
+                        .font(Halo.font(size: 22, weight: .semibold)).monospacedDigit()
+                    if let previous = model.previousBenchmark, previous.score > 0 {
+                        let difference = result.score - previous.score
+                        Text("\(difference >= 0 ? "+" : "")\(difference) compared with the previous score of \(previous.score). Results vary with other apps, power mode and temperature.")
+                            .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                    }
+                    Text("This measures three synthetic tasks. It does not diagnose a fault or predict how every app will perform.")
+                        .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), alignment: .leading)], alignment: .leading, spacing: 16) {
+                        fact("Processor hashing", result.cpuHashMBps > 0 ? String(format: "%.0f MB/s", result.cpuHashMBps) : "Not measured")
+                        fact("Storage writing", result.diskWriteMBps > 0 ? String(format: "%.0f MB/s", result.diskWriteMBps) : "Not measured")
+                        fact("Memory copying", result.memCopyGBps > 0 ? String(format: "%.1f GB/s", result.memCopyGBps) : "Not measured")
+                    }
+                    DisclosureGroup("How the score is calculated") {
+                        Text("The score averages the three results against fixed reference speeds: processor \(Int(BenchmarkResult.references.cpuMBps)) MB/s, storage \(Int(BenchmarkResult.references.diskMBps)) MB/s and memory \(Int(BenchmarkResult.references.memGBps)) GB/s. Matching those reference speeds gives 1,000. These are comparison constants, not a health threshold.")
+                            .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(Halo.font(size: 13))
+                }
+            } else if !model.benchmarkRunning {
+                Text("No saved tests yet. Start a test when you want a result to compare later.")
+                    .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+            }
         }
+        .foregroundStyle(Halo.textPrimary)
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
 
-    private var runButton: some View {
-        Button {
-            model.runBenchmark()
-        } label: {
-            HStack(spacing: 6) {
-                if model.benchmarkRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "gauge.with.needle")
-                        .font(Halo.font(size: 11, weight: .bold))
-                }
-                Text(model.benchmarkRunning ? "Running…" : "Run Benchmark")
-                    .font(Halo.font(size: 11, weight: .bold))
-            }
-            .foregroundStyle(model.benchmarkRunning ? Halo.textDim : Halo.void)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(
-                model.benchmarkRunning ? AnyShapeStyle(Halo.surface2) : AnyShapeStyle(Halo.ion),
-                in: Capsule())
+    private func fact(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title).font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+            Text(value).font(Halo.font(size: 16, weight: .medium)).monospacedDigit()
         }
-        .buttonStyle(.plain)
-        .disabled(model.benchmarkRunning)
-        .help("~8 seconds; the CPU phase loads one core on purpose")
-    }
-
-    @ViewBuilder
-    private func scoreBlock(_ result: BenchmarkResult) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("SCORE")
-                .font(Halo.font(size: 9, weight: .semibold))
-                .foregroundStyle(Halo.textDim)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("\(result.score)")
-                    .font(Halo.font(size: 24, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Halo.ion)
-                if let previous = model.previousBenchmark, previous.score > 0 {
-                    let delta = result.score - previous.score
-                    Text(delta >= 0 ? "+\(delta)" : "\(delta)")
-                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(deltaColor(delta, baseline: previous.score))
-                        .help("vs previous run (\(previous.score))")
-                }
-            }
-            Text(result.date.formatted(date: .abbreviated, time: .shortened))
-                .font(Halo.font(size: 9, design: .monospaced))
-                .foregroundStyle(Halo.textDim)
-        }
-        .help("1000 ≈ base M1 — average of the three phases against fixed reference speeds")
-    }
-
-    private func deltaColor(_ delta: Int, baseline: Int) -> Color {
-        let fraction = Double(delta) / Double(baseline)
-        if fraction <= -0.10 { return Halo.amber }
-        if fraction >= 0.10 { return Halo.pulseGreen }
-        return Halo.textDim
-    }
-
-    private func fact(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(Halo.font(size: 9, weight: .semibold))
-                .foregroundStyle(Halo.textDim)
-            Text(value)
-                .font(Halo.font(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.textPrimary)
-        }
-    }
-
-    private func baselineFact(_ label: String, _ score: String, _ desc: String, color: Color) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-            Text(label)
-                .font(Halo.font(size: 10, weight: .bold))
-                .foregroundStyle(color)
-                .frame(width: 45, alignment: .leading)
-            Text(score)
-                .font(Halo.font(size: 10, design: .monospaced))
-                .foregroundStyle(Halo.textPrimary)
-                .frame(width: 60, alignment: .leading)
-            Text(desc)
-                .font(Halo.font(size: 10))
-                .foregroundStyle(Halo.textDim)
-        }
+        .accessibilityElement(children: .combine)
     }
 }

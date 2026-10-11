@@ -149,7 +149,7 @@ struct MenuBarContent: View {
     private var topAttentionItem: AttentionItem? { model.attentionItems.first }
 
     private var hud: some View {
-        let condition = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil)
+        let condition = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("Pulse", systemImage: "waveform.path.ecg")

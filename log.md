@@ -125,3 +125,5 @@ Final recovery refinement: make test passed 354 tests in 80 suites; Battery over
 ## [2026-10-11] Verify native display accessibility and improve history/startup controls | Native NSSlider exposes adjustable role/value in release AX tree. Activity breakdowns now native buttons with chart summary; startup helpers use named switches, pending guards and coverage/effect guidance. Restored 2-second sample/chart alignment with sparse process enumeration. Debug builds pass; full test rerun active.
 
 Accessibility checkpoint validation: make test passes 354 tests in 80 suites. Activity/Startup release layout and final cadence CPU/RSS remain pending.
+
+## [2026-10-11] Clarify performance test and recorded attention | Replaced unsupported benchmark ratings with adaptive measurements and method/effect explanations. Home/menu-bar summaries distinguish recorded attention from clear current readings. Added three regressions; 357 tests in 81 suites pass.

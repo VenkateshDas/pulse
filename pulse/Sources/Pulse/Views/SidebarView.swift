@@ -123,7 +123,7 @@ struct SidebarView: View {
         guard model.snapshot != nil else { return "Checking your Mac…" }
         return Self.statusText(mode: .simple,
                               hasCritical: model.diagnosis.severity == .critical,
-                              hasWarning: model.diagnosis.severity == .warn)
+                              hasWarning: model.diagnosis.severity == .warn || !model.attentionItems.isEmpty)
     }
 
     private var statusSymbol: String {

@@ -57,7 +57,7 @@ struct DashboardView: View {
 
 
     private var condition: some View {
-        let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil)
+        let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
         return VStack(alignment: .leading, spacing: 14) {
             Label(state.title, systemImage: state.symbol)
                 .font(Halo.font(size: 22, weight: .semibold))
@@ -695,9 +695,11 @@ struct DashboardView: View {
 struct HomeCondition {
     let diagnosis: Diagnosis
     let hasSnapshot: Bool
+    var hasAttention: Bool = false
 
     var title: String {
         guard hasSnapshot else { return "Checking your Mac…" }
+        if diagnosis.severity == .clear && hasAttention { return "There is something to review" }
         switch diagnosis.severity {
         case .critical: return "Your Mac needs attention"
         case .warn: return "Something is worth a look"
@@ -705,9 +707,12 @@ struct HomeCondition {
         case .clear: return "No urgent issues detected"
         }
     }
-    var symbol: String { !hasSnapshot ? "clock" : (diagnosis.severity >= .warn ? "exclamationmark.circle" : "checkmark.circle") }
+    var symbol: String { !hasSnapshot ? "clock" : (diagnosis.severity >= .warn || hasAttention ? "exclamationmark.circle" : "checkmark.circle") }
     var explanation: String {
         guard hasSnapshot else { return "Pulse is reading your Mac's current activity. Your files and settings stay unchanged." }
+        if diagnosis.severity == .clear && hasAttention {
+            return "Current readings show no urgent problem, but Pulse has recorded something worth reviewing below. Check the details before making a change."
+        }
         switch diagnosis.factor {
         case .cpu: return "Your processor is busy. Review app activity to see what is using it; a brief spike can be normal."
         case .memory: return "Apps are putting memory under pressure or using more over time. Review app activity before closing anything; the largest app is not necessarily the cause."
