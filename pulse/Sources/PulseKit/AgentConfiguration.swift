@@ -82,7 +82,7 @@ public enum AgentConfiguration {
                 if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: value) }
             }
             Task {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(interactive ? 30 : 5))
                 if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: "") }
             }
         }
