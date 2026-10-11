@@ -34,6 +34,7 @@ The main application: a native macOS command center for performance and storage 
   - [pulse_architecture.tldraw](file:///Users/venkateshmurugadas/software_codes/mac-monitor/pulse_architecture.tldraw) (Interactive architecture & animated flow)
 
 ### [Specifications & Research](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs)
+- **Accessible whole-app redesign (2026-10-11, proposed):** [Research, complete surface audit, task-led navigation, interaction design, visual tokens, implementation order, and validation gates](docs/superpowers/specs/2026-10-11-accessible-pulse-redesign.md). Branch `feat/accessible-pulse-redesign` starts from latest `main` (`ef7ac5c`). Awaiting design approval; UI implementation has not started.
 - **Product Spec (v3.0):** [product_spec.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/product_spec.html) — authoritative implementation specification containing the full v1.0 state, HALO design tokens, and detailed feature specs.
 - **Mole Super-Spec:** [pulse-mole-super-spec.html](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/pulse-mole-super-spec.html) — port specification from Mole (F1–F8). All phases shipped except GPU sensor (F7, root-only `powermetrics`).
 - **BLAKE3 Spec:** [blake3-duplicate-finder-spec.md](file:///Users/venkateshmurugadas/software_codes/mac-monitor/docs/blake3-duplicate-finder-spec.md) — prod & tech spec for 4-stage BLAKE3 duplicate file finder.
