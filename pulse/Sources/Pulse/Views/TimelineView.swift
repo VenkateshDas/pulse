@@ -34,7 +34,7 @@ struct TimelineView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     removalHistory
                     weekSummaryCard
-                    sectionLabel("DAILY HISTORY · NEWEST FIRST")
+                    sectionLabel("Daily history · newest first")
                     todayCard
                     if !pastEntries.isEmpty {
                         pastDaysCard
@@ -179,13 +179,13 @@ struct TimelineView: View {
         let weekDisk = model.weeklyDeltaBytes
 
         return VStack(alignment: .leading, spacing: 12) {
-            Text("PAST 7 DAYS")
+            Text("Past 7 days")
                 .font(Halo.font(size: 10, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
 
             HStack(spacing: 10) {
                 summaryCell(
-                    label: "Disk grew",
+                    label: "Storage change",
                     value: weekDisk == 0
                         ? "—"
                         : "\(weekDisk > 0 ? "+" : "−")\(ByteFormat.string(UInt64(abs(weekDisk))))",
@@ -197,18 +197,18 @@ struct TimelineView: View {
                     color: Halo.ion
                 )
                 summaryCell(
-                    label: "Avg/day",
+                    label: "Daily battery average",
                     value: avgBattery.map { String(format: "%.1f h", $0) } ?? "—",
                     color: Halo.textPrimary
                 )
                 if let bench = healthModel.latestBenchmark {
                     summaryCell(
-                        label: "Benchmark",
+                        label: "Latest performance test",
                         value: "\(bench.score)",
                         color: bench.score >= 1000 ? Halo.pulseGreen : bench.score >= 500 ? Halo.amber : Halo.flare
                     )
                 } else {
-                    summaryCell(label: "Benchmark", value: "—", color: Halo.textDim)
+                    summaryCell(label: "Latest performance test", value: "—", color: Halo.textDim)
                 }
             }
         }
@@ -371,6 +371,12 @@ struct TimelineView: View {
         let isExpanded = expandable && expandedDays.contains(entry.date)
 
         return VStack(spacing: 4) {
+            Button {
+                withAnimation(Halo.Motion.snappy) {
+                    if isExpanded { expandedDays.remove(entry.date) }
+                    else { expandedDays.insert(entry.date) }
+                }
+            } label: {
             HStack(spacing: 10) {
                 HStack(spacing: 5) {
                     if expandable {
@@ -398,7 +404,7 @@ struct TimelineView: View {
                 }
 
                 if isSpike {
-                    Text("SPIKE")
+                    Text("Large change")
                         .font(Halo.font(size: 9, weight: .bold))
                         .foregroundStyle(Halo.flare)
                         .padding(.horizontal, 5).padding(.vertical, 2)
@@ -426,6 +432,13 @@ struct TimelineView: View {
                 }
             }
 
+            }
+            .buttonStyle(.plain)
+            .disabled(!expandable)
+            .accessibilityLabel("\(pastDateString(entry.date)), storage change \(entry.diskDeltaBytes.map(deltaSub) ?? "not recorded"), battery time \(entry.batteryHours.map { String(format: "%.1f hours", $0) } ?? "not recorded")")
+            .accessibilityValue(expandable ? (isExpanded ? "Details expanded" : "Details collapsed") : "")
+            .help("Show recorded storage details for this day")
+
             // Delta bar
             GeometryReader { geo in
                 HStack(spacing: 0) {
@@ -448,17 +461,6 @@ struct TimelineView: View {
                 .frame(height: 0.5)
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            guard expandable else { return }
-            withAnimation(Halo.Motion.snappy) {
-                if isExpanded {
-                    expandedDays.remove(entry.date)
-                } else {
-                    expandedDays.insert(entry.date)
-                }
-            }
-        }
-        .help(expandable ? "Click for the per-folder breakdown of this change" : "")
     }
 
     // MARK: - Growth attribution ("where it changed")
@@ -569,7 +571,7 @@ struct TimelineView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("DISK USED · \(model.snapshots.count)-DAY TREND")
+                Text("Storage used · \(model.snapshots.count) recorded days")
                     .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
@@ -589,6 +591,8 @@ struct TimelineView: View {
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 56, alignment: .trailing)
                 HistoryChart(values: series, color: Halo.ion, maxValue: scale)
+                    .accessibilityLabel("Recorded storage usage")
+                    .accessibilityValue(model.snapshots.last.map { "Latest recorded use \(ByteFormat.string($0.totalUsedBytes)). Readings are daily snapshots, not continuous tracking." } ?? "No readings")
             }
             .frame(height: 90)
         }

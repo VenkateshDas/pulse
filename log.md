@@ -119,3 +119,9 @@
 ## [2026-10-11] Harden GUI removal recovery | Native app and related-file Trash moves now journal atomically with rollback. Finder permission events run on MainActor only for denied file moves. Added three recovery fixtures; 354-test suite passed before final error typing. Release UI verified Internet first layer; visible RSS exceeds budget and remains an open gate.
 
 Final recovery refinement: make test passed 354 tests in 80 suites; Battery overview disclosures and charge-history accessibility were checked in the release app.
+
+## [2026-10-11] Display accessibility audit | Runtime revealed brightness slider missing from accessibility tree despite visual rendering. Simplified grouping and labels; matching disabled without external screen. Native heap inspection identified activity-store retention as a performance investigation lead; budget remains unverified.
+
+## [2026-10-11] Verify native display accessibility and improve history/startup controls | Native NSSlider exposes adjustable role/value in release AX tree. Activity breakdowns now native buttons with chart summary; startup helpers use named switches, pending guards and coverage/effect guidance. Restored 2-second sample/chart alignment with sparse process enumeration. Debug builds pass; full test rerun active.
+
+Accessibility checkpoint validation: make test passes 354 tests in 80 suites. Activity/Startup release layout and final cadence CPU/RSS remain pending.

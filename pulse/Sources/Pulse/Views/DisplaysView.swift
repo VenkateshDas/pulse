@@ -21,6 +21,9 @@ struct DisplaysView: View {
                     }
                 }
                 .toggleStyle(.switch)
+                .accessibilityLabel("Match built-in brightness")
+                .accessibilityHint("External screens follow the built-in screen. A manual adjustment stops matching.")
+                .disabled(!brightnessEngine.monitors.contains { !$0.isBuiltIn })
                 .padding()
 
                 Divider().overlay(Halo.borderSubtle)

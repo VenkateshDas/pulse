@@ -126,15 +126,15 @@ final class DashboardModel {
     var actionFeedback: String?
 
     static let historyLength = 900
-    static let activeInterval: Duration = .seconds(3)
-    static let idleInterval: Duration = .seconds(5)
+    static let activeInterval: Duration = .seconds(2)
+    static let idleInterval: Duration = .seconds(2)
     /// Screen locked: nobody can see the menu bar or any window, so the loop
     /// drops to a slow keep-alive tick that only maintains battery bookkeeping.
     static let lockedInterval: Duration = .seconds(30)
-    static let processEveryNTicks = 3
+    static let processEveryNTicks = 5
     /// No window open: the menu bar integer is the only consumer, so process
     /// enumeration (~every pid × proc_pidinfo) can run less often.
-    static let idleProcessEveryNTicks = 5
+    static let idleProcessEveryNTicks = 12
     /// Sample gap accepted as continuous live use for battery crediting.
     /// Must exceed the longest sampling interval (locked, 30s) with margin.
     static let maxSampleGapSeconds: TimeInterval = 45

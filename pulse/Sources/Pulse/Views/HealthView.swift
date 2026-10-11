@@ -1103,40 +1103,33 @@ private struct BatterySessionsCard: View {
     }
 }
 
-// MARK: - Startup items card
+// MARK: - Startup helpers
 
 private struct StartupItemsCard: View {
     @Environment(HealthModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Text("STARTUP ITEMS")
-                    .font(Halo.font(size: 10, weight: .semibold))
-                    .foregroundStyle(Halo.textDim)
-                Text("\(model.startupItems.count)")
-                    .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.ion)
-                Spacer()
-                if let feedback = model.actionFeedback {
-                    FeedbackBadge(message: feedback)
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Background helpers · \(model.startupItems.count)")
+                .font(Halo.font(size: 16, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
+            Text("These are launch helpers, not a complete list of login apps. Changes take effect the next time you sign in; a helper already running may continue until then. You can turn a personal helper back on here.")
+                .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+            if let feedback = model.actionFeedback {
+                Text(feedback).font(Halo.font(size: 13))
+                    .foregroundStyle(Halo.textPrimary)
+                    .textSelection(.enabled)
             }
-
-            columnHeader
-
             if model.startupItems.isEmpty {
-                Text("No launch agents installed")
-                    .font(Halo.font(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+                Text("No helpers found in the checked LaunchAgents folders. Other login apps may appear in System Settings → General → Login Items & Extensions.")
+                    .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
             } else {
-                // No inner ScrollView — the card grows with its rows and the
-                // page is the single scroll surface (avoids nested scrolling).
-                LazyVStack(spacing: 2) {
+                LazyVStack(spacing: 16) {
                     ForEach(model.startupItems) { item in
-                        StartupItemRow(item: item) { model.toggle(item) }
+                        StartupItemRow(item: item, changing: model.changingStartupItems.contains(item.id)) {
+                            model.toggle(item)
+                        }
+                        if item.id != model.startupItems.last?.id { Divider() }
                     }
                 }
             }
@@ -1145,84 +1138,53 @@ private struct StartupItemsCard: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
-
-    private var columnHeader: some View {
-        HStack(spacing: 10) {
-            Text("ITEM").frame(maxWidth: .infinity, alignment: .leading)
-            Text("KIND").frame(width: 110, alignment: .leading)
-            Text("STATUS").frame(width: 76, alignment: .leading)
-            Text("").frame(width: 60)
-        }
-        .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
-        .foregroundStyle(Halo.textDim)
-        .padding(.horizontal, 8)
-    }
 }
 
 private struct StartupItemRow: View {
     let item: StartupItem
+    let changing: Bool
     let toggle: () -> Void
 
+    private var title: String {
+        guard let program = item.program, let appEnd = program.range(of: ".app/") else { return item.label }
+        return URL(fileURLWithPath: String(program[..<appEnd.lowerBound])).lastPathComponent
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.label)
-                    .font(Halo.font(size: 12))
-                    .foregroundStyle(Halo.textPrimary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if let program = item.program {
-                    Text(program)
-                        .font(Halo.font(size: 9, design: .monospaced))
-                        .foregroundStyle(Halo.textDim)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(item.kind == .userAgent ? "Launch Agent" : "Global Agent")
-                .font(Halo.font(size: 10, design: .monospaced))
-                .foregroundStyle(Halo.textDim)
-                .frame(width: 110, alignment: .leading)
-
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(item.isEnabled ? Halo.pulseGreen : Halo.textDim.opacity(0.5))
-                    .frame(width: 5, height: 5)
-                Text(item.isEnabled ? "Enabled" : "Disabled")
-                    .font(Halo.font(size: 10, design: .monospaced))
-                    .foregroundStyle(item.isEnabled ? Halo.textPrimary : Halo.textDim)
-            }
-            .frame(width: 76, alignment: .leading)
-
+        VStack(alignment: .leading, spacing: 8) {
             if item.kind == .userAgent {
-                Button(action: toggle) {
-                    Text(item.isEnabled ? "Off" : "On")
-                        .font(Halo.font(size: 10, weight: .bold))
-                        .foregroundStyle(item.isEnabled ? Halo.flare : Halo.pulseGreen)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(
-                            (item.isEnabled ? Halo.flare : Halo.pulseGreen).opacity(0.12),
-                            in: Capsule())
+                Toggle(isOn: Binding(get: { item.isEnabled }, set: { _ in toggle() })) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title).font(Halo.font(size: 14, weight: .medium))
+                        Text(changing ? "Applying change…" : "Start this helper when you sign in")
+                            .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                    }
                 }
-                .buttonStyle(.plain)
-                .help(
-                    item.isEnabled
-                        ? "Disable — renames the plist; applies at next login"
-                        : "Enable — restores the plist; applies at next login")
-                .frame(width: 60)
+                .toggleStyle(.switch)
+                .disabled(changing)
+                .accessibilityLabel("Start \(title) helper when you sign in")
+                .accessibilityHint("Changes apply at next sign-in. This does not stop a running helper.")
             } else {
-                Image(systemName: "lock")
-                    .font(Halo.font(size: 10))
-                    .foregroundStyle(Halo.textDim)
-                    .help("System-wide agent — changing it needs admin rights")
-                    .frame(width: 60)
+                Text(title).font(Halo.font(size: 14, weight: .medium))
+                Label("Installed for everyone · \(item.isEnabled ? "enabled" : "disabled") · read only", systemImage: "lock")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                Text("Manage this helper through its app or macOS Login Items settings.")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
             }
+            DisclosureGroup("Helper details") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Identifier: \(item.label)")
+                    if let program = item.program { Text("Program: \(program)") }
+                    Text("Configuration: \(item.path)")
+                }
+                .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(Halo.font(size: 12))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .foregroundStyle(Halo.textPrimary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
