@@ -147,3 +147,7 @@ Release verification: 12 alternating Cleanup scroll passes and four Files passes
 ## [2026-10-11] Capture recurring Cleanup layout freeze | User recurrence captured PID 23631 at 100% CPU. Five-second sample: main-thread SwiftUI layout sizing/transaction loop, not icon I/O. Prior optimisation did not resolve freeze. Replace nested scroll/lazy stacks with native List sections, preserving category collapse and row actions. Release verification pending.
 
 Native-list release built and relaunched. Keyboard End reaches lower rows with icons/actions rendered. Post-change three-second sample shows main thread waiting in event loop, CPU observation 0%, unlike captured 100% layout loop. Wheel stress automation fails with noWindowsAvailable; full trackpad recurrence verification remains user gate.
+
+## [2026-10-11] Correct Ask Pulse lazy message layout | Captured PID 26445 at 98.7% CPU with main thread repeatedly in LazySubviewPlacements/SwiftUI graph updates. Replace message ScrollView/LazyVStack with native List, stable wrapping and inline Markdown with preserved paragraphs after stream completion. Tool disclosures and approval controls retained. Release verification pending.
+
+## [2026-10-11] Collapse Ask Pulse tool calls | Group consecutive tools behind collapsed native disclosures, keep individual results expandable and approvals visible. Release bundle and all 364 tests across 85 suites pass. Removed an invalid test assumption that NSCache cannot evict under memory pressure; off-main icon lookup and thumbnail checks remain.

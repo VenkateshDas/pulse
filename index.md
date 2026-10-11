@@ -100,3 +100,7 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Storage scrolling (2026-10-11):** Cleanup categories/protected rows use lazy stacks; hover is row-local. Cleanup, Files, Changes and storage inspectors resolve/rasterise file icons asynchronously, retain per-row thumbnails and share a bounded cache. Regression verifies off-main lookup and cache reuse. Previous full freeze was not reproduced after restart; runtime stress evidence is tracked in the redesign plan.
 
 - **Cleanup freeze correction:** live recurrence at 100% CPU captured main-thread SwiftUI lazy layout sizing. Cleanup now uses native List sections instead of nested lazy ScrollView stacks; icon work remains asynchronous.
+
+- **Ask Pulse timeline correction:** Native List replaces lazy message layout after live hang capture. Answer text wraps vertically and renders inline Markdown off-main after streaming, retaining paragraph breaks; provider/actions unchanged.
+
+- **Ask Pulse tool calls:** Consecutive calls are grouped behind a native disclosure, collapsed by default. Each result has its own disclosure; answers and action approvals remain visible.

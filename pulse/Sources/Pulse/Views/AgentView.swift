@@ -47,13 +47,25 @@ struct AgentView: View {
 
     private var timeline: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Halo.Space.md) {
-                    if model.items.isEmpty { welcome }
-                    ForEach(model.items) { item in card(item) }
-                    Color.clear.frame(height: 1).id("end")
-                }.padding(Halo.Space.xxl)
+            List {
+                if model.items.isEmpty { welcome }
+                ForEach(Array(model.items.enumerated()), id: \.element.id) { index, item in
+                    if item.kind != .tool {
+                        card(item)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .padding(.vertical, 6)
+                    } else if index == 0 || model.items[index - 1].kind != .tool {
+                        AgentToolCalls(items: Array(model.items[index...].prefix { $0.kind == .tool }))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .padding(.vertical, 6)
+                    }
+                }
+                Color.clear.frame(height: 1).id("end").listRowSeparator(.hidden)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .overlay(alignment: .bottomTrailing) {
                 if !model.items.isEmpty {
                     Button("Jump to latest") { proxy.scrollTo("end", anchor: .bottom) }
@@ -80,7 +92,7 @@ struct AgentView: View {
     @ViewBuilder private func card(_ item: AgentTimelineItem) -> some View {
         switch item.kind {
         case .user:
-            Text(item.title).font(Halo.font(size: 14)).foregroundStyle(Halo.onAccent).padding(10)
+            Text(item.title).font(Halo.font(size: 14)).fixedSize(horizontal: false, vertical: true).foregroundStyle(Halo.onAccent).padding(10)
                 .background(Halo.interactive, in: RoundedRectangle(cornerRadius: Halo.Radius.medium)).frame(maxWidth: .infinity, alignment: .trailing)
                 .accessibilityLabel("You: \(item.title)")
         case .approval:
@@ -95,18 +107,16 @@ struct AgentView: View {
                         .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
                 }.disabled(model.state != .awaitingApproval || model.items.last(where: { $0.kind == .approval })?.id != item.id)
             }.premiumCard().frame(maxWidth: 620)
-        case .tool:
-            DisclosureGroup(isExpanded: Binding(get: { item.isExpanded }, set: { _ in model.toggleExpansion(id: item.id) })) {
-                Text(item.detail.isEmpty && item.isRunning ? "Working…" : item.detail)
-                    .font(Halo.font(size: 12, design: .monospaced)).foregroundStyle(Halo.textPrimary)
-                    .textSelection(.enabled).padding(.top, Halo.Space.xs)
-            } label: {
-                Label(item.title, systemImage: icon(for: item.kind)).font(Halo.font(size: 12, weight: .semibold)).foregroundStyle(color(for: item.kind))
-            }.premiumCard(padding: Halo.Space.md).frame(maxWidth: 620)
         default:
             VStack(alignment: .leading, spacing: 5) {
                 if !item.title.isEmpty { Label(item.title, systemImage: icon(for: item.kind)).font(Halo.font(size: 12, weight: .semibold)).foregroundStyle(color(for: item.kind)) }
-                Text(item.detail.isEmpty && item.isRunning ? "Working…" : item.detail).font(Halo.font(size: item.kind == .answer ? 14 : 12, design: item.kind == .tool ? .monospaced : .default)).foregroundStyle(Halo.textPrimary).textSelection(.enabled)
+                AgentMessageText(text: item.detail.isEmpty && item.isRunning ? "Working…" : item.detail,
+                                 formatted: item.kind == .answer && !model.isBusy)
+                    .font(Halo.font(size: item.kind == .answer ? 14 : 12))
+                    .foregroundStyle(Halo.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
             }.premiumCard(padding: Halo.Space.md).frame(maxWidth: item.kind == .answer ? 720 : 620)
         }
     }
@@ -127,4 +137,53 @@ struct AgentView: View {
     }
     private func icon(for kind: AgentTimelineItem.Kind) -> String { switch kind { case .answer: "sparkles"; case .progress: "ellipsis"; case .tool: "wrench.and.screwdriver"; case .error: "exclamationmark.triangle"; default: "circle" } }
     private func color(for kind: AgentTimelineItem.Kind) -> Color { kind == .error ? Halo.flare : kind == .tool ? Halo.interactive : Halo.textSecondary }
+}
+
+/// Native disclosures start collapsed; streaming results never open them.
+private struct AgentToolCalls: View {
+    let items: [AgentTimelineItem]
+    @State private var expanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            ForEach(items) { item in
+                DisclosureGroup {
+                    Text(item.detail.isEmpty && item.isRunning ? "Working…" : item.detail)
+                        .font(Halo.font(size: 12, design: .monospaced))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                } label: {
+                    Label(item.title, systemImage: item.isRunning ? "hourglass" : "wrench.and.screwdriver")
+                }
+                .padding(.vertical, Halo.Space.xs)
+            }
+        } label: {
+            Label("Tool calls (\(items.count))", systemImage: items.contains(where: \.isRunning) ? "hourglass" : "wrench.and.screwdriver")
+                .font(Halo.font(size: 12, weight: .semibold))
+        }
+        .foregroundStyle(Halo.textPrimary)
+        .premiumCard(padding: Halo.Space.md)
+        .frame(maxWidth: 620, alignment: .leading)
+    }
+}
+
+/// Preserve paragraphs while rendering inline Markdown; stream text cheaply.
+private struct AgentMessageText: View {
+    let text: String
+    let formatted: Bool
+    @State private var rendered: AttributedString?
+
+    var body: some View {
+        Text(formatted ? (rendered ?? AttributedString(text)) : AttributedString(text))
+            .task(id: "\(formatted)-\(text)") {
+                guard formatted else { rendered = nil; return }
+                let source = text
+                let result = await Task.detached(priority: .utility) {
+                    (try? AttributedString(markdown: source,
+                        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(source)
+                }.value
+                guard !Task.isCancelled else { return }
+                rendered = result
+            }
+    }
 }
