@@ -18,11 +18,11 @@ struct DisplayModeManagerTests {
         #expect(manager.current == .simple)
     }
 
-    @Test func existingInstallDefaultsToPro() {
+    @Test func existingInstallWithoutExplicitChoiceDefaultsToCollapsedDetails() {
         let defaults = makeSuite()
         defaults.set(true, forKey: OnboardingView.completeKey)
         let manager = DisplayModeManager(defaults: defaults)
-        #expect(manager.current == .pro)
+        #expect(manager.current == .simple)
     }
 
     @Test func explicitChoiceWinsOverExistingInstallDefault() {

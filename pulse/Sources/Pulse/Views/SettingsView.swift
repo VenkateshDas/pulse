@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var agentAPIKey = AgentConfiguration.apiKey
     @State private var agentModel = AgentConfiguration.model
     @State private var agentStatus: String?
+    @State private var savingAgentSettings = false
 
     private static let autoHideOptions: [TimeInterval] = [0, 5, 10, 15, 30]
     private static let maxItemsOptions = [1, 2, 3, 4, 5]
@@ -32,6 +33,7 @@ struct SettingsView: View {
         // Registers an Observation dependency so the theme cards' selection
         // state (checkmark) updates immediately on tap.
         let _ = ThemeManager.shared.selected
+        let _ = ThemeManager.shared.largerText
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 PageHeader(
@@ -64,6 +66,11 @@ struct SettingsView: View {
 
     private var appearanceSection: some View {
         section("Appearance", icon: "paintpalette.fill", tint: Halo.interactive) {
+            settingsRow(title: "Larger text", detail: "Increase text size throughout Pulse.") {
+                Toggle("Larger text", isOn: Binding(get: { ThemeManager.shared.largerText }, set: { ThemeManager.shared.setLargerText($0) }))
+                    .labelsHidden().toggleStyle(.switch)
+            }
+            rowDivider
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(AppTheme.allCases) { theme in
                     themeCard(theme)
@@ -77,13 +84,13 @@ struct SettingsView: View {
     private var displayModeSection: some View {
         let mode = DisplayModeManager.shared.current
         return section(
-            "Display Mode", icon: "eye.fill", tint: Halo.interactive,
-            footnote: "Switch anytime — nothing is removed, only shown or hidden."
+            "Technical details", icon: "eye.fill", tint: Halo.interactive,
+            footnote: "Choose whether technical readings start expanded. Everyday explanations stay the same."
         ) {
-            settingsRow(title: "Interface", detail: mode.subtitle) {
-                Picker("", selection: displayModeBinding) {
+            settingsRow(title: "Default detail", detail: mode.subtitle) {
+                Picker("Default technical detail", selection: displayModeBinding) {
                     ForEach(DisplayMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Text(mode == .simple ? "Collapsed" : "Expanded").tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -110,7 +117,7 @@ struct SettingsView: View {
                 HStack(spacing: 6) {
                     swatch(palette.void.dark)
                     swatch(palette.surface2.dark)
-                    swatch(Color(hex: palette.interactive))
+                    swatch(palette.interactive.dark)
                     Spacer()
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
@@ -118,7 +125,7 @@ struct SettingsView: View {
                     }
                 }
                 Text(theme.displayName)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Halo.font(size: 12, weight: .medium))
                     .foregroundStyle(Halo.textPrimary)
             }
             .padding(10)
@@ -191,8 +198,8 @@ struct SettingsView: View {
 
     private var agentSection: some View {
         section(
-            "Pulse Agent", icon: "sparkles", tint: Halo.interactive,
-            footnote: "Provider key stays in this Mac's Keychain. Pulse sends it only to its local Agent runtime."
+            "Ask Pulse provider", icon: "sparkles", tint: Halo.interactive,
+            footnote: "The API key is stored in this Mac’s Keychain. Your provider receives questions and requested diagnostic results. Provider charges may apply."
         ) {
             settingsRow(title: "Provider", detail: "OpenRouter-compatible OpenAI endpoint.") {
                 Button("Use OpenRouter") {
@@ -203,29 +210,34 @@ struct SettingsView: View {
             }
             rowDivider
             VStack(alignment: .leading, spacing: 6) {
-                Text("Base URL").font(.system(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                Text("Base URL").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 TextField("https://openrouter.ai/api/v1", text: $agentBaseURL)
+                    .accessibilityLabel("Provider base URL")
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(Halo.font(size: 12, design: .monospaced))
             }
             rowDivider
             VStack(alignment: .leading, spacing: 6) {
-                Text("API Key").font(.system(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                Text("API Key").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 SecureField("sk-or-v1-…", text: $agentAPIKey)
+                    .accessibilityLabel("Provider API key")
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(Halo.font(size: 12, design: .monospaced))
             }
             rowDivider
             VStack(alignment: .leading, spacing: 6) {
-                Text("Model").font(.system(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                Text("Model").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 TextField("openai/gpt-4.1-mini", text: $agentModel)
+                    .accessibilityLabel("Provider model")
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(Halo.font(size: 12, design: .monospaced))
             }
             HStack {
-                Button("Save Agent Settings") { saveAgentSettings() }
-                    .buttonStyle(.borderedProminent).tint(Halo.interactive)
-                if let agentStatus { Text(agentStatus).font(.system(size: 11)).foregroundStyle(Halo.textDim) }
+                Button(savingAgentSettings ? "Saving provider…" : "Save provider settings") { saveAgentSettings() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(savingAgentSettings)
+                    .foregroundStyle(Halo.onAccent).tint(Halo.interactive)
+                if let agentStatus { Text(agentStatus).font(Halo.font(size: 11)).foregroundStyle(Halo.textDim) }
             }
             .padding(.top, 4)
         }
@@ -234,20 +246,26 @@ struct SettingsView: View {
     private func saveAgentSettings() {
         let baseURL = agentBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = agentModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: baseURL), ["https", "http"].contains(url.scheme?.lowercased()),
-              url.host != nil, !model.isEmpty, !agentAPIKey.isEmpty else {
-            agentStatus = "Enter a valid HTTP(S) base URL, API key, and model."
+        guard !savingAgentSettings else { return }
+        guard AgentConfiguration.providerURL(baseURL) != nil, !model.isEmpty, !agentAPIKey.isEmpty else {
+            agentStatus = "Enter an HTTPS provider URL, API key and model. HTTP is allowed only for localhost, 127.0.0.1 or ::1. Omit URL credentials, queries and fragments."
+            return
+        }
+        AgentConfiguration.apiKey = agentAPIKey
+        guard AgentConfiguration.apiKey == agentAPIKey else {
+            agentStatus = "The key could not be saved to Keychain. Unlock this Mac and try again."
             return
         }
         AgentConfiguration.baseURL = baseURL
         AgentConfiguration.model = model
-        AgentConfiguration.apiKey = agentAPIKey
         agentStatus = "Saved to Keychain"
+        savingAgentSettings = true
         Task {
+            defer { savingAgentSettings = false }
             guard await AgentDaemonManager.shared.ensureRunning() else { return }
             do {
                 try await AgentClient.shared.updateConfiguration(baseURL: baseURL, apiKey: agentAPIKey, model: model)
-                agentStatus = "Connected"
+                agentStatus = "Saved for Ask Pulse. The provider is checked when you send a question."
             } catch { agentStatus = "Saved; agent will use this after restart." }
         }
     }
@@ -319,9 +337,9 @@ struct SettingsView: View {
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: stat.symbol)
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                 Text(stat.label)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Halo.font(size: 11, weight: .medium))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -363,10 +381,10 @@ struct SettingsView: View {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(action.displayName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Halo.font(size: 13, weight: .medium))
                         .foregroundStyle(Halo.textPrimary)
                     Text(action.detail)
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                 }
                 Spacer(minLength: 12)
@@ -403,7 +421,7 @@ struct SettingsView: View {
             }
             if let message = conflictMessages[action] {
                 Text(message)
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.flare)
             }
         }
@@ -432,7 +450,7 @@ struct SettingsView: View {
             footnote: "Auto-clean completion notices are set on the Storage page."
         ) {
             settingsRow(
-                title: "Critical Alerts",
+                title: "Important alerts",
                 detail: "Notify when something needs attention now — runaway process, low disk, thermal throttling."
             ) {
                 Toggle("", isOn: notifyCriticalBinding)
@@ -441,8 +459,8 @@ struct SettingsView: View {
             }
             rowDivider
             settingsRow(
-                title: "Weekly Report",
-                detail: "A Monday-morning summary of reclaimed space and Mac health."
+                title: "Weekly reminder",
+                detail: "A Monday-morning reminder to review your Mac’s recorded activity."
             ) {
                 Toggle("", isOn: notifyWeeklyBinding)
                     .toggleStyle(.switch)
@@ -454,14 +472,20 @@ struct SettingsView: View {
     private var notifyCriticalBinding: Binding<Bool> {
         Binding(
             get: { NotificationPreferences.notifyCriticalAlerts },
-            set: { NotificationPreferences.notifyCriticalAlerts = $0 }
+            set: {
+                NotificationPreferences.notifyCriticalAlerts = $0
+                if $0 { PulsePermission.notifications.request() }
+            }
         )
     }
 
     private var notifyWeeklyBinding: Binding<Bool> {
         Binding(
             get: { NotificationPreferences.notifyWeeklyReport },
-            set: { NotificationPreferences.notifyWeeklyReport = $0 }
+            set: {
+                NotificationPreferences.notifyWeeklyReport = $0
+                if $0 { PulsePermission.notifications.request() }
+            }
         )
     }
 
@@ -566,10 +590,10 @@ struct SettingsView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Pulse \u{00b7} v\(updater.currentVersion)")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Halo.font(size: 13, weight: .medium))
                         .foregroundStyle(Halo.textPrimary)
                     aboutStatusText
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                 }
                 Spacer(minLength: 12)
@@ -594,6 +618,7 @@ struct SettingsView: View {
         if case .available = updater.status {
             Button("Download") { updater.openLatestDownload() }
                 .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
                 .tint(Halo.ion)
         } else {
             Button("Check for Updates\u{2026}") { updater.checkForUpdates(userInitiated: true) }
@@ -613,30 +638,16 @@ struct SettingsView: View {
         @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(
-                                LinearGradient(
-                                    colors: [tint.opacity(0.85), tint.opacity(0.55)],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                    )
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-            }
-            .padding(.bottom, 2)
+            Label(title, systemImage: icon)
+                .font(Halo.font(size: 17, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.bottom, 4)
             content()
             if let footnote {
                 Text(footnote)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Halo.textDim.opacity(0.8))
+                    .font(Halo.font(size: 11))
+                    .foregroundStyle(Halo.textSecondary)
                     .padding(.top, 4)
             }
         }
@@ -650,15 +661,15 @@ struct SettingsView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(Halo.font(size: 13, weight: .medium))
                     .foregroundStyle(Halo.textPrimary)
                 Text(detail)
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
-            control()
+            control().accessibilityLabel(title).accessibilityHint(detail)
         }
     }
 
@@ -670,18 +681,18 @@ struct SettingsView: View {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Halo.font(size: 13, weight: .medium))
                         .foregroundStyle(Halo.textPrimary)
                     Text(detail)
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                 }
                 Spacer(minLength: 12)
                 Text(summary)
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
             }
             .contentShape(Rectangle())

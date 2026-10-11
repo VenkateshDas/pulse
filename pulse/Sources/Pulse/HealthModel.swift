@@ -13,6 +13,7 @@ final class HealthModel {
     private(set) var batteryUnavailable = false
     private(set) var bluetoothDevices: [BluetoothDevice] = []
     private(set) var startupItems: [StartupItem] = []
+    private(set) var changingStartupItems: Set<String> = []
     private(set) var benchmarkRunning = false
     private(set) var latestBenchmark: BenchmarkResult?
     private(set) var previousBenchmark: BenchmarkResult?
@@ -106,7 +107,10 @@ final class HealthModel {
     }
 
     func toggle(_ item: StartupItem) {
+        guard item.kind == .userAgent, !changingStartupItems.contains(item.id) else { return }
+        changingStartupItems.insert(item.id)
         Task {
+            defer { changingStartupItems.remove(item.id) }
             do {
                 try await sampler.toggleStartupItem(item)
                 actionFeedback =

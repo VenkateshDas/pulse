@@ -27,8 +27,8 @@ struct AttentionSection: View {
             Image(systemName: "checkmark.seal.fill")
                 .foregroundStyle(Halo.pulseGreen)
             Text("All good — nothing worth a look right now")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Halo.textPrimary.opacity(0.85))
+                .font(Halo.font(size: 13, weight: .medium))
+                .foregroundStyle(Halo.textPrimary)
             Spacer()
         }
         .padding(14)
@@ -50,16 +50,16 @@ private struct AttentionCard: View {
                     .fill(severityColor.opacity(0.12))
                     .frame(width: 28, height: 28)
                 Image(systemName: symbol)
-                    .font(.system(size: 13))
+                    .font(Halo.font(size: 13))
                     .foregroundStyle(severityColor)
             }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Halo.font(size: 13, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 Text(item.detail)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Halo.font(size: 13))
                     .foregroundStyle(Halo.textDim)
             }
             Spacer(minLength: 12)
@@ -69,12 +69,6 @@ private struct AttentionCard: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Halo.surface2.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(severityColor)
-                .frame(width: 3)
-                .padding(.vertical, 8)
-        }
         .confirmationDialog(
             "Quit \(confirmQuit?.name ?? "")?",
             isPresented: Binding(
@@ -99,24 +93,14 @@ private struct AttentionCard: View {
         case .quitProcess(let pid, let name):
             Button("Quit") { confirmQuit = (pid, name) }
                 .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
                 .tint(Halo.ion.opacity(0.85))
                 .controlSize(.small)
         case .cleanJunk:
-            Button {
-                clean.runNow()
-            } label: {
-                if clean.isRunning {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Text("Clean")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Halo.amber.opacity(0.85))
-            .controlSize(.small)
-            .disabled(clean.isRunning)
+            Button("Review cleanup") { PulseNavigation.open(.storage, diskTab: 1) }
+                .buttonStyle(.bordered)
         case .openPane(let target):
-            Button("Review") { navigate(to: target) }
+            Button(target == .monitor ? "Review app activity" : "Review cleanup") { navigate(to: target) }
                 .buttonStyle(.bordered)
                 .tint(Halo.textDim)
                 .controlSize(.small)
@@ -136,7 +120,7 @@ private struct AttentionCard: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 11, weight: .bold))
+                .font(Halo.font(size: 11, weight: .bold))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 22, height: 22)
                 .background(Halo.surface2, in: Circle())

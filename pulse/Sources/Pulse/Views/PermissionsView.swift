@@ -42,11 +42,11 @@ enum PulsePermission: String, CaseIterable, Identifiable, Sendable {
     var detail: String {
         switch self {
         case .fullDiskAccess:
-            "Maps large files and safe-to-clean space across the disk. Without it the first storage scan stalls silently."
+            "Allows Pulse to check protected folders and read Trash. Without access, some files may be missing from the results."
         case .accessibility:
             "Routes the keyboard brightness keys to the display under your cursor — and stops macOS from only dimming the built-in screen."
         case .appManagement:
-            "Lets the App Uninstaller move other apps' bundles to the Trash. macOS provides no way to read this state, so grant it here once."
+            "Allows changes to other apps. This is separate from Full Disk Access. macOS does not let Pulse check this permission; a protected app may also require Finder authorization."
         case .notifications:
             "Heads-up when an auto-clean finishes or a critical alert fires (low disk, runaway process, battery health). Optional."
         }
@@ -158,10 +158,7 @@ enum PermissionsGate {
     }
 
     nonisolated static func shouldPromptOnLaunch() -> Bool {
-        if !OnboardingView.isComplete { return true }
-        let last = UserDefaults.standard.string(forKey: versionKey)
-        guard last != currentVersion else { return false }
-        return PulsePermission.allCases.contains { $0.required && $0.syncStatus != .granted }
+        !OnboardingView.isComplete
     }
 
     static func markPrompted() {
@@ -182,16 +179,16 @@ struct PermissionRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(permission.title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(Halo.font(size: 15, weight: .semibold))
                         .foregroundStyle(Halo.textPrimary)
                     if !permission.required {
                         Text("optional")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Halo.textDim.opacity(0.7))
+                            .font(Halo.font(size: 9, weight: .medium))
+                            .foregroundStyle(Halo.textSecondary)
                     }
                 }
                 Text(permission.detail)
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .fixedSize(horizontal: false, vertical: true)
                 actions.padding(.top, 2)
@@ -206,9 +203,8 @@ struct PermissionRow: View {
             Circle()
                 .fill(status == .granted ? Halo.pulseGreen : Halo.surface2)
                 .frame(width: 30, height: 30)
-                .shadow(color: status == .granted ? Halo.pulseGreen.opacity(0.4) : .clear, radius: 6)
             Image(systemName: status == .granted ? "checkmark" : permission.symbol)
-                .font(.system(size: 12, weight: .bold))
+                .font(Halo.font(size: 12, weight: .bold))
                 .foregroundStyle(status == .granted ? Halo.void : Halo.textPrimary)
         }
     }
@@ -217,13 +213,14 @@ struct PermissionRow: View {
     private var actions: some View {
         if status == .granted {
             Text("Granted")
-                .font(.system(size: 11, weight: .medium))
+                .font(Halo.font(size: 11, weight: .medium))
                 .foregroundStyle(Halo.pulseGreen)
         } else {
             HStack(spacing: 10) {
                 if permission.hasInAppPrompt {
                     Button("Enable") { act { permission.request() } }
                         .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
                         .tint(Halo.ion.opacity(0.85))
                 }
                 Button(permission.hasInAppPrompt ? "Open Settings" : "Grant in Settings") {
@@ -231,9 +228,9 @@ struct PermissionRow: View {
                 }
                 .buttonStyle(.bordered)
                 if status == .unknown {
-                    Text("can't be detected — grant once")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim.opacity(0.8))
+                    Text("Pulse cannot check this permission.")
+                        .font(Halo.font(size: 10))
+                        .foregroundStyle(Halo.textSecondary)
                 }
             }
         }
@@ -268,6 +265,35 @@ struct PermissionsSection: View {
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await store.refresh() }
+        }
+    }
+}
+
+/// Contextual permission explanation. No prompt or settings change happens on arrival.
+struct PermissionHelp: View {
+    let permission: PulsePermission
+    @State private var store = PermissionStore()
+    @State private var dismissed = false
+
+    var body: some View {
+        if !dismissed && store.status(permission) != .granted {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Some results may need \(permission.title)", systemImage: "lock.shield")
+                    .font(Halo.font(size: 14, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                Text(permission.detail).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Open System Settings") { NSWorkspace.shared.open(permission.settingsURL) }.buttonStyle(.bordered)
+                    Button("Continue without access") { dismissed = true }.buttonStyle(.borderless)
+                }
+            }
+            .padding(16)
+            .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityElement(children: .contain)
+            .task { await store.refresh() }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                Task { await store.refresh() }
+            }
         }
     }
 }

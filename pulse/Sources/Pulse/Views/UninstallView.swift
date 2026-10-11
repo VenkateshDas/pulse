@@ -24,19 +24,20 @@ struct UninstallView: View {
                 }
                 .padding(.bottom, 8)
             }
-            .scrollIndicators(.never)
+            .frame(minHeight: 0, maxHeight: .infinity)
+            .scrollIndicators(.automatic)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
+        .background(Halo.void)
         .onAppear { model.appeared() }
     }
 
     private var header: some View {
         PageHeader(
-            "Uninstall",
+            "Apps",
             subtitle:
-                "Remove an app and the debris it leaves behind. Matches are graded by confidence; the app and every leftover go to the Trash — nothing is ever destroyed."
+                "Choose an app, review its related files, then move selected items to Trash. They still use storage until Trash is emptied."
         ) {
             RefreshButton(help: "Reload installed apps", disabled: model.isLoadingApps) {
                 model.loadInstalledApps()
@@ -47,7 +48,7 @@ struct UninstallView: View {
     private var tabBar: some View {
         @Bindable var model = model
         return SegmentPicker(
-            options: UninstallModel.Tab.allCases.map { ($0, $0.rawValue) },
+            options: UninstallModel.Tab.allCases.map { ($0, $0 == .uninstall ? "Installed apps" : "Leftover files") },
             selection: $model.tab)
     }
 
@@ -58,8 +59,11 @@ struct UninstallView: View {
         } else if model.plan != nil {
             UninstallPlanCard()
         } else {
-            DropZoneCard()
+            if model.isScanning {
+                ProgressView("Finding related files…").padding()
+            }
             InstalledAppsCard()
+            DisclosureGroup("Choose an app from Finder") { DropZoneCard() }
         }
     }
 }
@@ -73,13 +77,13 @@ struct DropZoneCard: View {
     var body: some View {
         VStack(spacing: 10) {
             Image(systemName: "arrow.down.app")
-                .font(.system(size: 30))
+                .font(Halo.font(size: 30))
                 .foregroundStyle(targeted ? Halo.ion : Halo.textDim)
-            Text(model.isScanning ? "Scanning for leftovers…" : "Drag an app here to uninstall")
-                .font(.system(size: 13, weight: .semibold))
+            Text(model.isScanning ? "Scanning for leftovers…" : "Drag an app here to review")
+                .font(Halo.font(size: 13, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
-            Text("Drop any .app from Finder or the Dock — Pulse finds its leftover files.")
-                .font(.system(size: 11))
+            Text("Drop any .app from Finder or the Dock — Pulse checks common locations for related files.")
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textDim)
             if model.isScanning {
                 ProgressView().controlSize(.small).padding(.top, 2)
@@ -123,37 +127,37 @@ struct InstalledAppsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Text("INSTALLED APPS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Installed apps")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
-                    TextField("Filter…", text: $query)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11))
+                    TextField("Search apps", text: $query)
+                        .accessibilityLabel("Search installed apps")
+                        .textFieldStyle(.roundedBorder)
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textPrimary)
-                        .frame(width: 140)
+                        .frame(minWidth: 140, idealWidth: 210, maxWidth: 260)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Halo.surface2, in: Capsule())
+
             }
             if model.isLoadingApps && model.installedApps.isEmpty {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Reading /Applications…")
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                 }
                 .padding(.vertical, 16)
                 .frame(maxWidth: .infinity)
             } else if filtered.isEmpty {
-                Text("No apps match.")
-                    .font(.system(size: 12))
+                Text(query.isEmpty ? "No removable apps found in the checked locations." : "No apps match. Try another name or clear the search.")
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
@@ -177,11 +181,11 @@ struct InstalledAppsCard: View {
                     .frame(width: 24, height: 24)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(app.name)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(Halo.font(size: 13, weight: .semibold))
                         .foregroundStyle(Halo.textPrimary)
                         .lineLimit(1)
                     Text(subtitle(app))
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                         .lineLimit(1)
                 }
@@ -190,12 +194,12 @@ struct InstalledAppsCard: View {
                 // (0 = not yet computed) to keep the list load fast.
                 if app.sizeBytes > 0 {
                     Text(ByteFormat.string(app.sizeBytes))
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Halo.textPrimary)
                         .frame(width: 76, alignment: .trailing)
                 }
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             .padding(.horizontal, 10)
@@ -207,10 +211,12 @@ struct InstalledAppsCard: View {
         }
         .buttonStyle(.plain)
         .onHover { hoveredPath = $0 ? app.path : nil }
+        .disabled(model.isScanning || model.isUninstalling)
+        .accessibilityHint("Review related files before removal")
     }
 
     private func subtitle(_ app: InstalledApp) -> String {
-        var parts = ["v\(app.version)", app.bundleID]
+        var parts = ["Version \(app.version)"]
         if let days = app.lastUsedDays {
             parts.append(days == 0 ? "used today" : "used \(days)d ago")
         }
@@ -229,8 +235,8 @@ struct UninstallPlanCard: View {
                 planHeader(plan)
                 appRow(plan.app)
                 if plan.leftovers.isEmpty {
-                    Text("No leftovers found — removing the app alone fully uninstalls it.")
-                        .font(.system(size: 12))
+                    Text("No related files found in the checked locations. Files in other locations may remain.")
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                         .padding(.vertical, 8)
                 } else {
@@ -240,7 +246,7 @@ struct UninstallPlanCard: View {
                 }
                 if model.isPlanAppRunning {
                     Label("Quit \(plan.app.name) before uninstalling — it's running.", systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Halo.font(size: 11, weight: .semibold))
                         .foregroundStyle(Halo.amber)
                 }
                 uninstallButton(plan)
@@ -256,18 +262,19 @@ struct UninstallPlanCard: View {
                 model.clearPlan()
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.ion)
             }
             .buttonStyle(.plain)
             .help("Back to the app list")
-            Text("UNINSTALL PLAN")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
+            .accessibilityLabel("Back to installed apps")
+            .disabled(model.isUninstalling)
+            Text("Review removal")
+                .font(Halo.font(size: 10, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Spacer()
             Text("\(plan.leftovers.count) leftover\(plan.leftovers.count == 1 ? "" : "s") found")
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
         }
     }
@@ -276,24 +283,23 @@ struct UninstallPlanCard: View {
     private func appRow(_ app: InstalledApp) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "checkmark.square.fill")
-                .font(.system(size: 13))
+                .font(Halo.font(size: 13))
                 .foregroundStyle(Halo.pulseGreen)
             Image(nsImage: model.icon(for: app.path))
                 .resizable()
                 .frame(width: 20, height: 20)
             VStack(alignment: .leading, spacing: 1) {
                 Text(app.name)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
-                Text("the app itself → moved to Trash (Finder “Put Back” restores it)")
-                    .font(.system(size: 10))
+                Text("Included in removal. Restore from Trash before emptying it.")
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            GradePill(grade: .safe)
             Text(ByteFormat.string(app.sizeBytes))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
         }
@@ -307,16 +313,15 @@ struct UninstallPlanCard: View {
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text(grade.rawValue.uppercased())
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1.5)
+                    Text(grade == .safe ? "Matched to this app" : grade == .careful ? "Check before selecting" : "Inspect in Finder")
+                        .font(Halo.font(size: 9, weight: .bold))
                         .foregroundStyle(gradeColor(grade))
                     Text(sectionNote(grade))
-                        .font(.system(size: 9))
+                        .font(Halo.font(size: 9))
                         .foregroundStyle(Halo.textDim)
                     Spacer()
                     Text(ByteFormat.string(items.reduce(0) { $0 + $1.sizeBytes }))
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(Halo.font(size: 9, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                 }
                 .padding(.top, 6)
@@ -331,20 +336,13 @@ struct UninstallPlanCard: View {
         let selected = model.selection.contains(item.id)
         let selectable = item.grade != .review
         return HStack(spacing: 10) {
-            Button {
-                model.toggle(item)
-            } label: {
-                Image(systemName: selected ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 13))
-                    .foregroundStyle(
-                        !selectable ? Halo.textDim.opacity(0.4)
-                            : (selected ? Halo.pulseGreen : Halo.textDim))
-            }
-            .buttonStyle(.plain)
-            .disabled(!selectable)
-            .help(
-                selectable
-                    ? "" : "REVIEW matches are never bulk-selected — open in Finder and decide yourself")
+            Toggle("Select \(item.label), \(item.path)", isOn: Binding(
+                get: { selected }, set: { _ in model.toggle(item) }
+            ))
+            .labelsHidden()
+            .toggleStyle(.checkbox)
+            .disabled(!selectable || model.isUninstalling)
+            .help(selectable ? item.path : "Uncertain matches must be reviewed individually in Finder")
 
             Image(nsImage: model.icon(for: item.path))
                 .resizable()
@@ -352,30 +350,30 @@ struct UninstallPlanCard: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                     .lineLimit(1)
                 Text("\(item.category) · \(item.detail)")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             GradePill(grade: item.grade)
             Text(ByteFormat.string(item.sizeBytes))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.path)])
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             .buttonStyle(.plain)
             .help("Reveal in Finder — \(item.path)")
-            .accessibilityLabel("Reveal in Finder")
+            .accessibilityLabel("Show \(item.label) in Finder")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -383,39 +381,27 @@ struct UninstallPlanCard: View {
     }
 
     private func uninstallButton(_ plan: UninstallModel.Plan) -> some View {
-        Button {
-            model.uninstall()
-        } label: {
-            HStack(spacing: 6) {
-                if model.isUninstalling { ProgressView().controlSize(.small) }
-                Text(buttonLabel(plan))
-                    .font(.system(size: 13, weight: .bold))
+        VStack(alignment: .leading, spacing: 10) {
+            PermissionHelp(permission: .appManagement)
+            Text("Related files can contain preferences or documents. Leave anything you want to keep unselected. Restore from Trash before emptying it.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+            Button(role: .destructive) { model.uninstall() } label: {
+                Label(model.isUninstalling ? "Moving selected items…" : "Move \(plan.app.name) and \(model.selectedLeftovers.count) related files to Trash",
+                      systemImage: "trash")
+                    .frame(maxWidth: .infinity)
             }
-            .foregroundStyle(Halo.void)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                model.isUninstalling || model.isPlanAppRunning
-                    ? AnyShapeStyle(Halo.textDim) : AnyShapeStyle(Halo.flare),
-                in: Capsule())
+            .buttonStyle(.borderedProminent)
+            .tint(Halo.critical)
+            .foregroundStyle(Halo.onAccent)
+            .disabled(model.isUninstalling || model.isPlanAppRunning)
         }
-        .buttonStyle(.plain)
-        .disabled(model.isUninstalling || model.isPlanAppRunning)
-        .help("Move the app and every ticked leftover to the Trash")
-    }
-
-    private func buttonLabel(_ plan: UninstallModel.Plan) -> String {
-        if model.isUninstalling { return "Uninstalling…" }
-        let count = model.selectedLeftovers.count
-        let total = ByteFormat.string(model.totalRemovalBytes)
-        return "Uninstall \(plan.app.name) + \(count) leftover\(count == 1 ? "" : "s") (\(total))"
     }
 
     private func sectionNote(_ grade: SafetyGrade) -> String {
         switch grade {
-        case .safe: "exact bundle-ID match — pre-selected"
-        case .careful: "vendor or name match — tick to include"
-        case .review: "weak name match — open in Finder, never bulk-removed"
+        case .safe: "matched app identifier — selected initially"
+        case .careful: "shared publisher or name — select only if no longer needed"
+        case .review: "uncertain match — not included in this removal"
         }
     }
 }
@@ -452,14 +438,14 @@ struct UninstallResultCard: View {
     private func successHeader(_ result: UninstallModel.UninstallResult) -> some View {
         HStack(spacing: 10) {
             Image(systemName: result.appTrashed ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .font(.system(size: 22))
+                .font(Halo.font(size: 22))
                 .foregroundStyle(result.appTrashed ? Halo.pulseGreen : Halo.amber)
             VStack(alignment: .leading, spacing: 2) {
-                Text(result.appTrashed ? "\(result.appName) uninstalled" : "\(result.appName) — partly removed")
-                    .font(.system(size: 16, weight: .bold))
+                Text(result.appTrashed && !result.needsAttention ? "\(result.appName) moved to Trash" : "\(result.appName) — partly removed")
+                    .font(Halo.font(size: 16, weight: .bold))
                     .foregroundStyle(Halo.textPrimary)
                 Text(headline(result))
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Halo.font(size: 11, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
             }
             Spacer()
@@ -474,23 +460,23 @@ struct UninstallResultCard: View {
     private func appRow(_ result: UninstallModel.UninstallResult) -> some View {
         HStack(spacing: 10) {
             Image(systemName: result.appTrashed ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .font(.system(size: 13))
+                .font(Halo.font(size: 13))
                 .foregroundStyle(result.appTrashed ? Halo.pulseGreen : Halo.flare)
             Image(nsImage: model.icon(for: result.appBundlePath))
                 .resizable()
                 .frame(width: 18, height: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(result.appName)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 Text(
                     result.appTrashed
                         ? "moved to Trash · Finder “Put Back” restores it"
                         : "couldn't be moved to Trash — Retry and approve the Finder prompt"
                 )
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }
@@ -503,15 +489,14 @@ struct UninstallResultCard: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text("MOVED TO TRASH")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.pulseGreen)
                 Text("moved to Trash — empty Trash to free space")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 Text(ByteFormat.string(result.trashedBytes))
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(Halo.font(size: 9, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
             }
             .padding(.top, 2)
@@ -526,9 +511,8 @@ struct UninstallResultCard: View {
         if !result.failedItems.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
-                    Text("PENDING — NEEDS FULL DISK ACCESS")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1.5)
+                    Text("Items that could not be moved")
+                        .font(Halo.font(size: 9, weight: .bold))
                         .foregroundStyle(Halo.amber)
                     Spacer()
                 }
@@ -536,23 +520,23 @@ struct UninstallResultCard: View {
                 ForEach(result.failedItems, id: \.path) { item in
                     HStack(spacing: 10) {
                         Image(systemName: "lock.fill")
-                            .font(.system(size: 10))
+                            .font(Halo.font(size: 10))
                             .foregroundStyle(Halo.amber)
                             .frame(width: 16)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.label)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(Halo.font(size: 12, weight: .semibold))
                                 .foregroundStyle(Halo.textPrimary)
                                 .lineLimit(1)
                             Text(item.path)
-                                .font(.system(size: 9, design: .monospaced))
+                                .font(Halo.font(size: 9, design: .monospaced))
                                 .foregroundStyle(Halo.textDim)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
                         Spacer()
                         Text(ByteFormat.string(item.sizeBytes))
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Halo.textDim)
                             .frame(width: 76, alignment: .trailing)
                     }
@@ -568,23 +552,23 @@ struct UninstallResultCard: View {
     private func trashedRow(_ item: UninstallModel.PendingItem) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "trash")
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.pulseGreen)
                 .frame(width: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                     .lineLimit(1)
                 Text(item.path)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(Halo.font(size: 9, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
             Spacer()
             Text(ByteFormat.string(item.sizeBytes))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
         }
@@ -603,12 +587,12 @@ struct UninstallResultCard: View {
                     "\(result.appName) couldn't be moved to the Trash.",
                     systemImage: "lock.shield"
                 )
-                .font(.system(size: 11, weight: .semibold))
+                .font(Halo.font(size: 11, weight: .semibold))
                 .foregroundStyle(Halo.amber)
                 Text(
                     "Removing another app needs permission. Click Retry and approve the “control Finder” prompt (and the admin password, if asked) — same as dragging the app to the Trash by hand."
                 )
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
             }
         }
@@ -616,15 +600,15 @@ struct UninstallResultCard: View {
         if result.leftoversNeedAttention {
             VStack(alignment: .leading, spacing: 4) {
                 Label(
-                    "\(result.failedCount) leftover\(result.failedCount == 1 ? "" : "s") couldn't be moved — Pulse needs Full Disk Access.",
+                    "\(result.failedCount) related file\(result.failedCount == 1 ? "" : "s") couldn't be moved. Check file permissions and Full Disk Access.",
                     systemImage: "externaldrive.badge.xmark"
                 )
-                .font(.system(size: 11, weight: .semibold))
+                .font(Halo.font(size: 11, weight: .semibold))
                 .foregroundStyle(Halo.amber)
                 Text(
                     "Grant Pulse Full Disk Access, then Retry. In Settings, toggle Pulse on under Full Disk Access (add it with “+” if it isn’t listed)."
                 )
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
             }
         }
@@ -633,88 +617,59 @@ struct UninstallResultCard: View {
                 "\(result.reviewLeftCount) REVIEW match\(result.reviewLeftCount == 1 ? "" : "es") left untouched — open the app again to inspect them in Finder.",
                 systemImage: "eye"
             )
-            .font(.system(size: 11))
+            .font(Halo.font(size: 11))
             .foregroundStyle(Halo.textDim)
         }
         if result.trashedLeftovers.isEmpty && result.failedCount == 0 {
-            Text("No leftovers were removed — removing the app fully uninstalled it.")
-                .font(.system(size: 11))
+            Text("No related files were removed. Other files may remain outside the checked locations.")
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textDim)
         }
     }
 
     private func actions(_ result: UninstallModel.UninstallResult) -> some View {
-        HStack(spacing: 10) {
-            if result.needsAttention {
-                // FDA only helps the leftover (container) failures, so only
-                // surface that button when leftovers actually failed.
-                if result.leftoversNeedAttention {
-                    Button {
-                        model.openFullDiskAccessSettings()
-                    } label: {
-                        Text("Grant Full Disk Access")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Halo.void)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Halo.amber, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open System Settings → Privacy & Security → Full Disk Access")
-                }
-                Button {
-                    model.retryUninstall()
-                } label: {
-                    HStack(spacing: 6) {
-                        if model.isUninstalling { ProgressView().controlSize(.small) }
-                        Text(model.isUninstalling ? "Retrying…" : "↻ Retry")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundStyle(Halo.ion)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Halo.ion.opacity(0.12), in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isUninstalling)
-                .help("Re-attempt the parts that failed")
-            }
-            Spacer()
-            Button {
-                model.dismissResult()
-            } label: {
-                Text("Done")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Halo.void)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Halo.ion, in: Capsule())
-            }
-            .buttonStyle(.plain)
-            .help("Dismiss — back to the app list to uninstall another")
+        ViewThatFits(in: .horizontal) {
+            HStack { resultActions(result) }
+            VStack(alignment: .leading) { resultActions(result) }
         }
     }
+
+    @ViewBuilder private func resultActions(_ result: UninstallModel.UninstallResult) -> some View {
+        if result.leftoversNeedAttention {
+            Button("Open Full Disk Access settings") { model.openFullDiskAccessSettings() }
+                .buttonStyle(.bordered)
+        }
+        if result.needsAttention {
+            Button(model.isUninstalling ? "Retrying…" : "Retry failed items") { model.retryUninstall() }
+                .buttonStyle(.bordered).disabled(model.isUninstalling)
+        }
+        Button("View Trash") { PulseNavigation.open(.storage, diskTab: 2) }.buttonStyle(.bordered)
+        Button("Done") { model.dismissResult() }
+            .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
+            .disabled(model.isUninstalling)
+    }
+
 }
 
 // MARK: - Orphan scan
 
 struct OrphanScanCard: View {
+    @State private var reviewingRemoval = false
     @Environment(UninstallModel.self) private var model
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                Text("ORPHANED FILES")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Leftover files")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
-                Text("residue whose owning app is no longer installed")
-                    .font(.system(size: 10))
+                Text("possible files from apps you removed")
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 Button(model.hasScannedOrphans ? "Rescan" : "Scan") { model.scanOrphans() }
                     .buttonStyle(.plain)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.ion)
                     .disabled(model.isScanningOrphans)
             }
@@ -723,20 +678,20 @@ struct OrphanScanCard: View {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Scanning residue locations…")
-                        .font(.system(size: 12))
+                        .font(Halo.font(size: 12))
                         .foregroundStyle(Halo.textDim)
                 }
                 .padding(.vertical, 16)
                 .frame(maxWidth: .infinity)
             } else if !model.hasScannedOrphans {
                 Text("Scan to find leftover files from apps you've already deleted.")
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
             } else if model.orphans.isEmpty {
-                Text("No orphaned files — every residue folder maps to an installed app.")
-                    .font(.system(size: 12))
+                Text("No unmatched files found in the checked locations.")
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.pulseGreen)
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
@@ -754,14 +709,10 @@ struct OrphanScanCard: View {
     private func orphanRow(_ item: CleanItem) -> some View {
         let selected = model.orphanSelection.contains(item.id)
         return HStack(spacing: 10) {
-            Button {
-                model.toggleOrphan(item)
-            } label: {
-                Image(systemName: selected ? "checkmark.square.fill" : "square")
-                    .font(.system(size: 13))
-                    .foregroundStyle(selected ? Halo.pulseGreen : Halo.textDim)
-            }
-            .buttonStyle(.plain)
+            Toggle("Select \(item.label), \(item.path)", isOn: Binding(
+                get: { selected }, set: { _ in model.toggleOrphan(item) }
+            )).labelsHidden().toggleStyle(.checkbox)
+                .disabled(model.isRemovingOrphans)
 
             Image(nsImage: model.icon(for: item.path))
                 .resizable()
@@ -769,30 +720,30 @@ struct OrphanScanCard: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Halo.font(size: 12, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                     .lineLimit(1)
                 Text("\(item.category) · \(item.detail)")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             GradePill(grade: item.grade)
             Text(ByteFormat.string(item.sizeBytes))
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Halo.textPrimary)
                 .frame(width: 76, alignment: .trailing)
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: item.path)])
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             .buttonStyle(.plain)
             .help("Reveal in Finder — \(item.path)")
-            .accessibilityLabel("Reveal in Finder")
+            .accessibilityLabel("Show \(item.label) in Finder")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -800,30 +751,22 @@ struct OrphanScanCard: View {
     }
 
     private var removeButton: some View {
-        Button {
-            model.removeOrphans()
-        } label: {
-            HStack(spacing: 6) {
-                if model.isRemovingOrphans { ProgressView().controlSize(.small) }
-                Text(removeLabel)
-                    .font(.system(size: 13, weight: .bold))
-            }
-            .foregroundStyle(Halo.void)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(
-                model.orphanSelection.isEmpty || model.isRemovingOrphans
-                    ? AnyShapeStyle(Halo.textDim) : AnyShapeStyle(Halo.pulseGreen),
-                in: Capsule())
+        Button { reviewingRemoval = true } label: {
+            Label(removeLabel, systemImage: "trash")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
         .disabled(model.orphanSelection.isEmpty || model.isRemovingOrphans)
-        .help("Move every selected orphan to the Trash — restorable until you empty it")
+        .confirmationDialog("Move selected leftover files to Trash?", isPresented: $reviewingRemoval, titleVisibility: .visible) {
+            Button("Move selected files to Trash", role: .destructive) { model.removeOrphans() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("These files could not be matched to an installed app. They may still be useful. Restore from Trash before emptying it; moving files does not free storage yet.")
+        }
     }
 
     private var removeLabel: String {
         if model.isRemovingOrphans { return "Removing…" }
         let count = model.orphanSelection.count
-        return "Remove \(count) orphan\(count == 1 ? "" : "s") (\(ByteFormat.string(model.selectedOrphanBytes)))"
+        return "Review \(count) leftover\(count == 1 ? "" : "s") (\(ByteFormat.string(model.selectedOrphanBytes)))"
     }
 }

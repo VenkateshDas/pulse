@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// HALO design tokens — Precision Instrument Aesthetic
+/// Pulse design tokens — calm native surfaces, readable text and semantic color
 /// Dynamic Light/Dark mode support.
 enum Halo {
     /// A light/dark RGB token. Matching on `bestMatch` (not
@@ -34,24 +34,28 @@ enum Halo {
     static var textDim: Color { dynamicColor(palette.textDim, name: "TextDim") }
 
     // MARK: - Semantic Data Colors
-    static var nominal: Color { Color(hex: palette.nominal) }
-    static var warning: Color { Color(hex: palette.warning) }
-    static var critical: Color { Color(hex: palette.critical) }
-    static var interactive: Color { Color(hex: palette.interactive) }
+    static var nominal: Color { dynamicColor(palette.nominal, name: "nominal") }
+    static var warning: Color { dynamicColor(palette.warning, name: "warning") }
+    static var critical: Color { dynamicColor(palette.critical, name: "critical") }
+    static var interactive: Color { dynamicColor(palette.interactive, name: "interactive") }
 
-    // MARK: - Brand Teal (landing page accent)
-    static let teal = Color(hex: 0x10B981)
-    static let tealLight = Color(hex: 0x34D399)
-    static let tealDeep = Color(hex: 0x6EE7B7)
-    static let tealSoft = Color(hex: 0x10B981).opacity(0.15)
-    static let tealGlow = Color(hex: 0x10B981).opacity(0.4)
+    static var onAccent: Color { dynamicColor(.hex(0xFFFFFF, 0x172126), name: "OnAccent") }
 
-    // Legacy names
+    // Compatibility names used by existing charts and action controls.
+    static var teal: Color { nominal }
+    static var tealLight: Color { nominal }
+    static var tealDeep: Color { nominal }
+    static var tealSoft: Color { nominal.opacity(0.10) }
+    static var tealGlow: Color { .clear }
     static var ion: Color { interactive }
-    static let volt = Color(hex: 0x5E5CE6) // Indigo
+    static var volt: Color { dynamicColor(.hex(0x5D4894, 0xC4B5F2), name: "SecondaryChart") }
     static var pulseGreen: Color { nominal }
     static var amber: Color { warning }
     static var flare: Color { critical }
+
+    static func font(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
+        .system(size: max(12, size) * ThemeManager.currentTextScale, weight: weight, design: design)
+    }
 
     /// Status color for a 0–1 load fraction: nominal → warning → critical.
     static func statusColor(_ fraction: Double) -> Color {
@@ -65,10 +69,10 @@ enum Halo {
     // MARK: - Shadows
     enum Shadow {
         static let cardColor = Color.black.opacity(0.08)
-        static let cardRadius: CGFloat = 12
+        static let cardRadius: CGFloat = 0
         static let cardY: CGFloat = 4
         static let elevatedColor = Color.black.opacity(0.15)
-        static let elevatedRadius: CGFloat = 24
+        static let elevatedRadius: CGFloat = 8
         static let elevatedY: CGFloat = 8
         static let glowColor = Color(hex: 0x10B981).opacity(0.4)
         static let glowRadius: CGFloat = 12
@@ -79,7 +83,7 @@ enum Halo {
         static let small: CGFloat = 6
         static let medium: CGFloat = 10
         static let large: CGFloat = 14
-        static let xl: CGFloat = 18
+        static let xl: CGFloat = 12
     }
 
     // MARK: - Spacing
@@ -94,7 +98,7 @@ enum Halo {
 
     // MARK: - Animation Curves
     enum Motion {
-        static let snappy = Animation.spring(duration: 0.3, bounce: 0.15)
+        static var snappy: Animation? { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .easeOut(duration: 0.18) }
         static let smooth = Animation.easeInOut(duration: 0.25)
         static let ring = Animation.easeOut(duration: 0.5)
     }
@@ -107,12 +111,7 @@ enum Halo {
         )
     }
 
-    static let meshBackground = RadialGradient(
-        colors: [Color(hex: 0x10B981).opacity(0.04), .clear],
-        center: .topTrailing,
-        startRadius: 0,
-        endRadius: 500
-    )
+    static let meshBackground = Color.clear
 }
 
 // MARK: - Glass Backgrounds
@@ -123,10 +122,12 @@ enum Halo {
 struct GlassLayer<S: ShapeStyle>: View {
     var material: Material = .regularMaterial
     var tint: S
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         ZStack {
-            Rectangle().fill(material)
+            if reduceTransparency { Rectangle().fill(Halo.surface1) }
+            else { Rectangle().fill(material) }
             Rectangle().fill(tint)
         }
     }
@@ -138,29 +139,16 @@ extension View {
     func premiumCard(padding: CGFloat = Halo.Space.lg, cornerRadius: CGFloat = Halo.Radius.medium) -> some View {
         self
             .padding(padding)
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.regularMaterial)
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Halo.surface1.opacity(0.6))
-                }
-                .shadow(
-                    color: Halo.Shadow.cardColor,
-                    radius: Halo.Shadow.cardRadius,
-                    y: Halo.Shadow.cardY
-                )
-            }
+            .background(Halo.surface1, in: RoundedRectangle(cornerRadius: min(cornerRadius, 12)))
             .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Halo.borderSubtle, lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: min(cornerRadius, 12))
+                    .strokeBorder(Halo.borderSubtle, lineWidth: 1)
             }
     }
 
     func sectionLabel() -> some View {
         self
-            .font(.system(size: 11, weight: .bold))
-            .tracking(2)
+            .font(Halo.font(size: 14, weight: .semibold))
             .foregroundStyle(Halo.textDim)
     }
 }

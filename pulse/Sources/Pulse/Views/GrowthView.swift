@@ -11,7 +11,7 @@ struct GrowthView: View {
     @State private var expandedGroups: Set<String> = []
 
     private static let windows: [(value: Int, label: String)] = [
-        (1, "24H"), (2, "2 DAYS"), (7, "WEEK"), (30, "MONTH"),
+        (1, "24 hours"), (2, "2 days"), (7, "7 days"), (30, "30 days"),
     ]
 
     var body: some View {
@@ -19,19 +19,19 @@ struct GrowthView: View {
         VStack(spacing: 0) {
             HStack(spacing: Halo.Space.lg) {
                 Text("New & changed files")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Halo.font(size: 13, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 SegmentPicker(
                     options: Self.windows, selection: $storage.growthWindowDays, style: .chip)
                 Spacer()
                 if let report = storage.growthReport {
-                    Text("\(ByteFormat.string(report.totalRecentBytes)) written since \(shortDate(report.cutoff))")
-                        .font(.system(size: 11))
+                    Text("\(ByteFormat.string(report.totalRecentBytes)) created or modified since \(shortDate(report.cutoff))")
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textDim)
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 50)
+            .padding(.vertical, 12)
             .background(Halo.surface1)
             Rectangle().fill(Halo.surface2).frame(height: 1)
             content
@@ -46,7 +46,7 @@ struct GrowthView: View {
             VStack(spacing: 10) {
                 ProgressView()
                 Text("Checking file dates across the disk…")
-                    .font(.system(size: 12)).foregroundStyle(Halo.textDim)
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textDim)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let report = storage.growthReport {
@@ -54,7 +54,7 @@ struct GrowthView: View {
                 EmptyState(
                     icon: "checkmark.circle",
                     title: "No big growth here",
-                    hint: "Checked \(report.scannedFiles.formatted()) files; \(ByteFormat.string(report.totalRecentBytes)) arrived in this window but no folder gathered over 25 MB. Growth may be in snapshots or purgeable space — see the Hidden & system data row in Browse.")
+                    hint: "Checked \(report.scannedFiles.formatted()) files; \(ByteFormat.string(report.totalRecentBytes)) were created or modified in this window but no folder gathered over 25 MB. Growth may be in snapshots or purgeable space — see the Hidden & system data row in Files.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 2) {
@@ -64,9 +64,9 @@ struct GrowthView: View {
                                 ForEach(group.topFiles) { file in fileRow(file) }
                             }
                         }
-                        Text("Checked \(report.scannedFiles.formatted()) files across the disk. Files created or modified in this window, grouped by folder; folders under 25 MB and snapshot churn aren't listed — those live in Browse's Hidden & system data row.")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Halo.textDim.opacity(0.7))
+                        Text("Checked \(report.scannedFiles.formatted()) files across the disk. Files created or modified in this window, grouped by folder; folders under 25 MB and snapshot churn aren't listed — those live in Files's Hidden & system data row.")
+                            .font(Halo.font(size: 10))
+                            .foregroundStyle(Halo.textDim)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
@@ -88,23 +88,22 @@ struct GrowthView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.textDim)
                     .rotationEffect(.degrees(expanded ? 90 : 0))
-                Image(nsImage: NSWorkspace.shared.icon(forFile: group.path))
-                    .resizable().frame(width: 18, height: 18)
+                FileIconView(path: group.path).frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(displayPath(group.path))
-                            .font(.system(size: 12, weight: .medium))
+                            .font(Halo.font(size: 12, weight: .medium))
                             .foregroundStyle(Halo.textPrimary)
                             .lineLimit(1)
                         Text("\(group.fileCount) files")
-                            .font(.system(size: 10))
+                            .font(Halo.font(size: 10))
                             .foregroundStyle(Halo.textDim)
                         Spacer(minLength: 4)
                         Text("▲ \(ByteFormat.string(group.recentBytes))")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Halo.font(size: 11, design: .monospaced))
                             .foregroundStyle(Halo.amber)
                     }
                     GeometryReader { geo in
@@ -132,24 +131,23 @@ struct GrowthView: View {
 
     private func fileRow(_ file: RecentFile) -> some View {
         HStack(spacing: 8) {
-            Image(nsImage: NSWorkspace.shared.icon(forFile: file.path))
-                .resizable().frame(width: 14, height: 14)
+            FileIconView(path: file.path).frame(width: 14, height: 14)
             Text(file.name)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textPrimary)
                 .lineLimit(1)
             Text(file.modified, format: .relative(presentation: .named))
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
             Spacer(minLength: 4)
             Text(ByteFormat.string(file.sizeBytes))
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file.path)])
             } label: {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             }
             .buttonStyle(.plain)
@@ -162,7 +160,7 @@ struct GrowthView: View {
                             sizeBytes: file.sizeBytes, isDirectory: false))
                 } label: {
                     Image(systemName: "trash")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.flare)
                 }
                 .buttonStyle(.plain)

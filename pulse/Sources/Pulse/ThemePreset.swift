@@ -30,7 +30,7 @@ struct ColorPair {
 struct Palette {
     let void, surface1, surface2, border, borderSubtle: ColorPair
     let textPrimary, textSecondary, textDim: ColorPair
-    let nominal, warning, critical, interactive: UInt32
+    let nominal, warning, critical, interactive: ColorPair
 }
 
 /// User-selectable theme presets, applied app-wide (Command Center + popover).
@@ -41,7 +41,7 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
 
     var displayName: String {
         switch self {
-        case .precision: "Precision"
+        case .precision: "Pulse"
         case .midnight: "Midnight"
         case .contrast: "Contrast"
         case .slate: "Slate"
@@ -53,84 +53,74 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
         self == .midnight ? .darkAqua : nil
     }
 
-    /// Precision's values MUST equal today's literal `Theme.swift` constants
-    /// exactly — this is the regression anchor for users who never touch the
-    /// setting. `RGB.gray(_:)` reproduces the old `NSColor(calibratedWhite:)`
-    /// call bit-for-bit (r == g == b == the same float).
+    /// Preset identifiers remain stable so saved appearance choices survive.
     var palette: Palette {
+        let base = Palette(
+            void: .hex(0xF5F7F8, 0x171D21),
+            surface1: .hex(0xFFFFFF, 0x222B30),
+            surface2: .hex(0xE8EDF0, 0x303C43),
+            border: .hex(0x84949C, 0x71828B),
+            borderSubtle: .hex(0xCCD5DA, 0x52616A),
+            textPrimary: .hex(0x172126, 0xF2F6F7),
+            textSecondary: .hex(0x4F6068, 0xB5C2C9),
+            textDim: .hex(0x4F6068, 0xB5C2C9),
+            nominal: .hex(0x176B56, 0x70D6B3),
+            warning: .hex(0x875100, 0xF4C16A),
+            critical: .hex(0xB62F39, 0xFF9DA4),
+            interactive: .hex(0x176B56, 0x70D6B3)
+        )
         switch self {
         case .precision:
-            return Palette(
-                void: ColorPair(light: .gray(0.965), dark: .gray(0.065)),
-                surface1: ColorPair(light: .gray(1.0), dark: .gray(0.10)),
-                surface2: ColorPair(light: .gray(0.94), dark: .gray(0.16)),
-                border: ColorPair(light: .gray(0.88), dark: .gray(0.20)),
-                borderSubtle: ColorPair(light: .gray(0.92), dark: .gray(0.14)),
-                textPrimary: ColorPair(light: .gray(0.07), dark: .gray(0.96)),
-                textSecondary: ColorPair(light: .gray(0.30), dark: .gray(0.75)),
-                textDim: ColorPair(light: .gray(0.50), dark: .gray(0.55)),
-                nominal: 0x30D158,
-                warning: 0xFF9F0A,
-                critical: 0xFF453A,
-                interactive: 0x0A84FF
-            )
+            return base
         case .midnight:
-            // Forced dark — deep indigo-black, not just a darker gray.
-            // Light values mirror dark since this preset never shows light.
-            let void = RGB.hex(0x080A16)
-            let surface1 = RGB.hex(0x10142A)
-            let surface2 = RGB.hex(0x171B36)
-            let border = RGB.hex(0x262C52)
-            let borderSubtle = RGB.hex(0x1B2040)
-            let textPrimary = RGB.hex(0xF2F4FF)
-            let textSecondary = RGB.hex(0xB9C0E0)
-            let textDim = RGB.hex(0x7F87AD)
             return Palette(
-                void: ColorPair(light: void, dark: void),
-                surface1: ColorPair(light: surface1, dark: surface1),
-                surface2: ColorPair(light: surface2, dark: surface2),
-                border: ColorPair(light: border, dark: border),
-                borderSubtle: ColorPair(light: borderSubtle, dark: borderSubtle),
-                textPrimary: ColorPair(light: textPrimary, dark: textPrimary),
-                textSecondary: ColorPair(light: textSecondary, dark: textSecondary),
-                textDim: ColorPair(light: textDim, dark: textDim),
-                nominal: 0x32D74B,
-                warning: 0xFF9F0A,
-                critical: 0xFF453A,
-                interactive: 0x5E7CFF
+                void: .hex(0x111526, 0x111526),
+                surface1: .hex(0x1D2439, 0x1D2439),
+                surface2: .hex(0x2D3650, 0x2D3650),
+                border: .hex(0x8090B3, 0x8090B3),
+                borderSubtle: .hex(0x4E5B78, 0x4E5B78),
+                textPrimary: .hex(0xF2F4FF, 0xF2F4FF),
+                textSecondary: .hex(0xC0C9E3, 0xC0C9E3),
+                textDim: .hex(0xC0C9E3, 0xC0C9E3),
+                nominal: .hex(0x70D6B3, 0x70D6B3),
+                warning: .hex(0xF4C16A, 0xF4C16A),
+                critical: .hex(0xFF9DA4, 0xFF9DA4),
+                interactive: .hex(0xB2C1FF, 0xB2C1FF)
             )
         case .contrast:
-            // Extreme black/white with punchy, highly saturated accents.
             return Palette(
-                void: ColorPair(light: .gray(1.0), dark: .gray(0.0)),
-                surface1: ColorPair(light: .gray(1.0), dark: .gray(0.039)),
-                surface2: ColorPair(light: .gray(0.929), dark: .gray(0.086)),
-                border: ColorPair(light: .gray(0.557), dark: .gray(0.361)),
-                borderSubtle: ColorPair(light: .gray(0.85), dark: .gray(0.25)),
-                textPrimary: ColorPair(light: .gray(0.0), dark: .gray(1.0)),
-                textSecondary: ColorPair(light: .gray(0.20), dark: .gray(0.85)),
-                textDim: ColorPair(light: .gray(0.40), dark: .gray(0.65)),
-                nominal: 0x00C853,
-                warning: 0xFFAB00,
-                critical: 0xFF1744,
-                interactive: 0x2979FF
+                void: .hex(0xFFFFFF, 0x000000),
+                surface1: .hex(0xFFFFFF, 0x101010),
+                surface2: .hex(0xEEEEEE, 0x242424),
+                border: .hex(0x555555, 0xAAAAAA),
+                borderSubtle: .hex(0x555555, 0xAAAAAA),
+                textPrimary: .hex(0x000000, 0xFFFFFF),
+                textSecondary: .hex(0x333333, 0xDDDDDD),
+                textDim: .hex(0x333333, 0xDDDDDD),
+                nominal: .hex(0x07523E, 0x8AEFCB),
+                warning: .hex(0x744500, 0xFFD68A),
+                critical: .hex(0xA61D2A, 0xFFB8BE),
+                interactive: .hex(0x07523E, 0x8AEFCB)
             )
         case .slate:
-            // Cool blue-gray tint throughout, not neutral gray.
             return Palette(
-                void: ColorPair(light: .hex(0xE4E7EC), dark: .hex(0x12161C)),
-                surface1: ColorPair(light: .hex(0xEEF1F5), dark: .hex(0x1A2028)),
-                surface2: ColorPair(light: .hex(0xDADFE6), dark: .hex(0x232B36)),
-                border: ColorPair(light: .hex(0xB7C0CC), dark: .hex(0x384454)),
-                borderSubtle: ColorPair(light: .hex(0xC7CFD9), dark: .hex(0x2B3542)),
-                textPrimary: ColorPair(light: .hex(0x10151C), dark: .hex(0xEDF1F6)),
-                textSecondary: ColorPair(light: .hex(0x38445A), dark: .hex(0xAEB9C8)),
-                textDim: ColorPair(light: .hex(0x5C6B7D), dark: .hex(0x7C8B9C)),
-                nominal: 0x30D158,
-                warning: 0xFF9F0A,
-                critical: 0xFF453A,
-                interactive: 0x6C9BFF
+                void: .hex(0xEDF1F5, 0x121B25),
+                surface1: .hex(0xF8FAFC, 0x1D2A38),
+                surface2: .hex(0xDFE7EF, 0x2C3C4D),
+                border: .hex(0x7A8EA2, 0x8196AD),
+                borderSubtle: .hex(0xBDCAD7, 0x506880),
+                textPrimary: .hex(0x16283A, 0xEFF5FC),
+                textSecondary: .hex(0x425A70, 0xB6CAE0),
+                textDim: .hex(0x425A70, 0xB6CAE0),
+                nominal: base.nominal, warning: base.warning, critical: base.critical,
+                interactive: .hex(0x235A8C, 0xA1D0FF)
             )
         }
+    }
+}
+
+extension ColorPair {
+    static func hex(_ light: UInt32, _ dark: UInt32) -> ColorPair {
+        ColorPair(light: .hex(light), dark: .hex(dark))
     }
 }

@@ -1,84 +1,95 @@
+import AppKit
 import SwiftUI
 import PulseKit
 
 struct DisplaySliderView: View {
     let monitor: Monitor
     @ObservedObject private var brightnessEngine = BrightnessEngine.shared
-    
-    @State private var isDragging: Bool = false
-    
+
+    private var brightness: Double { brightnessEngine.brightnessMap[monitor.id] ?? 0 }
+    private var valueLabel: String {
+        brightness < 0 ? "Dimmed below minimum" : "\(Int((brightness * 100).rounded()))%"
+    }
+
     var body: some View {
-        let currentBrightness = brightnessEngine.brightnessMap[monitor.id] ?? 0.0
-        
-        VStack(alignment: .leading, spacing: Halo.Space.xs) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(monitor.name)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
+                Label(monitor.name, systemImage: monitor.isBuiltIn ? "laptopcomputer" : "display")
+                    .font(Halo.font(size: 14, weight: .medium)).foregroundStyle(Halo.textPrimary)
                 Spacer()
-                // .rounded() to match the OSD label and the DDC write — plain
-                // Int() truncates and reads 1% lower (93 vs 94 for 0.935).
-                if currentBrightness < 0.0 {
-                    Text("Sub-zero brightness")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Halo.textDim)
-                } else {
-                    Text("\(Int((currentBrightness * 100).rounded()))%")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .foregroundStyle(Halo.textDim)
-                }
+                Text(valueLabel).font(Halo.font(size: 12)).monospacedDigit().foregroundStyle(Halo.textSecondary)
             }
-            
-            // Custom Premium Capsule Slider
-            GeometryReader { geometry in
-                let trackWidth = geometry.size.width
-                let normalized = (currentBrightness + 1.0) / 2.0
-                let fillWidth = max(0, min(trackWidth, trackWidth * CGFloat(normalized)))
-
-                ZStack(alignment: .leading) {
-                    // Track Background
-                    Capsule()
-                        .fill(Halo.surface2)
-                        .frame(height: 18)
-
-                    // Track Fill
-                    Capsule()
-                        .fill(currentBrightness < 0.0 ? AnyShapeStyle(LinearGradient(colors: [.indigo, .blue], startPoint: .leading, endPoint: .trailing)) : AnyShapeStyle(Halo.accentGradient(Halo.ion)))
-                        .frame(width: fillWidth, height: 18)
-                }
-                .clipShape(Capsule())
-                .contentShape(Capsule())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if !isDragging {
-                                withAnimation(Halo.Motion.snappy) {
-                                    isDragging = true
-                                }
-                            }
-                            
-                            let newValue = max(-1.0, min(1.0, (value.location.x / trackWidth) * 2.0 - 1.0))
-
-                            if brightnessEngine.isAdaptiveModeEnabled && !monitor.isBuiltIn {
-                                brightnessEngine.isAdaptiveModeEnabled = false
-                            }
-                            
-                            // User-initiated transitions get smooth spring animation
-                            withAnimation(Halo.Motion.snappy) {
-                                brightnessEngine.setBrightness(for: monitor, to: newValue)
-                            }
+            NativeBrightnessSlider(
+                value: Binding(
+                    get: { brightness },
+                    set: { value in
+                        // Manual changes must stop matching from fighting the user.
+                        if !monitor.isBuiltIn && brightnessEngine.isAdaptiveModeEnabled {
+                            brightnessEngine.isAdaptiveModeEnabled = false
                         }
-                        .onEnded { value in
-                            withAnimation(Halo.Motion.snappy) {
-                                isDragging = false
-                            }
-                            brightnessEngine.saveBrightnessMap()
-                        }
-                )
+                        brightnessEngine.setBrightness(for: monitor, to: value)
+                    }),
+                label: "Brightness for \(monitor.name)", valueDescription: valueLabel,
+                onCommit: { brightnessEngine.saveBrightnessMap() })
+                .frame(height: 28)
+            Text("Below minimum brightness uses a dimming overlay.")
+                .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+            if brightness < 0 {
+                Text("An overlay dims the screen below its hardware minimum.")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
             }
-            .frame(height: 18)
-            .padding(.vertical, 4)
+            if let error = brightnessEngine.lastWriteErrors[monitor.id] {
+                Label("Hardware brightness could not be changed. \(error)", systemImage: "exclamationmark.circle")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(.vertical, Halo.Space.sm)
+        .padding(.vertical, 16)
+    }
+}
+
+/// NSSlider provides the native adjustable accessibility role and keyboard
+/// behavior. SwiftUI's slider was rendered but missing from the macOS 26 AX
+/// tree during runtime verification. Save only after editing completes.
+private struct NativeBrightnessSlider: NSViewRepresentable {
+    @Binding var value: Double
+    let label: String
+    let valueDescription: String
+    let onCommit: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeNSView(context: Context) -> BrightnessControl {
+        let slider = BrightnessControl(value: value, minValue: -1, maxValue: 1,
+                                       target: context.coordinator, action: #selector(Coordinator.changed(_:)))
+        slider.isContinuous = true
+        slider.altIncrementValue = 0.01
+        slider.onCommit = onCommit
+        slider.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        updateNSView(slider, context: context)
+        return slider
+    }
+    func updateNSView(_ slider: BrightnessControl, context: Context) {
+        context.coordinator.parent = self
+        slider.doubleValue = value
+        slider.onCommit = onCommit
+        slider.setAccessibilityLabel(label)
+        slider.setAccessibilityValueDescription(valueDescription)
+    }
+    final class Coordinator: NSObject {
+        var parent: NativeBrightnessSlider
+        init(_ parent: NativeBrightnessSlider) { self.parent = parent }
+        @objc func changed(_ sender: NSSlider) { parent.value = sender.doubleValue }
+    }
+}
+
+private final class BrightnessControl: NSSlider {
+    var onCommit: () -> Void = {}
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        onCommit()
+    }
+    override func keyDown(with event: NSEvent) {
+        super.keyDown(with: event)
+        onCommit()
     }
 }

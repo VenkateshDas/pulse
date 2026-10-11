@@ -15,7 +15,20 @@ final class OptimizeModel {
         var loaded = false
     }
 
-    let tasks = OptimizeEngine.tasks
+    let tasks: [OptimizeTask]
+    private(set) var selectedIDs: Set<String> = []
+    private(set) var isBatchRunning = false
+
+    init(tasks: [OptimizeTask] = OptimizeEngine.tasks) { self.tasks = tasks }
+
+    var selectedTasks: [OptimizeTask] {
+        tasks.filter { selectedIDs.contains($0.id) && state(for: $0.id).loaded && state(for: $0.id).skipReason == nil }
+    }
+
+    func setSelected(_ selected: Bool, id: String) {
+        guard !isAnyRunning, state(for: id).loaded, state(for: id).skipReason == nil else { return }
+        if selected { selectedIDs.insert(id) } else { selectedIDs.remove(id) }
+    }
     let refusals = OptimizeEngine.refusals
     private(set) var states: [String: TaskState] = [:]
     private(set) var didLoad = false
@@ -57,11 +70,21 @@ final class OptimizeModel {
         var s = states[task.id] ?? TaskState()
         s.skipReason = skip
         s.preview = preview
+        s.loaded = true
         states[task.id] = s
     }
 
     func run(_ task: OptimizeTask) async {
-        guard state(for: task.id).skipReason == nil else { return }
+        guard state(for: task.id).loaded, state(for: task.id).skipReason == nil,
+              !state(for: task.id).isRunning else { return }
+        // A preview can go stale while the person reviews it.
+        if let reason = await task.skipCheck() {
+            var skipped = state(for: task.id)
+            skipped.skipReason = reason
+            states[task.id] = skipped
+            selectedIDs.remove(task.id)
+            return
+        }
         var s = states[task.id] ?? TaskState()
         s.isRunning = true
         states[task.id] = s
@@ -79,13 +102,18 @@ final class OptimizeModel {
         await refresh(task)
     }
 
-    var isAnyRunning: Bool { states.values.contains { $0.isRunning } }
+    var isAnyRunning: Bool { isBatchRunning || states.values.contains { $0.isRunning } }
 
-    /// Runs every non-skipped task in sequence — admin ones included, each
-    /// raising its own macOS password prompt via PrivilegedRunner.
-    func runAll() async {
-        for task in tasks where state(for: task.id).skipReason == nil {
+    /// Captures the reviewed selection before starting; unselected tasks never run.
+    func runSelected() async {
+        guard !isAnyRunning else { return }
+        let reviewed = selectedTasks
+        guard !reviewed.isEmpty else { return }
+        isBatchRunning = true
+        defer { isBatchRunning = false }
+        for task in reviewed {
             await run(task)
+            selectedIDs.remove(task.id)
         }
     }
 }

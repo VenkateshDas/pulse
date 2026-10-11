@@ -1,6 +1,14 @@
 import Foundation
 import Darwin
 
+/// Distinguishes a denied file move from journal or rollback failures.
+public struct TrashMoveError: LocalizedError, Sendable {
+    public let domain: String
+    public let code: Int
+    public let message: String
+    public var errorDescription: String? { message }
+}
+
 public struct TrashedItem: Codable, Sendable, Equatable {
     public let originalPath: String
     public let trashPath: String
@@ -69,7 +77,12 @@ public actor UndoJournal {
         try locked {
             try save() // Preflight persistence before touching user files.
             var trashed: NSURL?
-            try FileManager.default.trashItem(at: url, resultingItemURL: &trashed)
+            do {
+                try FileManager.default.trashItem(at: url, resultingItemURL: &trashed)
+            } catch {
+                let failure = error as NSError
+                throw TrashMoveError(domain: failure.domain, code: failure.code, message: failure.localizedDescription)
+            }
             guard let trashPath = trashed?.path else {
                 throw NSError(domain: "Pulse", code: 1, userInfo: [NSLocalizedDescriptionKey: "Trash moved \(url.path) without returning its destination; inspect Finder Trash."])
             }

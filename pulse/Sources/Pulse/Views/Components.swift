@@ -9,18 +9,15 @@ struct FeedbackBadge: View {
     let message: String
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 11))
-            Text(message)
-                .font(.system(size: 11, weight: .medium))
-                .lineLimit(2)
-        }
-        .foregroundStyle(Halo.pulseGreen)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Halo.pulseGreen.opacity(0.10), in: Capsule())
-        .transition(.opacity.combined(with: .move(edge: .top)))
+        Label(message, systemImage: "info.circle")
+            .font(Halo.font(size: 13))
+            .foregroundStyle(Halo.textPrimary)
+            .fixedSize(horizontal: false, vertical: true)
+            .textSelection(.enabled)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityElement(children: .combine)
     }
 }
 
@@ -60,9 +57,10 @@ struct RefreshButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "arrow.clockwise")
-                .font(.system(size: 13, weight: .semibold))
+                .font(Halo.font(size: 13, weight: .semibold))
+                .padding(4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
         .foregroundStyle(Halo.textDim)
         .help(help)
         .accessibilityLabel(help)
@@ -91,19 +89,31 @@ struct PageHeader<Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: Halo.Space.lg) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text(subtitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Halo.textDim)
-                    .fixedSize(horizontal: false, vertical: true)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: Halo.Space.lg) {
+                heading
+                Spacer(minLength: 16)
+                trailing
             }
-            Spacer()
-            trailing
+            VStack(alignment: .leading, spacing: 12) {
+                heading
+                trailing
+            }
         }
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(Halo.font(size: 24, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text(subtitle)
+                .font(Halo.font(size: 13))
+                .foregroundStyle(Halo.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -120,55 +130,16 @@ struct SegmentPicker<T: Hashable>: View {
     var style: Style = .chip
     var help: ((T) -> String)? = nil
 
-    @State private var hovered: T?
-
     var body: some View {
-        HStack(spacing: style == .tab ? Halo.Space.sm : 4) {
+        Picker("View options", selection: $selection) {
             ForEach(options, id: \.value) { option in
-                segment(option.value, label: option.label)
+                Text(option.label).tag(option.value)
             }
         }
-    }
-
-    @ViewBuilder
-    private func segment(_ value: T, label: String) -> some View {
-        let isSelected = selection == value
-        let isHover = hovered == value && !isSelected
-        Button {
-            withAnimation(Halo.Motion.snappy) { selection = value }
-        } label: {
-            Group {
-                switch style {
-                case .tab:
-                    Text(label)
-                        .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? Halo.interactive : Halo.textDim)
-                        .padding(.horizontal, Halo.Space.md)
-                        .padding(.vertical, Halo.Space.sm)
-                        .background(
-                            isSelected
-                                ? Halo.interactive.opacity(0.10)
-                                : (isHover ? Halo.surface2.opacity(0.6) : .clear),
-                            in: Capsule())
-                case .chip:
-                    Text(label.uppercased())
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(isSelected ? Halo.void : Halo.textDim)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            isSelected
-                                ? AnyShapeStyle(Halo.ion)
-                                : AnyShapeStyle(Halo.surface2.opacity(isHover ? 1.0 : 0.75)),
-                            in: Capsule())
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .onHover { hovered = $0 ? value : nil }
-        .help(help?(value) ?? "")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .font(Halo.font(size: 13))
+        .help(help?(selection) ?? "Choose a view")
     }
 }
 
@@ -185,14 +156,14 @@ struct EmptyState: View {
     var body: some View {
         VStack(spacing: Halo.Space.md) {
             Image(systemName: icon)
-                .font(.system(size: 32))
-                .foregroundStyle(tint.opacity(0.55))
+                .font(Halo.font(size: 32))
+                .foregroundStyle(tint)
             Text(title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Halo.textPrimary.opacity(0.85))
+                .font(Halo.font(size: 14, weight: .medium))
+                .foregroundStyle(Halo.textPrimary)
             if let hint {
                 Text(hint)
-                    .font(.system(size: 12))
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -200,5 +171,36 @@ struct EmptyState: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(Halo.Space.xl)
+    }
+}
+
+/// A recognizable task with its purpose and one destination; never executes removal.
+struct TaskRow: View {
+    let title: String
+    let detail: String
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(Halo.font(size: 18))
+                    .foregroundStyle(Halo.interactive)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(Halo.font(size: 14, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                    Text(detail).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").foregroundStyle(Halo.textSecondary).accessibilityHidden(true)
+            }
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 }

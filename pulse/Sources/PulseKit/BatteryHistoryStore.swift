@@ -155,27 +155,9 @@ public final class BatteryHistoryStore {
 
 // MARK: - Global Concurrency Helpers (to avoid Swift 6 region isolation compiler bugs)
 
-func backfillBatteryHistoryFromSystemLog() async -> [Date: TimeInterval] {
-    await Task.detached(priority: .background) { () -> [Date: TimeInterval] in
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
-        process.arguments = ["-g", "log"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            let data = try pipe.fileHandleForReading.readToEnd()
-            process.waitUntilExit()
-            if let data = data, let logContent = String(data: data, encoding: .utf8) {
-                return parseLogContent(logContent)
-            }
-        } catch {
-            log.error("pmset history backfill failed: \(error, privacy: .public)")
-        }
-        return [:]
-    }.value
-}
+/// Retained for source compatibility. Historical shell collection is unsupported;
+/// Pulse records battery history directly and preserves previously saved records.
+func backfillBatteryHistoryFromSystemLog() async -> [Date: TimeInterval] { [:] }
 
 func parseLogContent(_ log: String) -> [Date: TimeInterval] {
     let dateFormatter = DateFormatter()
@@ -393,30 +375,8 @@ func parseBatterySessions(_ log: String) -> [BatterySession] {
     return sessions
 }
 
-/// Background single-process read of `pmset -g log`, parsed into both history totals and discrete sessions.
-public func backfillBatteryDataFromSystemLog() async -> ([Date: TimeInterval], [BatterySession]) {
-    await Task.detached(priority: .background) { () -> ([Date: TimeInterval], [BatterySession]) in
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
-        process.arguments = ["-g", "log"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            let data = try pipe.fileHandleForReading.readToEnd()
-            process.waitUntilExit()
-            if let data, let logContent = String(data: data, encoding: .utf8) {
-                let history = parseLogContent(logContent)
-                let sessions = parseBatterySessions(logContent)
-                return (history, sessions)
-            }
-        } catch {
-            log.error("pmset combined backfill failed: \(error, privacy: .public)")
-        }
-        return ([:], [])
-    }.value
-}
+/// Retained for source compatibility; no subprocess is used for historical collection.
+public func backfillBatteryDataFromSystemLog() async -> ([Date: TimeInterval], [BatterySession]) { ([:], []) }
 
 /// Background read of `pmset -g log`, parsed into backfilled sessions.
 public func backfillBatterySessionsFromSystemLog() async -> [BatterySession] {

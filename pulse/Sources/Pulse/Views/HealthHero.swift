@@ -47,7 +47,6 @@ struct HealthScoreRing: View {
                 .stroke(score.band.color,
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: score.band.color.opacity(0.4), radius: 12)
             label
         }
         .frame(width: diameter, height: diameter)
@@ -62,18 +61,17 @@ struct HealthScoreRing: View {
             EmptyView()
         case .scoreOnly:
             Text("\(score.value)")
-                .font(.system(size: diameter * 0.42, weight: .bold, design: .rounded))
+                .font(Halo.font(size: diameter * 0.42, weight: .bold, design: .rounded))
                 .foregroundStyle(Halo.textPrimary)
-                .contentTransition(.numericText())
+                .monospacedDigit()
         case .full:
             VStack(spacing: 0) {
                 Text("\(score.value)")
-                    .font(.system(size: diameter * 0.38, weight: .bold, design: .rounded))
+                    .font(Halo.font(size: diameter * 0.38, weight: .bold, design: .rounded))
                     .foregroundStyle(Halo.textPrimary)
-                    .contentTransition(.numericText())
-                Text(score.band.rawValue.uppercased())
-                    .font(.system(size: diameter * 0.1, weight: .bold))
-                    .tracking(2)
+                    .monospacedDigit()
+                Text(score.band.rawValue.capitalized)
+                    .font(Halo.font(size: diameter * 0.1, weight: .bold))
                     .foregroundStyle(score.band.color)
             }
         }
@@ -99,10 +97,9 @@ struct DiagnosisBadge: View {
                 Circle()
                     .fill(diagnosis.severity.color)
                     .frame(width: 8, height: 8)
-                    .shadow(color: diagnosis.severity.color.opacity(0.4), radius: 6)
             }
             Text(diagnosis.line)
-                .font(.system(size: 13, weight: .semibold))
+                .font(Halo.font(size: 13, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
             if let name = culpritName, diagnosis.culpritPID != nil {
                 Button {
@@ -111,9 +108,9 @@ struct DiagnosisBadge: View {
                     HStack(spacing: 4) {
                         Text(name).lineLimit(1)
                         Image(systemName: "arrow.up.right")
-                            .font(.system(size: 8, weight: .bold))
+                            .font(Halo.font(size: 8, weight: .bold))
                     }
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Halo.font(size: 11, weight: .medium))
                     .foregroundStyle(diagnosis.severity.color)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)

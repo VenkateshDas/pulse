@@ -17,21 +17,20 @@ final class NetworkModel: NSObject {
     enum SpeedTestState: Equatable {
         case idle
         case running
+        case cancelling
+        case cancelled
         case failed(String)
     }
-
-struct IPLocation: Decodable, Equatable {
-    let ip: String
-    let city: String
-    let country: String
-}
 
     private(set) var speedTestState: SpeedTestState = .idle
     private(set) var lastResult: SpeedTestResult?
     /// Most recent runs first, capped by `SpeedTestStore.maxCount`.
     private(set) var history: [SpeedTestResult] = []
     private(set) var locationAuthorized = false
-    private(set) var ipLocation: IPLocation?
+    private(set) var automaticTestsEnabled: Bool
+    private let defaults: UserDefaults
+    @ObservationIgnored private var testTask: Task<SpeedTestResult?, Never>?
+    var isTesting: Bool { speedTestState == .running || speedTestState == .cancelling }
 
     /// How often the background test re-runs. Real bandwidth is consumed
     /// each run, so this stays coarse — not a live-polled metric.
@@ -40,37 +39,48 @@ struct IPLocation: Decodable, Equatable {
     /// doesn't compete with app startup for bandwidth/CPU.
     static let initialDelay: Duration = .seconds(20)
 
-    private let runner = SpeedTestRunner()
-    private let store = SpeedTestStore()
+    private let performTest: @Sendable () async throws -> SpeedTestResult
+    private let store: SpeedTestStore
+    var automaticTestingScheduled: Bool { autoLoop != nil }
     @ObservationIgnored private var autoLoop: Task<Void, Never>?
     @ObservationIgnored private var locationManager: CLLocationManager?
 
-    override init() {
+    init(defaults: UserDefaults = .standard, store: SpeedTestStore = SpeedTestStore(),
+         performTest: (@Sendable () async throws -> SpeedTestResult)? = nil) {
+        self.defaults = defaults
+        self.store = store
+        let runner = SpeedTestRunner()
+        self.performTest = performTest ?? { try await runner.run() }
+        automaticTestsEnabled = defaults.bool(forKey: "pulse.automaticSpeedTests")
         super.init()
         history = store.results
         lastResult = history.first
     }
 
-    /// Starts the recurring background test. Called once at app launch
-    /// (`PulseApp`), independent of whether the Network page is open — the
-    /// point is a cached result is always ready when the user does open it.
+    /// Starts recurring tests only after a persisted, explicit opt-in.
     func start() {
-        guard autoLoop == nil else { return }
+        guard automaticTestsEnabled, autoLoop == nil else { return }
         autoLoop = Task { [weak self] in
             try? await Task.sleep(for: Self.initialDelay)
             while !Task.isCancelled {
-                guard let self else { return }
+                guard let self, self.automaticTestsEnabled else { return }
                 if ConnectionTypeMonitor.shared.current != .none {
-                    await self.fetchIPLocation()
-                    await self.performTest()
+                    _ = await self.runSpeedTestAwaiting()
                 }
                 try? await Task.sleep(for: Self.autoInterval)
             }
         }
     }
 
-    /// Requests Location authorization on first Network page visit (not app
-    /// launch) — CoreWLAN needs it to return SSID/BSSID.
+    func setAutomaticTests(_ enabled: Bool) {
+        automaticTestsEnabled = enabled
+        defaults.set(enabled, forKey: "pulse.automaticSpeedTests")
+        autoLoop?.cancel()
+        autoLoop = nil
+        if enabled { start() }
+    }
+
+    /// Requests Location only after the explicit Show network name action.
     func requestLocationAuthorizationIfNeeded() {
         let manager = locationManager ?? {
             let manager = CLLocationManager()
@@ -84,56 +94,47 @@ struct IPLocation: Decodable, Equatable {
         manager.requestAlwaysAuthorization()
     }
 
-    /// Manual "Run Test" — same path as the auto-run, just user-triggered.
-    func runSpeedTest() {
-        guard speedTestState != .running else { return }
-        Task { 
-            await fetchIPLocation()
-            await performTest() 
-        }
+    /// Mark the operation running before scheduling work to prevent duplicate clicks.
+    func runSpeedTest() { _ = beginTest() }
+
+    func runSpeedTestAwaiting() async -> SpeedTestResult? {
+        guard let task = beginTest() else { return nil }
+        return await task.value
     }
 
-    /// Hotkey variant: runs the same test but hands the result back so the
-    /// caller can post a notification. Returns nil on failure or if a test
-    /// is already in flight.
-    func runSpeedTestAwaiting() async -> SpeedTestResult? {
-        guard speedTestState != .running else { return nil }
-        await fetchIPLocation()
-        await performTest()
-        guard speedTestState == .idle else { return nil }
-        return lastResult
+    private func beginTest() -> Task<SpeedTestResult?, Never>? {
+        guard !isTesting else { return nil }
+        speedTestState = .running
+        let task = Task { [weak self] () -> SpeedTestResult? in
+            guard let self else { return nil }
+            defer { self.testTask = nil }
+            do {
+                let result = try await self.performTest()
+                try Task.checkCancellation()
+                self.store.record(result)
+                self.history = self.store.results
+                self.lastResult = result
+                self.speedTestState = .idle
+                return result
+            } catch {
+                if Task.isCancelled || self.speedTestState == .cancelling {
+                    self.speedTestState = .cancelled
+                } else {
+                    self.speedTestState = .failed("The test could not finish. Check your connection and try again. Your previous result is still available.")
+                }
+                return nil
+            }
+        }
+        testTask = task
+        return task
     }
 
     func cancelSpeedTest() {
-        Task { await runner.cancel() }
-        speedTestState = .idle
+        guard isTesting else { return }
+        speedTestState = .cancelling
+        testTask?.cancel()
     }
 
-    private func performTest() async {
-        speedTestState = .running
-        do {
-            let result = try await runner.run()
-            store.record(result)
-            history = store.results
-            lastResult = result
-            speedTestState = .idle
-        } catch SpeedTestError.toolUnavailable {
-            speedTestState = .failed("networkQuality isn't available on this Mac")
-        } catch {
-            speedTestState = .failed("Speed test failed — check your connection")
-        }
-    }
-
-    private func fetchIPLocation() async {
-        guard let url = URL(string: "https://ipwho.is/") else { return }
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            ipLocation = try? JSONDecoder().decode(IPLocation.self, from: data)
-        } catch {
-            // Expected when offline — debug, not error.
-            log.debug("IP location fetch failed: \(error, privacy: .public)")
-        }
-    }
 }
 
 extension NetworkModel: CLLocationManagerDelegate {

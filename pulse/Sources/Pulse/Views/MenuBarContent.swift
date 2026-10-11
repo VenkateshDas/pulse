@@ -14,8 +14,6 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     @Environment(\.dismiss) private var dismiss
-    @State private var isOptimizing = false
-    @State private var optimizeReport: String?
     @State private var menuBarCollapsed = false
     @State private var confirmAttentionQuit: (pid: Int32, name: String)?
     @State private var confirmEmptyTrash = false
@@ -28,66 +26,36 @@ struct MenuBarContent: View {
         // popover re-renders (picking up fresh `Halo.*` values) when the
         // user switches presets in Settings.
         let _ = ThemeManager.shared.selected
-        VStack(alignment: .leading, spacing: 12) {
-            // HUD Card
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
                 hud
-                    .padding(12)
-                    .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
-
-                // Vitals Card
-                VStack(spacing: 8) {
-                    if let snapshot = model.snapshot {
-                        let cpuLabel = snapshot.gpuUsage.map { String(format: "%.0f%% · GPU %.0f%%", snapshot.cpuTotalPercent, $0.deviceUtilization) }
-                            ?? String(format: "%.0f%%", snapshot.cpuTotalPercent)
-                        metricRow(
-                            "CPU", cpuLabel,
-                            fraction: snapshot.cpuTotalPercent / 100,
-                            spark: model.cpuHistory)
-                        metricRow(
-                            "Memory", ByteFormat.string(snapshot.memoryUsedBytes),
-                            fraction: snapshot.memoryUsedFraction,
-                            spark: model.memoryHistory)
-                        diskRow(snapshot)
-                        thermalRow(snapshot)
-                        if let battery = snapshot.battery {
-                            batteryRow(battery)
-                        }
-                        networkRow(snapshot)
-                        ipRow
-                        speedRow
-                    } else {
-                        Text("Sampling…")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(Halo.textDim)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding(12)
-                .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
-
-                // Hardware Card
+                Divider()
                 if let snapshot = model.snapshot {
-                    VStack(alignment: .leading, spacing: 10) {
-                        DisplaysPopoverSection()
-                        Divider().overlay(Halo.borderSubtle)
+                    VStack(spacing: 10) {
+                        infoRow("Processor use", String(format: "%.0f%%", snapshot.cpuTotalPercent), color: Halo.textPrimary)
+                        infoRow("Storage available", ByteFormat.string(snapshot.diskFreeBytes), color: Halo.textPrimary)
+                        if let battery = snapshot.battery { batteryRow(battery) }
+                    }
+                    VStack(spacing: 12) {
+                        metricRow("Memory used", ByteFormat.string(snapshot.memoryUsedBytes), fraction: snapshot.memoryUsedFraction, spark: model.memoryHistory)
+                        thermalRow(snapshot)
+                        networkRow(snapshot)
                         topProcesses(snapshot)
                     }
-                    .padding(12)
-                    .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
+                    DisplaysPopoverSection()
+                } else {
+                    ProgressView("Checking current activity…")
                 }
-
-                // Controls Card
-                VStack(spacing: 10) {
-                    keepAwakeRow
-                    Divider().overlay(Halo.borderSubtle)
-                    menuBarManagerRow
-                    Divider().overlay(Halo.borderSubtle)
-                    actions
-                }
-                .padding(12)
-                .background(Halo.surface1.opacity(0.6), in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous))
+                Divider()
+                keepAwakeRow
+                menuBarManagerRow
+                Divider()
+                actions
+            }.padding(18)
         }
-        .padding(14)
+        // MenuBarExtra sizes its panel from the content; a ScrollView has no
+        // intrinsic height, so a maximum alone can collapse it to a thin strip.
+        .frame(height: 620)
         .onAppear {
             model.viewAppeared()
             storage.refreshTrashInfo()
@@ -97,8 +65,9 @@ struct MenuBarContent: View {
             updater.checkForUpdates()  // throttled background check
         }
         .onDisappear { model.viewDisappeared() }
-        .frame(width: 300)
-        .background { GlassLayer(tint: Halo.void.opacity(0.4)) }
+        .frame(width: 360)
+        .background(Halo.surface1)
+        .disabled(confirmEmptyTrash || confirmAttentionQuit != nil)
         .overlay { confirmOverlay }
     }
 
@@ -140,25 +109,27 @@ struct MenuBarContent: View {
     ) -> some View {
         VStack(spacing: 10) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(Halo.font(size: 13, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
             Text(message)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textSecondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
                     .buttonStyle(.bordered)
-                    .clipShape(Capsule())
+
                 Button(actionLabel, role: .destructive, action: onConfirm)
                     .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .clipShape(Capsule())
+                    .foregroundStyle(Halo.onAccent)
+                    .tint(Halo.critical)
+
             }
         }
         .padding(16)
-        .frame(maxWidth: 250)
+        .frame(maxWidth: 320)
         .background(
             Halo.surface1,
             in: RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
@@ -178,69 +149,49 @@ struct MenuBarContent: View {
     private var topAttentionItem: AttentionItem? { model.attentionItems.first }
 
     private var hud: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                HealthScoreRing(score: model.healthScore, diameter: 44, lineWidth: 5, labelMode: .scoreOnly)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(topAttentionItem?.title ?? model.diagnosis.line)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Halo.textPrimary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Text("Health \(model.healthScore.value) · \(model.healthScore.band.rawValue)")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim)
-                }
+        let condition = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Pulse", systemImage: "waveform.path.ecg")
+                    .font(Halo.font(size: 17, weight: .semibold))
                 Spacer()
-                Button {
-                    dismiss()
-                    openWindow(id: "dashboard")
-                    NSApp.activate(ignoringOtherApps: true)
-                } label: {
-                    Image(systemName: "rectangle.grid.2x2")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Halo.textSecondary)
-                        .frame(width: 26, height: 26)
-                        .background(Halo.surface2, in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .help("Open Command Center")
+                Button("Open Pulse") { navigate(to: .dashboard) }.buttonStyle(.bordered)
             }
             if let item = topAttentionItem {
+                Text(item.title).font(Halo.font(size: 14, weight: .semibold))
                 attentionRow(item)
+            } else {
+                Label(condition.title, systemImage: condition.symbol)
+                    .font(Halo.font(size: 14, weight: .semibold))
             }
         }
+    }
+
+    private func navigate(to item: SidebarItem, diskTab: Int? = nil) {
+        PulseNavigation.open(item, diskTab: diskTab)
+        dismiss()
+        openWindow(id: "dashboard")
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @ViewBuilder
     private func attentionRow(_ item: AttentionItem) -> some View {
         HStack(spacing: 8) {
             Text(item.detail)
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
-                .lineLimit(1)
-                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             switch item.action {
             case .quitProcess(let pid, let name):
                 Button("Quit") { confirmAttentionQuit = (pid, name) }
                     .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
                     .tint(Halo.ion.opacity(0.85))
                     .controlSize(.mini)
             case .cleanJunk:
-                Button {
-                    clean.runNow()
-                } label: {
-                    if clean.isRunning {
-                        ProgressView().controlSize(.mini)
-                    } else {
-                        Text("Clean")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Halo.amber.opacity(0.85))
-                .controlSize(.mini)
-                .disabled(clean.isRunning)
+                Button("Review cleanup") { navigate(to: .storage, diskTab: 1) }
+                    .buttonStyle(.bordered)
             case .openPane(let target):
                 Button("Review") { navigateAttention(to: target) }
                     .buttonStyle(.bordered)
@@ -252,16 +203,9 @@ struct MenuBarContent: View {
     }
 
     private func navigateAttention(to target: AttentionTarget) {
-        dismiss()
-        openWindow(id: "dashboard")
-        NSApp.activate(ignoringOtherApps: true)
         switch target {
-        case .monitor:
-            NotificationCenter.default.post(name: DashboardView.navigateToMonitor, object: nil)
-        case .storage:
-            // Low-disk review belongs on Storage → Reclaim (the cleanable
-            // list), not Optimize — same route the Timeline spike tap uses.
-            NotificationCenter.default.post(name: TimelineView.navigateToClean, object: nil)
+        case .monitor: navigate(to: .monitor)
+        case .storage: navigate(to: .storage, diskTab: 1)
         }
     }
 
@@ -271,11 +215,11 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.textSecondary)
                 Spacer()
                 Text(value)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.textPrimary)
             }
             HStack(spacing: 6) {
@@ -292,11 +236,11 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Disk free")
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 Text("\(ByteFormat.string(snapshot.diskFreeBytes)) / \(ByteFormat.string(snapshot.diskTotalBytes))")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.textPrimary)
             }
             bar(snapshot.diskUsedFraction)
@@ -304,7 +248,7 @@ struct MenuBarContent: View {
                 // Same sign semantics as the Dashboard disk card: + = usage grew.
                 let sign = weekly >= 0 ? "+" : "−"
                 Text("\(sign)\(ByteFormat.string(UInt64(abs(weekly)))) used this week")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(Halo.font(size: 10, design: .monospaced))
                     .foregroundStyle(weekly >= 0 ? Halo.amber : Halo.pulseGreen)
             }
         }
@@ -338,7 +282,7 @@ struct MenuBarContent: View {
         let (value, color): (String, Color) =
             switch snapshot.connectionType {
             case .wifi:
-                ("\(wifi?.ssid ?? "Wi-Fi") · \(wifi?.signalQualityPercent ?? 0)%",
+                (wifi.map { "\($0.ssid ?? "Wi-Fi") · \($0.signalQualityPercent)% signal" } ?? "Wi-Fi connected; signal unavailable",
                  (wifi?.signalQualityFraction ?? 0) < 0.35
                      ? Halo.flare
                      : ((wifi?.signalQualityFraction ?? 0) < 0.65 ? Halo.amber : Halo.pulseGreen))
@@ -347,73 +291,43 @@ struct MenuBarContent: View {
             case .other: ("Connected", Halo.textPrimary)
             case .none: ("Offline", Halo.textDim)
             }
-        return infoRow("Network", value, color: color)
-    }
-
-    private var ipRow: some View {
-        if let loc = network.ipLocation {
-            return infoRow("Public IP", "\(loc.ip) · \(loc.city)", color: Halo.textPrimary)
-        } else {
-            return infoRow("Public IP", "Fetching…", color: Halo.textDim)
-        }
-    }
-
-    /// Cached speed-test result (auto-refreshed every 30 min by NetworkModel)
-    /// with an inline re-run trigger: a tiny gauge icon that swaps to a
-    /// spinner while the ~20 s test runs. Before the first result the whole
-    /// value slot becomes a "Run test" link.
-    private var speedRow: some View {
-        let running = network.speedTestState == .running
-        return HStack {
-            Text("Speed")
-                .font(.system(size: 11))
-                .foregroundStyle(Halo.textDim)
-            Spacer()
-            if running {
-                Text("Testing…")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.textDim)
-                ProgressView()
-                    .controlSize(.mini)
-            } else if let result = network.lastResult {
-                Text(String(format: "%.0f ↓ · %.0f ↑ Mbps", result.downloadMbps, result.uploadMbps))
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.textPrimary)
-                    .help("Tested \(result.date.formatted(date: .omitted, time: .shortened)) · auto every 30 min")
-                speedTestButton
-            } else {
-                Button("Run test") { network.runSpeedTest() }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Halo.ion)
-                    .help("Measure internet speed now — takes about 20 seconds")
+        return VStack(spacing: 8) {
+            infoRow("Network", value, color: color)
+            HStack {
+                if let result = network.lastResult {
+                    Text(String(format: "↓ %.0f · ↑ %.0f Mbps", result.downloadMbps, result.uploadMbps))
+                        .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
+                        .accessibilityLabel(String(format: "Last speed test: download %.0f, upload %.0f megabits per second", result.downloadMbps, result.uploadMbps))
+                } else {
+                    Text("Speed not tested").font(Halo.font(size: 12))
+                }
+                Spacer()
+                if network.isTesting {
+                    ProgressView().controlSize(.small)
+                    Button { network.cancelSpeedTest() } label: { Image(systemName: "stop.circle") }
+                        .accessibilityLabel("Stop speed test")
+                } else {
+                    Button { network.runSpeedTest() } label: { Image(systemName: "arrow.clockwise") }
+                        .accessibilityLabel("Test network speed")
+                        .help("Test download and upload speed. Uses up to 18 MB of network data.")
+                }
+            }
+            if case .failed(let message) = network.speedTestState {
+                Text(message).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    private var speedTestButton: some View {
-        Button {
-            network.runSpeedTest()
-        } label: {
-            Image(systemName: "gauge.with.needle")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Halo.ion)
-                .frame(width: 18, height: 18)
-                .background(Halo.ion.opacity(0.12), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .help("Re-test internet speed now — takes about 20 seconds")
     }
 
     /// Compact label/value row (no bar/sparkline) for the secondary metrics.
     private func infoRow(_ label: String, _ value: String, color: Color) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textDim)
             Spacer()
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(color)
         }
     }
@@ -446,6 +360,7 @@ struct MenuBarContent: View {
             }
         }
         .frame(height: 4)
+        .accessibilityHidden(true)
     }
 
     // MARK: Top processes
@@ -456,23 +371,22 @@ struct MenuBarContent: View {
         if !top.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
                 Text("TOP PROCESSES")
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 ForEach(top) { proc in
                     HStack(spacing: 8) {
                         Text(proc.name)
-                            .font(.system(size: 11))
+                            .font(Halo.font(size: 11))
                             .foregroundStyle(Halo.textPrimary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                         Spacer()
                         Text(String(format: "%.0f%%", proc.cpuPercent))
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(Halo.font(size: 10, design: .monospaced))
                             .foregroundStyle(Halo.ion)
                             .frame(width: 38, alignment: .trailing)
                         Text(ByteFormat.string(proc.residentBytes))
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(Halo.font(size: 10, design: .monospaced))
                             .foregroundStyle(Halo.textDim)
                             .frame(width: 56, alignment: .trailing)
                     }
@@ -488,10 +402,10 @@ struct MenuBarContent: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: awake.isActive ? "cup.and.saucer.fill" : "cup.and.saucer")
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(awake.isActive ? Halo.ion : Halo.textSecondary)
                 Text("Keep Awake")
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.textSecondary)
                 Spacer()
                 if awake.isActive {
@@ -502,7 +416,7 @@ struct MenuBarContent: View {
                     } label: {
                         SwiftUI.TimelineView(.periodic(from: .now, by: 30)) { _ in
                             Text(awake.remainingText ?? "On")
-                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Halo.ion)
                         }
                     }
@@ -510,7 +424,7 @@ struct MenuBarContent: View {
                     .fixedSize()
                     .help("Change duration")
                 }
-                Toggle("", isOn: Binding(
+                Toggle("Keep Mac awake", isOn: Binding(
                     get: { awake.isActive },
                     set: { $0 ? awake.activate() : awake.deactivate() }
                 ))
@@ -520,11 +434,11 @@ struct MenuBarContent: View {
             }
             if awake.isActive {
                 Text("Mac won't sleep\(awake.expiresAt == nil ? " until turned off" : "").")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .foregroundStyle(Halo.textDim)
             } else if awake.lastActivationFailed {
                 Text("Couldn't create the power assertion — try again.")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .foregroundStyle(Halo.amber)
             }
         }
@@ -536,13 +450,13 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: "menubar.rectangle")
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.textSecondary)
                 Text("Menu Bar Manager")
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.textSecondary)
                 Spacer()
-                Toggle("", isOn: Binding(
+                Toggle("Organise menu bar icons", isOn: Binding(
                     get: { MenuBarManager.shared.isEnabled },
                     set: {
                         MenuBarManager.shared.isEnabled = $0
@@ -567,7 +481,7 @@ struct MenuBarContent: View {
                 .tint(Halo.ion)
 
                 Text("Or click the ‹ chevron in the menu bar. ⌘-drag an icon right of the | separator to keep it always visible.")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .foregroundStyle(Halo.textDim)
             }
         }
@@ -577,70 +491,28 @@ struct MenuBarContent: View {
     // MARK: Actions
 
     private var actions: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Button {
-                    isOptimizing = true
-                    optimizeReport = nil
-                    Task {
-                        let report = await OptimizeEngine.runSafeTasks()
-                        isOptimizing = false
-                        optimizeReport = report
-                    }
-                } label: {
-                    Label(isOptimizing ? "Optimizing…" : "Optimize", systemImage: "bolt.heart.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .controlSize(.regular)
-                .buttonStyle(.bordered)
-                .tint(Halo.pulseGreen)
-                .clipShape(Capsule())
-                .disabled(isOptimizing)
-
-                Button {
-                    confirmEmptyTrash = true
-                } label: {
-                    Label(trashLabel, systemImage: "trash")
-                        .frame(maxWidth: .infinity)
-                }
-                .controlSize(.regular)
-                .buttonStyle(.bordered)
-                .tint(Halo.amber)
-                .clipShape(Capsule())
+        VStack(alignment: .leading, spacing: 10) {
+            Button { navigate(to: .storage, diskTab: 1) } label: {
+                Label("Review cleanup", systemImage: "folder")
+                    .frame(maxWidth: .infinity)
+            }.buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
+            Button { navigate(to: .optimize) } label: {
+                Label("Review maintenance tasks", systemImage: "checklist")
+                    .frame(maxWidth: .infinity)
+            }.buttonStyle(.bordered)
+            Button { confirmEmptyTrash = true } label: {
+                Label(trashLabel, systemImage: "trash").frame(maxWidth: .infinity)
+            }.buttonStyle(.bordered)
                 .disabled(storage.trashItemCount == 0 || storage.isCleaning)
-            }
-
-            if isOptimizing {
-                Text("Running safe optimizations…")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
-            } else if let report = optimizeReport {
-                Text(report)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.pulseGreen)
-                    .lineLimit(2)
-            } else if storage.isCleaning {
-                Text("Emptying Trash…")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.textDim)
+            if storage.isCleaning {
+                ProgressView("Emptying Trash…")
             } else if let report = storage.cleanReport {
-                Text(report)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Halo.pulseGreen)
-                    .lineLimit(2)
+                Text(report).font(Halo.font(size: 13)).foregroundStyle(Halo.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
             updateRow
-
-            Button("Quit Pulse") {
-                // The one true exit. Cmd-Q only closes the window (stays in the
-                // menu bar); this actually terminates Pulse.
-                AppActivation.shared.quit()
-            }
-            .buttonStyle(.plain)
-            .font(.system(size: 11))
-            .foregroundStyle(Halo.textDim)
-            .frame(maxWidth: .infinity)
+            Button("Quit Pulse") { AppActivation.shared.quit() }.buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -657,17 +529,18 @@ struct MenuBarContent: View {
             }
             .controlSize(.small)
             .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
             .tint(Halo.ion)
-            .clipShape(Capsule())
+
         case .checking:
             Text("Checking for updates…")
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textDim)
                 .frame(maxWidth: .infinity)
         default:
             Button(updateLinkLabel) { updater.checkForUpdates(userInitiated: true) }
                 .buttonStyle(.plain)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(updater.status == .failed ? Halo.amber : Halo.ion)
                 .frame(maxWidth: .infinity)
         }

@@ -17,7 +17,7 @@ struct TrashView: View {
             VStack(alignment: .leading, spacing: Halo.Space.lg) {
                 PageHeader(
                     "Trash",
-                    subtitle: "\(storage.trashItemCount) items (\(ByteFormat.string(storage.trashBytes))) — plus every Pulse operation you can still undo."
+                    subtitle: "Review what was removed. Emptying Trash permanently removes its contents."
                 ) {
                     RefreshButton(help: "Refresh Trash contents") {
                         storage.refreshTrashInfo()
@@ -27,25 +27,26 @@ struct TrashView: View {
                         ProgressView().controlSize(.small)
                     } else if let report = storage.cleanReport {
                         Text(report)
-                            .font(.system(size: 11))
+                            .font(Halo.font(size: 11))
                             .foregroundStyle(Halo.pulseGreen)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if selectedTab == .raw {
                         Button(role: .destructive) {
                             confirmEmpty = true
                         } label: {
                             Text("Empty Trash")
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(Halo.font(size: 11, weight: .semibold))
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(Color.red)
+                    .foregroundStyle(Halo.onAccent)
+                        .tint(Halo.critical)
                         .controlSize(.small)
                         .disabled(storage.trashItemCount == 0 || storage.isCleaning)
                     }
                 }
                 SegmentPicker(
-                    options: [(Tab.raw, "Raw Trash"), (Tab.history, "Pulse History")],
+                    options: [(Tab.raw, "Trash contents"), (Tab.history, "Recent removals")],
                     selection: $selectedTab)
             }
             .padding(.horizontal, 24)
@@ -62,13 +63,13 @@ struct TrashView: View {
                         hint: "Pulse needs Full Disk Access to view your Trash.\nGo to System Settings > Privacy & Security to grant access.",
                         tint: Halo.amber)
                 } else if storage.trashItemCount == 0 {
-                    EmptyState(icon: "trash", title: "Trash is Empty")
+                    EmptyState(icon: "trash", title: "Trash is empty", hint: "Items moved here will be available to review before permanent removal.")
                 } else {
                     contentList
                 }
             } else {
                 if storage.undoEntries.isEmpty {
-                    EmptyState(icon: "clock.arrow.circlepath", title: "No Recent Operations")
+                    EmptyState(icon: "clock.arrow.circlepath", title: "No recent removals", hint: "Recoverable removals made by Pulse appear here while the items remain in Trash.")
                 } else {
                     historyList
                 }
@@ -101,7 +102,7 @@ struct TrashView: View {
             .padding(.vertical, 8)
         }
     }
-    
+
     private var historyList: some View {
         ScrollView {
             LazyVStack(spacing: 8) {
@@ -123,17 +124,17 @@ private struct TrashItemRow: View {
             Image(nsImage: NSWorkspace.shared.icon(forFile: item.id))
                 .resizable()
                 .frame(width: 24, height: 24)
-            
+
             Text(item.name)
-                .font(.system(size: 12, weight: .medium))
+                .font(Halo.font(size: 12, weight: .medium))
                 .foregroundStyle(Halo.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            
+
             Spacer(minLength: 16)
-            
+
             Text(ByteFormat.string(item.sizeBytes))
-                .font(.system(size: 11, design: .monospaced))
+                .font(Halo.font(size: 11, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
         }
         .padding(.horizontal, 16)
@@ -146,60 +147,62 @@ private struct UndoEntryRow: View {
     @Environment(StorageModel.self) private var storage
     let entry: UndoEntry
     @State private var isExpanded = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(entry.op)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(Halo.font(size: 13, weight: .semibold))
                         .foregroundStyle(Halo.textPrimary)
-                    
+
                     Text("\(entry.date.formatted(date: .abbreviated, time: .shortened)) · \(entry.items.count) items · \(ByteFormat.string(UInt64(entry.bytesFreed)))")
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textDim)
                 }
-                
+
                 Spacer()
-                
+
                 Button("Restore") {
                     storage.restore(entry: entry)
                 }
                 .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
                 .tint(Halo.interactive)
                 .controlSize(.small)
                 .disabled(storage.isCleaning)
-                
+
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) {
+                    withAnimation(Halo.Motion.snappy) {
                         isExpanded.toggle()
                     }
                 } label: {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(Halo.font(size: 10, weight: .bold))
                         .foregroundStyle(Halo.textDim)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .frame(width: 16, height: 16)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
+                .accessibilityLabel(isExpanded ? "Hide removed files" : "Show removed files")
             }
             .padding(16)
             .background(Halo.surface1)
-            
+
             if isExpanded {
                 Divider().background(Halo.borderSubtle)
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(entry.items.prefix(10), id: \.originalPath) { item in
                         Text(URL(fileURLWithPath: item.originalPath).lastPathComponent)
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Halo.font(size: 11, design: .monospaced))
                             .foregroundStyle(Halo.textDim)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
                     if entry.items.count > 10 {
                         Text("... and \(entry.items.count - 10) more")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(Halo.textDim.opacity(0.6))
+                            .font(Halo.font(size: 11, design: .monospaced))
+                            .foregroundStyle(Halo.textDim)
                     }
                 }
                 .padding(16)

@@ -11,10 +11,9 @@ struct CoreHeatmap: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 4) {
                 Text("PER-CORE")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                 Image(systemName: "info.circle")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .help("Instantaneous load distribution across all CPU cores")
             }
             .foregroundStyle(Halo.textDim)

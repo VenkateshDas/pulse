@@ -32,8 +32,9 @@ struct TimelineView: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    removalHistory
                     weekSummaryCard
-                    sectionLabel("DAILY HISTORY · NEWEST FIRST")
+                    sectionLabel("Daily history · newest first")
                     todayCard
                     if !pastEntries.isEmpty {
                         pastDaysCard
@@ -45,7 +46,7 @@ struct TimelineView: View {
                         categoryCard(latest)
                     }
                     if !dashboard.recentAnomalies.isEmpty {
-                        sectionLabel("PROCESS ANOMALIES · SUSTAINED CPU")
+                        sectionLabel("Recorded app activity")
                         anomalyCard
                     }
                 }
@@ -55,16 +56,41 @@ struct TimelineView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
-        .onAppear { model.recordToday(scan: storage.scan) }
+        .background(Halo.void)
+        .onAppear {
+            model.recordToday(scan: storage.scan)
+            storage.refreshUndoHistory()
+        }
+    }
+
+    private var removalHistory: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recent removals").font(Halo.font(size: 17, weight: .semibold))
+            if storage.undoEntries.isEmpty {
+                Text("No removal records available. Pulse records supported file moves so you can review what changed.")
+                    .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+            } else {
+                ForEach(Array(storage.undoEntries.prefix(5))) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.op).font(Halo.font(size: 14, weight: .medium))
+                        Text("\(entry.items.count) items · \(entry.date.formatted(date: .abbreviated, time: .shortened))")
+                            .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                    }
+                }
+            }
+            Button("Review removals and restore options") { PulseNavigation.open(.storage, diskTab: 2) }
+                .buttonStyle(.bordered)
+            Text("Moving files to Trash does not free storage until Trash is emptied. Restore is available only while the files remain there.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+        }.premiumCard()
     }
 
     // MARK: - Header
 
     private var header: some View {
         PageHeader(
-            "Timeline",
-            subtitle: "Your Mac's daily health record — disk growth, battery sessions, and notable events."
+            "Activity",
+            subtitle: "Review recorded storage changes, battery sessions and app activity. Observations are separate from actions you took."
         )
         .padding(.bottom, 4)
     }
@@ -78,21 +104,21 @@ struct TimelineView: View {
                 HStack(spacing: 10) {
                     let isLeak = anomaly.kind == .memoryLeak
                     Image(systemName: isLeak ? "memorychip" : "bolt.horizontal.fill")
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.amber)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(anomaly.processName)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(Halo.font(size: 12, weight: .semibold))
                             .foregroundStyle(Halo.textPrimary)
                         Text(isLeak
                             ? "+\(ByteFormat.string(UInt64(max(anomaly.growthBytes ?? 0, 0)))) RAM in \(Int(anomaly.sustainedSeconds / 60)) min · pid \(anomaly.pid)"
                             : "\(Int(anomaly.cpuPercent))% CPU for \(Int(anomaly.sustainedSeconds / 60)) min · pid \(anomaly.pid)")
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(Halo.font(size: 10, design: .monospaced))
                             .foregroundStyle(Halo.textDim)
                     }
                     Spacer()
                     Text(anomaly.date.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                 }
                 .padding(.vertical, 8)
@@ -103,7 +129,7 @@ struct TimelineView: View {
         }
         .padding(.horizontal, 14)
         .premiumCard(padding: 0)
-        
+
     }
 
     // MARK: - Data join
@@ -153,14 +179,13 @@ struct TimelineView: View {
         let weekDisk = model.weeklyDeltaBytes
 
         return VStack(alignment: .leading, spacing: 12) {
-            Text("PAST 7 DAYS")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
+            Text("Past 7 days")
+                .font(Halo.font(size: 10, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
 
             HStack(spacing: 10) {
                 summaryCell(
-                    label: "Disk grew",
+                    label: "Storage change",
                     value: weekDisk == 0
                         ? "—"
                         : "\(weekDisk > 0 ? "+" : "−")\(ByteFormat.string(UInt64(abs(weekDisk))))",
@@ -172,18 +197,18 @@ struct TimelineView: View {
                     color: Halo.ion
                 )
                 summaryCell(
-                    label: "Avg/day",
+                    label: "Daily battery average",
                     value: avgBattery.map { String(format: "%.1f h", $0) } ?? "—",
                     color: Halo.textPrimary
                 )
                 if let bench = healthModel.latestBenchmark {
                     summaryCell(
-                        label: "Benchmark",
+                        label: "Latest performance test",
                         value: "\(bench.score)",
                         color: bench.score >= 1000 ? Halo.pulseGreen : bench.score >= 500 ? Halo.amber : Halo.flare
                     )
                 } else {
-                    summaryCell(label: "Benchmark", value: "—", color: Halo.textDim)
+                    summaryCell(label: "Latest performance test", value: "—", color: Halo.textDim)
                 }
             }
         }
@@ -194,10 +219,10 @@ struct TimelineView: View {
     private func summaryCell(label: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 18, weight: .semibold, design: .monospaced))
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -221,12 +246,11 @@ struct TimelineView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(todayDateString())
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(Halo.font(size: 13, weight: .semibold))
                     .foregroundStyle(Halo.textPrimary)
                 Spacer()
                 Text("TODAY")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.ion)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -261,15 +285,15 @@ struct TimelineView: View {
             if let bench = todayBench {
                 HStack(spacing: 6) {
                     Image(systemName: "gauge.with.needle")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                     Text("Benchmark run today — score \(bench.score)")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Halo.font(size: 11, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                     Spacer()
                     Text(bench.date.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Halo.textDim.opacity(0.7))
+                        .font(Halo.font(size: 10, design: .monospaced))
+                        .foregroundStyle(Halo.textDim)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -294,19 +318,18 @@ struct TimelineView: View {
     private func todayMetric(label: String, value: String, sub: String?, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 17, weight: .semibold, design: .monospaced))
                 .foregroundStyle(color)
             if let sub {
                 Text(sub)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
             } else {
                 Text(" ")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -322,13 +345,12 @@ struct TimelineView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("PAST DAYS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 Text("disk · battery")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Halo.textDim.opacity(0.6))
+                    .font(Halo.font(size: 10, design: .monospaced))
+                    .foregroundStyle(Halo.textDim)
             }
             .padding(.bottom, 10)
 
@@ -349,36 +371,41 @@ struct TimelineView: View {
         let isExpanded = expandable && expandedDays.contains(entry.date)
 
         return VStack(spacing: 4) {
+            Button {
+                withAnimation(Halo.Motion.snappy) {
+                    if isExpanded { expandedDays.remove(entry.date) }
+                    else { expandedDays.insert(entry.date) }
+                }
+            } label: {
             HStack(spacing: 10) {
                 HStack(spacing: 5) {
                     if expandable {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Halo.textDim.opacity(0.7))
+                            .font(Halo.font(size: 8, weight: .bold))
+                            .foregroundStyle(Halo.textDim)
                             .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     }
                     Text(pastDateString(entry.date))
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textDim)
                 }
                 .frame(width: 84, alignment: .leading)
 
                 if let delta = entry.diskDeltaBytes {
                     Text(deltaSub(delta))
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Halo.font(size: 11, design: .monospaced))
                         .foregroundStyle(diskDeltaColor(delta))
                         .frame(width: 88, alignment: .leading)
                 } else {
                     Text("—")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Halo.font(size: 11, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                         .frame(width: 88, alignment: .leading)
                 }
 
                 if isSpike {
-                    Text("SPIKE")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(0.8)
+                    Text("Large change")
+                        .font(Halo.font(size: 9, weight: .bold))
                         .foregroundStyle(Halo.flare)
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Halo.flare.opacity(0.12), in: Capsule())
@@ -391,19 +418,26 @@ struct TimelineView: View {
                     HStack(spacing: 4) {
                         if let first = entry.firstActiveAt, let last = entry.lastActiveAt {
                             Text("\(formatTime(first)) – \(formatTime(last))")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Halo.textDim.opacity(0.7))
+                                .font(Halo.font(size: 10))
+                                .foregroundStyle(Halo.textDim)
                         }
                         Text(String(format: "%.1f h", hours))
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Halo.ion)
                     }
                 } else {
                     Text("no battery data")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim.opacity(0.5))
+                        .font(Halo.font(size: 10))
+                        .foregroundStyle(Halo.textDim)
                 }
             }
+
+            }
+            .buttonStyle(.plain)
+            .disabled(!expandable)
+            .accessibilityLabel("\(pastDateString(entry.date)), storage change \(entry.diskDeltaBytes.map(deltaSub) ?? "not recorded"), battery time \(entry.batteryHours.map { String(format: "%.1f hours", $0) } ?? "not recorded")")
+            .accessibilityValue(expandable ? (isExpanded ? "Details expanded" : "Details collapsed") : "")
+            .help("Show recorded storage details for this day")
 
             // Delta bar
             GeometryReader { geo in
@@ -427,17 +461,6 @@ struct TimelineView: View {
                 .frame(height: 0.5)
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            guard expandable else { return }
-            withAnimation(Halo.Motion.snappy) {
-                if isExpanded {
-                    expandedDays.remove(entry.date)
-                } else {
-                    expandedDays.insert(entry.date)
-                }
-            }
-        }
-        .help(expandable ? "Click for the per-folder breakdown of this change" : "")
     }
 
     // MARK: - Growth attribution ("where it changed")
@@ -452,7 +475,7 @@ struct TimelineView: View {
                 attributionSection(for: entry.date, limit: 8)
             } else {
                 Text("No breakdown for this day — Pulse can only attribute growth on days a storage scan ran on both ends of the change.")
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(Halo.textDim)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -461,7 +484,7 @@ struct TimelineView: View {
                     NotificationCenter.default.post(name: Self.navigateToClean, object: nil)
                 } label: {
                     Label("Review in Reclaim", systemImage: "sparkles")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(Halo.font(size: 10, weight: .semibold))
                         .foregroundStyle(Halo.ion)
                 }
                 .buttonStyle(.plain)
@@ -486,12 +509,11 @@ struct TimelineView: View {
                 abs(attribution.otherBytes), 1)
             VStack(alignment: .leading, spacing: 5) {
                 Text("WHERE IT CHANGED · SINCE \(shortDate(attribution.baselineDate))")
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 if changes.isEmpty && attribution.otherBytes == 0 {
                     Text("Only small moves — nothing shifted by more than 50 MB.")
-                        .font(.system(size: 10))
+                        .font(Halo.font(size: 10))
                         .foregroundStyle(Halo.textDim)
                 } else {
                     ForEach(changes, id: \.name) { change in
@@ -512,7 +534,7 @@ struct TimelineView: View {
     ) -> some View {
         HStack(spacing: 10) {
             Text(name)
-                .font(.system(size: 11))
+                .font(Halo.font(size: 11))
                 .foregroundStyle(dim ? Halo.textDim : Halo.textPrimary)
                 .frame(width: 150, alignment: .leading)
                 .lineLimit(1)
@@ -528,7 +550,7 @@ struct TimelineView: View {
             }
             .frame(height: 5)
             Text(deltaSub(delta))
-                .font(.system(size: 10, design: .monospaced))
+                .font(Halo.font(size: 10, design: .monospaced))
                 .foregroundStyle(diskDeltaColor(delta).opacity(dim ? 0.7 : 1))
                 .frame(width: 88, alignment: .trailing)
         }
@@ -549,14 +571,13 @@ struct TimelineView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("DISK USED · \(model.snapshots.count)-DAY TREND")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Storage used · \(model.snapshots.count) recorded days")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 if let last = model.snapshots.last {
                     Text(ByteFormat.string(last.totalUsedBytes))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Halo.font(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundStyle(Halo.ion)
                 }
             }
@@ -566,10 +587,12 @@ struct TimelineView: View {
                     Spacer()
                     Text("0")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 56, alignment: .trailing)
                 HistoryChart(values: series, color: Halo.ion, maxValue: scale)
+                    .accessibilityLabel("Recorded storage usage")
+                    .accessibilityValue(model.snapshots.last.map { "Latest recorded use \(ByteFormat.string($0.totalUsedBytes)). Readings are daily snapshots, not continuous tracking." } ?? "No readings")
             }
             .frame(height: 90)
         }
@@ -584,13 +607,12 @@ struct TimelineView: View {
         let maxBytes = sorted.first?.value ?? 1
         return VStack(alignment: .leading, spacing: 10) {
             Text("WHAT'S USING SPACE · LATEST SCAN")
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2)
+                .font(Halo.font(size: 10, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             ForEach(Array(sorted), id: \.key) { name, bytes in
                 HStack(spacing: 10) {
                     Text(name)
-                        .font(.system(size: 11))
+                        .font(Halo.font(size: 11))
                         .foregroundStyle(Halo.textPrimary)
                         .frame(width: 130, alignment: .leading)
                         .lineLimit(1)
@@ -601,7 +623,7 @@ struct TimelineView: View {
                     }
                     .frame(height: 8)
                     Text(ByteFormat.string(bytes))
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Halo.font(size: 11, design: .monospaced))
                         .foregroundStyle(Halo.textDim)
                         .frame(width: 76, alignment: .trailing)
                 }
@@ -615,9 +637,8 @@ struct TimelineView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .semibold))
-            .tracking(1.5)
-            .foregroundStyle(Halo.textDim.opacity(0.7))
+            .font(Halo.font(size: 9, weight: .semibold))
+            .foregroundStyle(Halo.textDim)
     }
 
     private func deltaSub(_ delta: Int64) -> String {

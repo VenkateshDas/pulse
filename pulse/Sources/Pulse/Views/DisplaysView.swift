@@ -5,27 +5,31 @@ struct DisplaysView: View {
     @ObservedObject private var brightnessEngine = BrightnessEngine.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        ScrollView {
+        VStack(alignment: .leading, spacing: 24) {
             header
-            
+
             VStack(spacing: 0) {
                 Toggle(isOn: $brightnessEngine.isAdaptiveModeEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Adaptive Sync")
-                            .font(.system(size: 13, weight: .semibold))
+                        Text("Match built-in brightness")
+                            .font(Halo.font(size: 13, weight: .semibold))
                             .foregroundStyle(Halo.textPrimary)
-                        Text("Syncs external monitors to the built-in display's ambient brightness.")
-                            .font(.system(size: 11))
+                        Text("External screens follow your built-in screen. Adjusting an external screen manually turns matching off.")
+                            .font(Halo.font(size: 11))
                             .foregroundStyle(Halo.textDim)
                     }
                 }
                 .toggleStyle(.switch)
+                .accessibilityLabel("Match built-in brightness")
+                .accessibilityHint("External screens follow the built-in screen. A manual adjustment stops matching.")
+                .disabled(!brightnessEngine.monitors.contains { !$0.isBuiltIn })
                 .padding()
-                
+
                 Divider().overlay(Halo.borderSubtle)
-                
+
                 if brightnessEngine.monitors.isEmpty {
-                    Text("No monitors detected.")
+                    Text("No screens are available. Connect a display, then reopen this page.")
                         .font(.subheadline)
                         .foregroundStyle(Halo.textDim)
                         .padding()
@@ -41,21 +45,22 @@ struct DisplaysView: View {
             }
             .padding(16)
             .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
-            
+
             Spacer()
         }
         .padding(24)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
+        .background(Halo.void)
         .onAppear {
             brightnessEngine.refreshMonitors()
         }
     }
-    
+
     private var header: some View {
         PageHeader(
             "Displays",
-            subtitle: "Intelligent adaptive brightness for built-in and external displays."
+            subtitle: "Make each screen comfortable. Use the slider or your keyboard to adjust brightness."
         )
     }
 }

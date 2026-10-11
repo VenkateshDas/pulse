@@ -139,6 +139,7 @@ public struct SmartScanner: Sendable {
     private func scanKnownLocations() -> [CleanItem] {
         var out: [CleanItem] = []
         for target in effectiveTargets {
+            if Task.isCancelled { break }
             let url = home.appendingPathComponent(target.rel)
             guard FileManager.default.fileExists(atPath: url.path) else { continue }
             if target.rel == ".Trash" {
@@ -183,6 +184,7 @@ public struct SmartScanner: Sendable {
         else { return [] }
         var out: [CleanItem] = []
         for child in children {
+            if Task.isCancelled { break }
             guard (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
             else { continue }
             let size = Self.directorySize(child)
@@ -212,6 +214,7 @@ public struct SmartScanner: Sendable {
         else { return [] }
         var out: [CleanItem] = []
         for child in children {
+            if Task.isCancelled { break }
             let isDir =
                 (try? child.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
             let size =
@@ -258,6 +261,7 @@ public struct SmartScanner: Sendable {
         var installers: [CleanItem] = []
 
         for entry in topLevel {
+            if Task.isCancelled { break }
             let name = entry.lastPathComponent
             guard !Self.prunedNames.contains(name), !name.hasPrefix(".") else { continue }
             let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
@@ -300,6 +304,7 @@ public struct SmartScanner: Sendable {
         else { return }
 
         for child in children {
+            if Task.isCancelled { break }
             guard let values = try? child.resourceValues(forKeys: Set(keys)) else { continue }
             if values.isSymbolicLink == true { continue }
             let name = child.lastPathComponent
@@ -366,6 +371,7 @@ public struct SmartScanner: Sendable {
         else { return [] }
         var out: [CleanItem] = []
         for child in children {
+            if Task.isCancelled { break }
             guard Self.installerExtensions.contains(child.pathExtension.lowercased()),
                 let values = try? child.resourceValues(forKeys: [
                     .isRegularFileKey, .totalFileAllocatedSizeKey, .contentModificationDateKey,
@@ -428,6 +434,7 @@ public struct SmartScanner: Sendable {
         else { return 0 }
         var total: UInt64 = 0
         for case let file as URL in enumerator {
+            if Task.isCancelled { break }
             guard
                 let values = try? file.resourceValues(forKeys: [
                     .totalFileAllocatedSizeKey, .isRegularFileKey,

@@ -108,3 +108,46 @@
 ## [2026-09-19] fix | Keep Agno tool-event content out of final answers, preserve complete final text, collapse tool details by default, and clear working progress when answer begins.
 
 ## [2026-10-10] Diagnostic investigation | Correct PID enumeration and CPU accounting; add native VM/storage interval activity, bounded shared observation, process detail/tree/grouping, network timing, history with coverage limits, startup/sleep inspection, identity-bound graceful quit, Monitor investigation UI, agent failure preservation and focused Pulse skill references. Optimize reports successful Trash moves without claiming reclaimed space.
+## [2026-10-11] Redesign research and proposal | Updated main to ef7ac5c and created feat/accessible-pulse-redesign. Audited SwiftUI pages, shared controls, runtime dashboard accessibility, permissions, cleanup accounting, and performance constraints. Added a source-backed whole-app redesign proposal with task-led navigation, readable native UI, explicit outcomes/recovery, complete surface coverage, implementation stages, and validation gates. Design review pending; no app code changed.
+
+## [2026-10-11] Accessible redesign foundation | Implemented approved task-led navigation, readable light/dark themes, Larger text, Home and onboarding; native brightness control, reviewed duplicate workflows, opt-in bounded native network estimates and explicitly selected maintenance tasks. Build passed; whole-app implementation and runtime/CI verification remain in progress.
+
+## [2026-10-11] Accessible redesign workflows | Added search-first app removal review, task-led menu bar, adaptive inspectors, cleanup cancellation, estimated energy explanations, actual removal records, provider setup and robust conversation stop handling. Removed prohibited legacy shell collection/action paths and kept truthful unavailable guidance. Fixed a runtime split-view sizing failure; Home, Apps/search and Battery/Internet inspected in the release app. 351 tests passed; remaining runtime matrix, release performance, final review and PR/CI gates remain open.
+
+## [2026-10-11] Redesign implementation checkpoint | Task-led shell and reviewed interactions committed in 52a2e2a; 351-test suite and latest debug build pass. Release/runtime/performance gates remain open. Recovery audit identified GUI Trash journaling and main-thread Finder event fixes for the next checkpoint.
+
+## [2026-10-11] Harden GUI removal recovery | Native app and related-file Trash moves now journal atomically with rollback. Finder permission events run on MainActor only for denied file moves. Added three recovery fixtures; 354-test suite passed before final error typing. Release UI verified Internet first layer; visible RSS exceeds budget and remains an open gate.
+
+Final recovery refinement: make test passed 354 tests in 80 suites; Battery overview disclosures and charge-history accessibility were checked in the release app.
+
+## [2026-10-11] Display accessibility audit | Runtime revealed brightness slider missing from accessibility tree despite visual rendering. Simplified grouping and labels; matching disabled without external screen. Native heap inspection identified activity-store retention as a performance investigation lead; budget remains unverified.
+
+## [2026-10-11] Verify native display accessibility and improve history/startup controls | Native NSSlider exposes adjustable role/value in release AX tree. Activity breakdowns now native buttons with chart summary; startup helpers use named switches, pending guards and coverage/effect guidance. Restored 2-second sample/chart alignment with sparse process enumeration. Debug builds pass; full test rerun active.
+
+Accessibility checkpoint validation: make test passes 354 tests in 80 suites. Activity/Startup release layout and final cadence CPU/RSS remain pending.
+
+## [2026-10-11] Clarify performance test and recorded attention | Replaced unsupported benchmark ratings with adaptive measurements and method/effect explanations. Home/menu-bar summaries distinguish recorded attention from clear current readings. Added three regressions; 357 tests in 81 suites pass.
+
+## [2026-10-11] Guard stale conversation-stop replies | Cancellation acknowledgement is scoped to its run generation. Controlled out-of-order regression passes; make test passes 358 tests in 82 suites.
+
+## [2026-10-11] Validate provider setup and investigation lifecycle | Provider URL/Keychain feedback and accessibility labels hardened, duplicate saves guarded, investigation handles renamed window occlusion and shared typography. 360 tests pass; release verifies Home/Startup/Performance first layers. Timed performance measurements underway.
+
+## [2026-10-11] Open draft redesign PR and measure release | PR #84 attached; 60s visible-page CPU 0.749%, RSS 62,928–79,984 KiB. User delegated target interpretation; strict budget applies to background monitoring, with separate interactive measurements. Closed-window proof and required CI remain pending.
+
+## [2026-10-11] Correct repeated visibility events | Closed-window CPU/RSS missed the budget; found shared appearance counter over-counted repeated window events. Replaced with idempotent window/popover states and added overlap/repeat regressions. Runtime remeasurement required.
+
+## [2026-10-11] Fix collapsed menu-bar popover | User screenshot showed a thin blue strip. MenuBarContent used only maxHeight on a ScrollView, allowing its intrinsic panel height to collapse. Set an explicit 620pt viewport; release bundle passes with stable signing and rebuilt app relaunched. Direct menu-popover visual verification remains pending.
+
+## [2026-10-11] Simplify popover readings | Removed introductory explanation and readings/menu-bar disclosures. Attention shows its concrete title and review action; network shows last download/upload test with named retest/stop icons, progress and failure feedback. Existing bounded speed-test model reused.
+
+## [2026-10-11] Remove blocking storage icon work | Recent unified logs contain DisplayServices traffic but no recorded crash/hang. Cold scan/scroll profile shows CleanView row rendering entering NSWorkspace icon lookup and icon rasterisation on main thread. Move that work to utility tasks with row-local images; make category/protected rows lazy and isolate hover. 364 tests in 85 suites pass, including off-main lookup/cache regression. Original indefinite freeze not reproduced after restart; release scroll verification pending.
+
+Release verification: 12 alternating Cleanup scroll passes and four Files passes returned responsive UI; rows/icons rendered. Before/after 20-second samples show iconForFile on main thread before and zero main-thread iconForFile entries after (lookup now on utility workers). No files moved or preferences changed. Full historical freeze remains unconfirmed; performance budget compliance is not claimed.
+
+## [2026-10-11] Capture recurring Cleanup layout freeze | User recurrence captured PID 23631 at 100% CPU. Five-second sample: main-thread SwiftUI layout sizing/transaction loop, not icon I/O. Prior optimisation did not resolve freeze. Replace nested scroll/lazy stacks with native List sections, preserving category collapse and row actions. Release verification pending.
+
+Native-list release built and relaunched. Keyboard End reaches lower rows with icons/actions rendered. Post-change three-second sample shows main thread waiting in event loop, CPU observation 0%, unlike captured 100% layout loop. Wheel stress automation fails with noWindowsAvailable; full trackpad recurrence verification remains user gate.
+
+## [2026-10-11] Correct Ask Pulse lazy message layout | Captured PID 26445 at 98.7% CPU with main thread repeatedly in LazySubviewPlacements/SwiftUI graph updates. Replace message ScrollView/LazyVStack with native List, stable wrapping and inline Markdown with preserved paragraphs after stream completion. Tool disclosures and approval controls retained. Release verification pending.
+
+## [2026-10-11] Collapse Ask Pulse tool calls | Group consecutive tools behind collapsed native disclosures, keep individual results expandable and approvals visible. Release bundle and all 364 tests across 85 suites pass. Removed an invalid test assumption that NSCache cannot evict under memory pressure; off-main icon lookup and thumbnail checks remain.

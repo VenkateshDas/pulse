@@ -209,30 +209,21 @@ final class UninstallModel {
         isUninstalling = true
         report = nil
         Task.detached(priority: .userInitiated) {
-            let trashed = needsTrash ? Self.moveAppToTrash(appURL) : (base?.appTrashed ?? true)
+            let trashed = needsTrash ? await Self.moveAppToTrash(appURL) : (base?.appTrashed ?? true)
 
             var trashedLeftovers: [PendingItem] = []
             var failedItems: [PendingItem] = []
             var trashedBytes: UInt64 = 0
 
-            var trashedJournalItems: [TrashedItem] = []
-
             for item in leftovers {
                 do {
-                    var trashedURL: NSURL?
-                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: &trashedURL)
+                    _ = try await UndoJournal.shared.trashItem(
+                        at: URL(fileURLWithPath: item.path), operation: "Uninstall related files (\(appName))", bytes: item.sizeBytes)
                     trashedLeftovers.append(PendingItem(path: item.path, label: item.label, sizeBytes: item.sizeBytes))
                     trashedBytes += item.sizeBytes
-                    if let trashPath = trashedURL?.path {
-                        trashedJournalItems.append(TrashedItem(originalPath: item.path, trashPath: trashPath))
-                    }
                 } catch {
                     failedItems.append(PendingItem(path: item.path, label: item.label, sizeBytes: item.sizeBytes))
                 }
-            }
-            
-            if !trashedJournalItems.isEmpty {
-                await UndoJournal.shared.record(UndoEntry(op: "Uninstall Leftovers (\(appName))", items: trashedJournalItems, bytesFreed: Int64(trashedBytes)))
             }
 
             let receipt = UninstallResult(
@@ -258,30 +249,39 @@ final class UninstallModel {
                     self.scanOrphans()
                 }
                 if base != nil, !receipt.needsAttention {
-                    self.report = "All set — \(appName) and its leftovers are fully removed."
+                    self.report = "Selected items for \(appName) moved to Trash. Space remains used until Trash is emptied."
                 }
             }
         }
     }
 
-    nonisolated static func moveAppToTrash(_ url: URL) -> Bool {
-        var trashedURL: NSURL?
-        if (try? FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)) != nil {
-            if let trashPath = trashedURL?.path {
-                let tItem = TrashedItem(originalPath: url.path, trashPath: trashPath)
-                Task { await UndoJournal.shared.record(UndoEntry(op: "Uninstall App", items: [tItem], bytesFreed: 0)) }
-            }
+    nonisolated static func moveAppToTrash(_ url: URL, journal: UndoJournal = .shared) async -> Bool {
+        let identity = Bundle(url: url)?.bundleIdentifier ?? ""
+        guard !BundleGuard.isProtected(bundleID: identity),
+              !isRunning(identity), !url.standardizedFileURL.path.hasPrefix("/System/") else { return false }
+        do {
+            _ = try await journal.trashItem(at: url, operation: "Move app to Trash", bytes: 0)
             return true
+        } catch {
+            // A recovery-record failure must not be bypassed by Finder.
+            guard let failure = error as? TrashMoveError,
+                  failure.domain == NSCocoaErrorDomain,
+                  [NSFileWriteNoPermissionError, NSFileReadNoPermissionError].contains(failure.code),
+                  FileManager.default.fileExists(atPath: url.path) else { return false }
         }
-        let escaped = url.path
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let source = "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"
-        var scriptError: NSDictionary?
-        let script = NSAppleScript(source: source)
-        script?.executeAndReturnError(&scriptError)
-        guard script != nil, scriptError == nil else { return false }
-        return !FileManager.default.fileExists(atPath: url.path)
+        // Finder owns the privileged move and its Put Back recovery. Apple
+        // Events must run on the main thread; no shell process is involved.
+        return await MainActor.run {
+            let escaped = url.path
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            let source = "tell application \"Finder\" to delete (POSIX file \"\(escaped)\" as alias)"
+            var scriptError: NSDictionary?
+            let script = NSAppleScript(source: source)
+            script?.executeAndReturnError(&scriptError)
+            guard script != nil, scriptError == nil else { return false }
+            return !FileManager.default.fileExists(atPath: url.path)
+        }
     }
 
     func openFullDiskAccessSettings() {
@@ -340,25 +340,18 @@ final class UninstallModel {
             var trashedPaths: Set<String> = []
             var trashedBytes: UInt64 = 0
             for item in items {
-                // Unload a running user launch agent before trashing its plist,
-                // so the change takes effect now (not just next login). Daemons
-                // need root to bootout and are left to unload on reboot.
-                await Self.bootoutUserAgentIfNeeded(path: item.path)
+                // Moving a helper plist changes its next launch, not a running job.
                 do {
-                    var trashedURL: NSURL?
-                    try FileManager.default.trashItem(at: URL(fileURLWithPath: item.path), resultingItemURL: &trashedURL)
+                    _ = try await UndoJournal.shared.trashItem(
+                        at: URL(fileURLWithPath: item.path), operation: "Remove leftover helper", bytes: item.sizeBytes)
                     trashedPaths.insert(item.id)
                     trashedBytes += item.sizeBytes
-                    if let trashPath = trashedURL?.path {
-                        let tItem = TrashedItem(originalPath: item.path, trashPath: trashPath)
-                        await UndoJournal.shared.record(UndoEntry(op: "Remove Orphan", items: [tItem], bytesFreed: Int64(item.sizeBytes)))
-                    }
                 } catch {
                 }
             }
             var report: String
             if !trashedPaths.isEmpty {
-                report = "\(trashedPaths.count) orphaned items (\(ByteFormat.string(trashedBytes))) moved to Trash."
+                report = "\(trashedPaths.count) of \(items.count) selected leftover items (\(ByteFormat.string(trashedBytes))) moved to Trash. Running helpers may continue until sign-out or restart; space stays used until Trash is emptied."
             } else {
                 report = "Nothing was removed — items may need Full Disk Access."
             }
@@ -377,16 +370,4 @@ final class UninstallModel {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil
     }
 
-    /// `launchctl bootout` for a user LaunchAgent plist (gui domain, no root),
-    /// so disabling it unloads the running job immediately. No-op for system
-    /// `/Library` jobs (need root) and non-agent paths.
-    nonisolated static func bootoutUserAgentIfNeeded(path: String) async {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        guard path.hasPrefix(home), path.contains("/LaunchAgents/"),
-            path.hasSuffix(".plist"),
-            let plist = UninstallScanner.readLaunchPlist(URL(fileURLWithPath: path)),
-            let label = plist["Label"] as? String, !label.isEmpty
-        else { return }
-        _ = try? await Shell.run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
-    }
 }

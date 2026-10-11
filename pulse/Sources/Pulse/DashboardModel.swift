@@ -14,13 +14,42 @@ enum NotificationPreferences {
     private static let weeklyKey = "PulseNotifyWeeklyReport"
 
     static var notifyCriticalAlerts: Bool {
-        get { UserDefaults.standard.object(forKey: criticalKey) as? Bool ?? true }
+        get { UserDefaults.standard.object(forKey: criticalKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: criticalKey) }
     }
 
     static var notifyWeeklyReport: Bool {
-        get { UserDefaults.standard.object(forKey: weeklyKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: weeklyKey) }
+        get { UserDefaults.standard.object(forKey: weeklyKey) as? Bool ?? false }
+        set {
+            UserDefaults.standard.set(newValue, forKey: weeklyKey)
+            updateWeeklyReminder()
+        }
+    }
+
+    static func updateWeeklyReminder() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let center = UNUserNotificationCenter.current()
+        let id = "com.pulse.weekly-report"
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+        guard notifyWeeklyReport else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Check in on your Mac"
+        content.body = "Open Pulse to review recorded activity, storage and battery readings."
+        var components = DateComponents()
+        components.weekday = 2; components.hour = 9; components.minute = 0
+        center.add(UNNotificationRequest(identifier: id, content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: true)))
+    }
+
+}
+
+/// Visibility is a state, not a count: AppKit can repeat occlusion events.
+struct DashboardVisibility {
+    enum Surface: Hashable { case window, popover }
+    private(set) var surfaces: Set<Surface> = []
+    var isVisible: Bool { !surfaces.isEmpty }
+    mutating func set(_ surface: Surface, visible: Bool) {
+        if visible { surfaces.insert(surface) } else { surfaces.remove(surface) }
     }
 }
 
@@ -107,15 +136,15 @@ final class DashboardModel {
     var actionFeedback: String?
 
     static let historyLength = 900
-    static let activeInterval: Duration = .seconds(3)
-    static let idleInterval: Duration = .seconds(5)
+    static let activeInterval: Duration = .seconds(2)
+    static let idleInterval: Duration = .seconds(2)
     /// Screen locked: nobody can see the menu bar or any window, so the loop
     /// drops to a slow keep-alive tick that only maintains battery bookkeeping.
     static let lockedInterval: Duration = .seconds(30)
-    static let processEveryNTicks = 3
+    static let processEveryNTicks = 5
     /// No window open: the menu bar integer is the only consumer, so process
     /// enumeration (~every pid × proc_pidinfo) can run less often.
-    static let idleProcessEveryNTicks = 5
+    static let idleProcessEveryNTicks = 12
     /// Sample gap accepted as continuous live use for battery crediting.
     /// Must exceed the longest sampling interval (locked, 30s) with margin.
     static let maxSampleGapSeconds: TimeInterval = 45
@@ -132,7 +161,7 @@ final class DashboardModel {
     // observable mutation re-runs its layout (~4% CPU measured). So full
     // snapshots are only published while at least one view is visible;
     // the menu bar integer updates regardless.
-    @ObservationIgnored private var visibleViews = 0
+    @ObservationIgnored private var visibility = DashboardVisibility()
     /// Lock screen does NOT change NSWindow occlusion state, so it needs
     /// its own signal — otherwise the dashboard burns CPU all night.
     @ObservationIgnored private var screenLocked = false
@@ -195,33 +224,30 @@ final class DashboardModel {
     }
 
     func viewAppeared() {
-        visibleViews += 1
+        visibility.set(.popover, visible: true)
         publishLatest()
     }
 
     func viewDisappeared() {
-        visibleViews = max(0, visibleViews - 1)
+        visibility.set(.popover, visible: false)
+    }
+
+    func windowVisibilityChanged(_ visible: Bool) {
+        let wasVisible = visibility.isVisible
+        visibility.set(.window, visible: visible)
+        if !wasVisible && visibility.isVisible { publishLatest() }
     }
 
     func start() {
         guard loop == nil else { return }
         observeScreenLock()
         observeDisplaySleep()
-        requestNotificationAuthorization()
-        
+
         batteryTrend = batteryHistory.entries
         batterySessions = batterySessionStore.allSessions
 
-        Task { [weak self] in
-            guard let self else { return }
-            if self.batteryHistory.entries.isEmpty || self.batterySessionStore.allSessions.isEmpty {
-                let (history, sessions) = await backfillBatteryDataFromSystemLog()
-                self.batteryHistory.mergeParsedEntries(history)
-                self.batteryTrend = self.batteryHistory.entries
-                self.batterySessionStore.mergeBackfilled(sessions)
-                self.batterySessions = self.batterySessionStore.allSessions
-            }
-        }
+        // Battery history is recorded from native samples while Pulse runs.
+        // Keep existing history; do not launch pmset for retrospective data.
 
         startSamplingLoop()
     }
@@ -231,7 +257,7 @@ final class DashboardModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 let locked = self.screenLocked
-                let dashboardOpen = self.visibleViews > 0 && !locked
+                let dashboardOpen = self.visibility.isVisible && !locked
                 self.tickCount += 1
                 // Locked: skip process enumeration entirely — nobody can see
                 // the result, and it's the most expensive part of a sample.
@@ -449,7 +475,7 @@ final class DashboardModel {
         if readings != menuBarReadings {
             menuBarReadings = readings
         }
-        if visibleViews > 0 && !screenLocked {
+        if visibility.isVisible && !screenLocked {
             publishLatest()
         }
     }
@@ -457,12 +483,6 @@ final class DashboardModel {
     /// UNUserNotificationCenter traps when the process has no bundle (bare
     /// SwiftPM `make run`) — every call stays behind this guard.
     private var notificationsAvailable: Bool { Bundle.main.bundleIdentifier != nil }
-
-    private func requestNotificationAuthorization() {
-        guard notificationsAvailable else { return }
-        UNUserNotificationCenter.current()
-            .requestAuthorization(options: [.alert, .badge]) { _, _ in }
-    }
 
     /// Posts a system notification for each critical alert, rate-limited to
     /// once per 30 min per alert id so a sustained condition doesn't spam.
@@ -516,7 +536,7 @@ final class DashboardModel {
             Task { @MainActor in
                 guard let self else { return }
                 self.screenLocked = false
-                if self.visibleViews > 0 { self.publishLatest() }
+                if self.visibility.isVisible { self.publishLatest() }
                 // The loop may be mid-30s locked sleep — restart it so the
                 // menu bar integer refreshes promptly on unlock.
                 if self.loop != nil {

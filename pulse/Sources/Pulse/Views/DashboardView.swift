@@ -6,6 +6,7 @@ import SwiftUI
 struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(NetworkModel.self) private var networkModel
+    @Environment(StorageModel.self) private var storage
     /// Gates the charts/heatmap/process-table wall behind a tap in Simple
     /// mode, so a non-technical user's first view is verdict + vitals, not
     /// an instrument panel. Pro mode starts expanded — nothing changes for
@@ -23,115 +24,126 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Halo.Space.lg) {
-                hero
-                AttentionSection()
-                if let feedback = model.actionFeedback {
-                    FeedbackBadge(message: feedback)
-                }
-                vitals
-                detailsDisclosure
-                if showDetails {
-                    HStack(alignment: .top, spacing: Halo.Space.lg) {
-                        VStack(spacing: Halo.Space.lg) {
-                            chartsPanel
+            VStack(alignment: .leading, spacing: 28) {
+                PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
+                condition
+                if model.snapshot != nil && !model.attentionItems.isEmpty { AttentionSection() }
+                if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
+                everydaySummary
+                tasks
+                recentRemovals
+                DisclosureGroup("Technical details", isExpanded: $showDetails) {
+                    VStack(spacing: 20) {
+                        if model.snapshot != nil {
+                            vitals
+                            chartsPanel.frame(minHeight: 400)
                             CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                            TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                        } else {
+                            Text("Readings will appear after the first check.")
                         }
-                        .frame(maxHeight: .infinity)
-
-                        TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                            .frame(width: 400)
-                            .frame(maxHeight: .infinity, alignment: .top)
                     }
-                    .frame(minHeight: 480)
+                    .padding(.top, 16)
                 }
+                .font(Halo.font(size: 14, weight: .medium))
+                .foregroundStyle(Halo.textPrimary)
             }
             .padding(Halo.Space.xxl)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: 1040, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
-        .background { ZStack { Halo.void; Halo.meshBackground } }
+        .background(Halo.void)
     }
 
-    private var detailsDisclosure: some View {
-        Button {
-            withAnimation(Halo.Motion.snappy) { showDetails.toggle() }
-        } label: {
-            HStack(spacing: 6) {
-                Text(showDetails ? "Hide details" : "Show details")
-                Image(systemName: "chevron.right")
-                    .rotationEffect(.degrees(showDetails ? 90 : 0))
+
+    private var condition: some View {
+        let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
+        return VStack(alignment: .leading, spacing: 14) {
+            Label(state.title, systemImage: state.symbol)
+                .font(Halo.font(size: 22, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            Text(state.explanation)
+                .font(Halo.font(size: 14))
+                .foregroundStyle(Halo.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let destination = state.destination {
+                Button(state.actionTitle) { PulseNavigation.open(destination, diskTab: destination == .storage ? 1 : nil) }
+                    .buttonStyle(.borderedProminent)
+                    .foregroundStyle(Halo.onAccent)
             }
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Halo.textDim)
+            if let snapshot = model.snapshot {
+                Text("Last checked \(snapshot.timestamp.formatted(date: .omitted, time: .shortened))")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                if Date.now.timeIntervalSince(snapshot.timestamp) > 30 {
+                    Label("These readings are older. Wait for a fresh check before acting.", systemImage: "clock")
+                        .font(Halo.font(size: 12)).foregroundStyle(Halo.warning)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Mac condition")
+    }
+
+    private var everydaySummary: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), alignment: .leading)], alignment: .leading, spacing: 20) {
+            summary("Storage", value: model.snapshot.map { ByteFormat.string($0.diskFreeBytes) + " available" } ?? "Checking…", symbol: "internaldrive", destination: .storage)
+            summary("Battery", value: model.snapshot.map { $0.battery.map { "\($0.currentChargePercent)% charged" } ?? "No battery reading" } ?? "Checking…", symbol: "battery.75percent", destination: .health)
+            summary("Internet", value: model.snapshot.map { $0.connectionType == .none ? "Not connected" : "Connected to a network" } ?? "Checking…", symbol: "wifi", destination: .network)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("At a glance")
+    }
+
+    private func summary(_ title: String, value: String, symbol: String, destination: SidebarItem) -> some View {
+        Button { PulseNavigation.open(destination) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(title, systemImage: symbol).font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                Text(value).font(Halo.font(size: 15, weight: .medium)).foregroundStyle(Halo.textPrimary)
+                    .monospacedDigit().fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Open \(destination.title)")
     }
 
-    // MARK: Hero (greeting + diagnosis verdict + health score)
-
-    private var hero: some View {
-        HStack(alignment: .center, spacing: 20) {
-            greeting
-            Spacer()
-            HealthScoreRing(score: model.healthScore, labelMode: .scoreOnly)
+    private var tasks: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("What would you like to do?").font(Halo.font(size: 17, weight: .semibold))
+                .accessibilityAddTraits(.isHeader).padding(.bottom, 12)
+            TaskRow(title: "Review cleanup", detail: "Choose files to move to Trash. Nothing is removed during a scan.", symbol: "sparkles") { PulseNavigation.open(.storage, diskTab: 1) }
+            Divider()
+            TaskRow(title: "Remove an app", detail: "Review the app and its related files before removing them.", symbol: "square.grid.2x2") { PulseNavigation.open(.uninstall) }
+            Divider()
+            TaskRow(title: "Check a slowdown", detail: "See which apps are busy and measure while the problem happens.", symbol: "waveform.path.ecg") { PulseNavigation.open(.monitor) }
+            Divider()
+            TaskRow(title: "Adjust brightness", detail: "Make your screens more comfortable to use.", symbol: "sun.max") { PulseNavigation.open(.displays) }
         }
+        .foregroundStyle(Halo.textPrimary)
     }
 
-    private var greeting: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("\(timeGreeting), \(firstName)")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(Halo.textPrimary)
-            DiagnosisBadge(
-                diagnosis: model.diagnosis,
-                culpritName: culpritName,
-                onCulpritTap: {
-                    // Carry the PID so Monitor opens with the culprit selected.
-                    NotificationCenter.default.post(
-                        name: Self.navigateToMonitor,
-                        object: model.diagnosis.culpritPID)
-                })
-            Text(statusLine)
-                .font(.system(size: 13, weight: .medium, design: .default))
-                .foregroundStyle(Halo.textDim)
+    @ViewBuilder private var recentRemovals: some View {
+        if let entry = storage.undoEntries.first {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Recent removal").font(Halo.font(size: 17, weight: .semibold)).accessibilityAddTraits(.isHeader)
+                Text("\(entry.items.count) items moved to Trash on \(entry.date.formatted(date: .abbreviated, time: .shortened)).")
+                    .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                Button("Review recent removals") { PulseNavigation.open(.storage, diskTab: 2) }.buttonStyle(.bordered)
+            }
         }
-    }
-
-    /// Name of the diagnosis culprit process, looked up by PID in the snapshot.
-    private var culpritName: String? {
-        guard let pid = model.diagnosis.culpritPID else { return nil }
-        return model.snapshot?.topProcesses.first { $0.pid == pid }?.name
-    }
-
-    private var timeGreeting: String {
-        switch Calendar.current.component(.hour, from: .now) {
-        case 5..<12: "Good morning"
-        case 12..<17: "Good afternoon"
-        default: "Good evening"
-        }
-    }
-
-    private var firstName: String {
-        NSFullUserName().components(separatedBy: " ").first ?? "there"
-    }
-
-    private var statusLine: String {
-        let issues = model.alerts.count
-        // Info-level alerts are FYIs, not problems — only warning+ changes
-        // the health verdict (the sidebar footer uses the same rule).
-        let hasProblems = model.alerts.contains { $0.severity != .info }
-        let health = hasProblems ? "Your Mac needs a look" : "Your Mac is healthy"
-        let attention =
-            issues == 0
-            ? "nothing needs attention"
-            : "\(issues) thing\(issues == 1 ? "" : "s") worth a glance"
-        return "\(health) · \(attention) · sampling live"
     }
 
     // MARK: Vitals
 
     private var vitals: some View {
-        HStack(spacing: Halo.Space.md) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 240))], spacing: Halo.Space.md) {
             cpuCard
             memoryCard
             diskCard
@@ -474,7 +486,7 @@ struct DashboardView: View {
                     color: Halo.volt, maxValue: 100
                 )
             }
-            
+
             HStack(spacing: 16) {
                 networkChartRow
 
@@ -493,7 +505,7 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .premiumCard()
     }
-    
+
     private var thermalChartRow: some View {
         let maxTemp = max(
             model.tempHistory.max() ?? 60,
@@ -505,10 +517,9 @@ struct DashboardView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text("THERMAL · 30M")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                 Image(systemName: "info.circle")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .help("CPU and GPU temperature over the last 30 minutes (Orange = CPU, Purple = GPU)")
             }
             .foregroundStyle(Halo.textDim)
@@ -518,7 +529,7 @@ struct DashboardView: View {
                     Spacer()
                     Text("0°")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 50, alignment: .trailing)
 
@@ -548,7 +559,7 @@ struct DashboardView: View {
                     Text("LIVE").foregroundStyle(Halo.pulseGreen)
                 }
             }
-            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
             .foregroundStyle(Halo.textDim)
         }
     }
@@ -559,10 +570,9 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text("CPU · 24H")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                 Image(systemName: "info.circle")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .help("Minute-averaged CPU over the last 24 hours. Gaps (sleep, app closed) are shown honestly — never interpolated.")
             }
             .foregroundStyle(Halo.textDim)
@@ -572,7 +582,7 @@ struct DashboardView: View {
                     Spacer()
                     Text("0%")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 50, alignment: .trailing)
                 HistoryChart(values: model.cpuDayHistory, color: Halo.ion, maxValue: 100)
@@ -589,7 +599,7 @@ struct DashboardView: View {
                     Text("LIVE").foregroundStyle(Halo.pulseGreen)
                 }
             }
-            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
             .foregroundStyle(Halo.textDim)
         }
     }
@@ -606,22 +616,21 @@ struct DashboardView: View {
                     .foregroundStyle(Halo.pulseGreen)
             }
         }
-        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+        .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
         .foregroundStyle(Halo.textDim)
     }
-    
+
     private var networkChartRow: some View {
         let maxIn = model.networkInHistory.compactMap { $0 }.max() ?? 1024
         let maxOut = model.networkOutHistory.compactMap { $0 }.max() ?? 1024
         let maxValue = max(maxIn, maxOut, 1024) * 1.2 // Scale to fit
-        
+
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text("NETWORK · 30M")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                 Image(systemName: "info.circle")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .help("Network throughput over the last 30 minutes (Blue = Download, Purple = Upload)")
             }
             .foregroundStyle(Halo.textDim)
@@ -631,10 +640,10 @@ struct DashboardView: View {
                     Spacer()
                     Text("0 B/s")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 50, alignment: .trailing)
-                
+
                 ZStack {
                     // Download = ion, upload = volt — same semantics as Monitor.
                     HistoryChart(values: paddedHistory(model.networkInHistory), color: Halo.ion, maxValue: maxValue)
@@ -642,7 +651,7 @@ struct DashboardView: View {
                 }
             }
             .frame(maxHeight: .infinity)
-            
+
             xAxis
         }
     }
@@ -651,10 +660,9 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                    .font(Halo.font(size: 10, weight: .semibold))
                 Image(systemName: "info.circle")
-                    .font(.system(size: 9))
+                    .font(Halo.font(size: 9))
                     .help(title.contains("CPU") ? "CPU utilization history over the last 30 minutes" : "System memory utilization history over the last 30 minutes")
             }
             .foregroundStyle(Halo.textDim)
@@ -664,21 +672,70 @@ struct DashboardView: View {
                     Spacer()
                     Text(bottomLabel)
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 50, alignment: .trailing)
                 HistoryChart(values: history, color: color, maxValue: maxValue)
             }
             .frame(maxHeight: .infinity)
-            
+
             xAxis
         }
     }
-    
+
     private func paddedHistory(_ buffer: [Double]) -> [Double?] {
         let missing = 900 - buffer.count
         if missing <= 0 { return buffer.map { $0 } }
         let padding: [Double?] = Array(repeating: nil, count: missing)
         return padding + buffer.map { $0 }
+    }
+}
+
+/// Presentation translates the existing diagnosis without changing its scoring or attribution.
+struct HomeCondition {
+    let diagnosis: Diagnosis
+    let hasSnapshot: Bool
+    var hasAttention: Bool = false
+
+    var title: String {
+        guard hasSnapshot else { return "Checking your Mac…" }
+        if diagnosis.severity == .clear && hasAttention { return "There is something to review" }
+        switch diagnosis.severity {
+        case .critical: return "Your Mac needs attention"
+        case .warn: return "Something is worth a look"
+        case .info: return "There is something to review"
+        case .clear: return "No urgent issues detected"
+        }
+    }
+    var symbol: String { !hasSnapshot ? "clock" : (diagnosis.severity >= .warn || hasAttention ? "exclamationmark.circle" : "checkmark.circle") }
+    var explanation: String {
+        guard hasSnapshot else { return "Pulse is reading your Mac's current activity. Your files and settings stay unchanged." }
+        if diagnosis.severity == .clear && hasAttention {
+            return "Current readings show no urgent problem, but Pulse has recorded something worth reviewing below. Check the details before making a change."
+        }
+        switch diagnosis.factor {
+        case .cpu: return "Your processor is busy. Review app activity to see what is using it; a brief spike can be normal."
+        case .memory: return "Apps are putting memory under pressure or using more over time. Review app activity before closing anything; the largest app is not necessarily the cause."
+        case .disk: return "Storage is filling up. Review files you no longer need before moving anything to Trash."
+        case .thermal: return "Your Mac is running warm. Give it airflow and review busy apps if work feels slower."
+        default:
+            return diagnosis.severity == .clear ? "The available readings show no urgent problems. You can keep working or choose a task below." : diagnosis.line + ". Review the available details before making a change."
+        }
+    }
+    var destination: SidebarItem? {
+        guard hasSnapshot else { return nil }
+        switch diagnosis.factor {
+        case .cpu, .memory: return .monitor
+        case .disk: return .storage
+        case .thermal: return .monitor
+        default: return diagnosis.severity >= .warn ? .health : nil
+        }
+    }
+    var actionTitle: String {
+        switch destination {
+        case .monitor: "Review app activity"
+        case .storage: "Review cleanup"
+        default: "Review battery & energy"
+        }
     }
 }

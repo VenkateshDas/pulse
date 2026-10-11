@@ -1,60 +1,47 @@
 import Testing
-
 @testable import Pulse
 
-@Suite("Sidebar visibility")
+@Suite("Task navigation")
 struct SidebarVisibilityTests {
-    @Test func proModeShowsEveryItemInEverySection() {
-        for section in SidebarSection.allCases {
-            #expect(section.visibleItems(for: .pro) == section.items)
-        }
+    @Test func everyDestinationIsReachable() {
+        let destinations = SidebarItem.everyday + SidebarItem.advanced + [.agent, .settings]
+        #expect(Set(destinations) == Set(SidebarItem.allCases))
+        #expect(Set(destinations).count == destinations.count)
     }
 
-    @Test func simpleModeHidesAdvancedItemsFromTopLevelRows() {
-        let systemVisible = SidebarSection.system.visibleItems(for: .simple)
-        let toolsVisible = SidebarSection.tools.visibleItems(for: .simple)
-
-        #expect(!systemVisible.contains(.monitor))
-        #expect(!toolsVisible.contains(.diagnostics))
+    @Test func shortcutsKeepTheirOriginalDestinations() {
+        #expect(Array(SidebarItem.allCases.prefix(9)) == [.dashboard, .agent, .storage, .timeline, .optimize, .uninstall, .monitor, .network, .displays])
+        #expect(SidebarItem(rawValue: "Dashboard") == .dashboard)
+        #expect(SidebarItem(rawValue: "Uninstall") == .uninstall)
     }
 
-    @Test func simpleModeKeepsNonGatedSiblingsVisible() {
-        // Hiding Monitor/Diagnostics must not take Displays/Health/Optimize/
-        // Uninstall/Settings down with them.
-        let systemVisible = SidebarSection.system.visibleItems(for: .simple)
-        let toolsVisible = SidebarSection.tools.visibleItems(for: .simple)
-
-        #expect(systemVisible.contains(.displays))
-        #expect(systemVisible.contains(.health))
-        #expect(toolsVisible.contains(.optimize))
-        #expect(toolsVisible.contains(.uninstall))
-        #expect(toolsVisible.contains(.settings))
-    }
-
-    @Test func gatedItemsStayInAllCasesSoHotkeysStillWork() {
-        // RootView's ⌘1-9 bindings iterate SidebarItem.allCases directly —
-        // gating must be display-only, never remove a case.
-        #expect(SidebarItem.allCases.contains(.monitor))
-        #expect(SidebarItem.allCases.contains(.diagnostics))
+    @Test func advancedToolsDoNotCrowdEverydayNavigation() {
+        #expect(Set(SidebarItem.everyday).isDisjoint(with: SidebarItem.advancedGatedItems))
+        #expect(SidebarItem.advanced.contains(.startup))
+        #expect(SidebarItem.advanced.contains(.benchmark))
     }
 }
 
-@Suite("Sidebar status text")
+@Suite("Plain status")
 struct SidebarStatusTextTests {
-    @Test func proModeUsesOpsConsolePhrasing() {
-        #expect(SidebarView.statusText(mode: .pro, hasCritical: true, hasWarning: false) == "ATTENTION NEEDED")
-        #expect(SidebarView.statusText(mode: .pro, hasCritical: false, hasWarning: true) == "MINOR ISSUES")
-        #expect(SidebarView.statusText(mode: .pro, hasCritical: false, hasWarning: false) == "ALL SYSTEMS NOMINAL")
+    @Test func severityTakesPrecedenceInEveryDetailPreference() {
+        for mode in DisplayMode.allCases {
+            #expect(SidebarView.statusText(mode: mode, hasCritical: true, hasWarning: true) == "Needs attention")
+            #expect(SidebarView.statusText(mode: mode, hasCritical: false, hasWarning: true) == "Something to review")
+            #expect(SidebarView.statusText(mode: mode, hasCritical: false, hasWarning: false) == "No urgent issues detected")
+        }
     }
+}
 
-    @Test func simpleModeUsesPlainLanguage() {
-        #expect(SidebarView.statusText(mode: .simple, hasCritical: true, hasWarning: false) == "Needs attention")
-        #expect(SidebarView.statusText(mode: .simple, hasCritical: false, hasWarning: true) == "A couple of small things")
-        #expect(SidebarView.statusText(mode: .simple, hasCritical: false, hasWarning: false) == "Everything's fine")
-    }
-
-    @Test func criticalTakesPrecedenceOverWarningInBothModes() {
-        #expect(SidebarView.statusText(mode: .pro, hasCritical: true, hasWarning: true) == "ATTENTION NEEDED")
-        #expect(SidebarView.statusText(mode: .simple, hasCritical: true, hasWarning: true) == "Needs attention")
+@Suite("Contextual navigation")
+@MainActor
+struct ContextualNavigationTests {
+    @Test func routeSurvivesBeforeWindowAppearsAndIsConsumedOnce() {
+        _ = PulseNavigation.takePending()
+        PulseNavigation.open(.storage, diskTab: 1)
+        let route = PulseNavigation.takePending()
+        #expect(route?.destination == .storage)
+        #expect(route?.diskTab == 1)
+        #expect(PulseNavigation.takePending() == nil)
     }
 }

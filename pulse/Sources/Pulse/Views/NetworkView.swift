@@ -15,22 +15,25 @@ struct NetworkView: View {
                 header
                 connectionCard
                 speedTestCard
-                throughputChart
-                if model.history.count >= 2 {
-                    speedHistoryCard
+                DisclosureGroup("Network details and history") {
+                    VStack(spacing: Halo.Space.lg) {
+                        factGrid.premiumCard()
+                        throughputChart
+                        if model.history.count >= 2 { speedHistoryCard }
+                    }.padding(.top, 12)
                 }
             }
             .padding(Halo.Space.xxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background { ZStack { Halo.void; Halo.meshBackground } }
-        .onAppear { model.requestLocationAuthorizationIfNeeded() }
+        .background(Halo.void)
+
     }
 
     private var header: some View {
         PageHeader(
-            "Network",
-            subtitle: "Signal strength, throughput, and connection quality."
+            "Internet",
+            subtitle: "Check your connection and estimate its speed when you need to."
         )
     }
 
@@ -39,20 +42,9 @@ struct NetworkView: View {
     private var connectionType: ConnectionType { dashboard.snapshot?.connectionType ?? .none }
     private var wifi: WiFiInfo? { dashboard.snapshot?.wifiInfo }
 
-    /// 0–1, matching the dashboard card's semantics: real Wi-Fi quality, a
-    /// flat "fine" reading for other connected types, zero when offline.
-    private var quality: Double {
-        switch connectionType {
-        case .wifi: wifi?.signalQualityFraction ?? 0
-        case .ethernet, .cellular, .other: 1.0
-        case .none: 0
-        }
-    }
-
     private var qualityColor: Color {
-        connectionType == .none
-            ? Halo.textDim
-            : (quality < 0.35 ? Halo.flare : (quality < 0.65 ? Halo.amber : Halo.pulseGreen))
+        guard let wifi else { return Halo.textDim }
+        return wifi.signalQualityFraction < 0.35 ? Halo.critical : wifi.signalQualityFraction < 0.65 ? Halo.amber : Halo.pulseGreen
     }
 
     private var connectionLabel: String {
@@ -68,69 +60,28 @@ struct NetworkView: View {
     private var connectionSubtitle: String {
         switch connectionType {
         case .wifi: "Wi-Fi · \(wifi?.signalQualityLabel ?? "Signal unknown") signal"
-        case .ethernet: "Wired · stable connection"
+        case .ethernet: "Connected by Ethernet"
         case .cellular: "Cellular data"
         case .other: "Active connection"
-        case .none: "Join a network to see live details"
+        case .none: "Join a network in macOS settings to continue"
         }
     }
-
-    /// Ring caption word: the quality verdict for Wi-Fi, the medium otherwise.
-    private var ringCaption: String {
-        switch connectionType {
-        case .wifi: (wifi?.signalQualityLabel ?? "—").uppercased()
-        case .ethernet: "WIRED"
-        case .cellular: "CELLULAR"
-        case .other: "ONLINE"
-        case .none: "OFFLINE"
-        }
-    }
-
-    private var ringHeadline: String {
-        connectionType == .wifi ? "\(wifi?.signalQualityPercent ?? 0)" : (connectionType == .none ? "—" : "OK")
-    }
-
-    // MARK: Connection card (hero)
 
     private var connectionCard: some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(spacing: 8) {
-                QualityRing(
-                    fraction: quality, color: qualityColor,
-                    headline: ringHeadline, caption: ringCaption)
-                if connectionType == .wifi {
-                    Text("Signal quality")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Halo.textDim)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Label(dashboard.snapshot == nil ? "Checking connection…" : connectionLabel,
+                  systemImage: connectionType == .wifi ? "wifi" : connectionType == .none ? "wifi.slash" : "network")
+                .font(Halo.font(size: 18, weight: .semibold))
+            Text(connectionSubtitle).font(Halo.font(size: 14)).foregroundStyle(Halo.textSecondary)
+            Text("A connection to a network does not confirm that websites are reachable. Use the optional speed test if you want to check a remote service.")
+                .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+            if connectionType == .wifi, !model.locationAuthorized, wifi?.ssid == nil {
+                Text("macOS requires Location access to show the Wi-Fi network name. Speed tests work without this access.")
+                    .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                Button("Show Wi-Fi network name…") { model.requestLocationAuthorizationIfNeeded() }
+                    .buttonStyle(.bordered)
             }
-            .frame(width: 150)
-
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(connectionLabel)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Halo.textPrimary)
-                    Text(connectionSubtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Halo.textDim)
-                }
-
-                if connectionType != .none {
-                    factGrid
-                }
-
-                if connectionType == .wifi, !model.locationAuthorized, wifi?.ssid == nil {
-                    Text("Grant Location access in System Settings to see the network name.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(Halo.textDim.opacity(0.7))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
+        }.frame(maxWidth: .infinity, alignment: .leading).premiumCard()
     }
 
     /// Two rows of three facts, BatteryCard style. Live throughput always
@@ -138,18 +89,16 @@ struct NetworkView: View {
     private var factGrid: some View {
         let down = ByteFormat.string(dashboard.snapshot?.networkBytesInPerSecond ?? 0) + "/s"
         let up = ByteFormat.string(dashboard.snapshot?.networkBytesOutPerSecond ?? 0) + "/s"
-        let cols = [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
+        let cols = [GridItem(.adaptive(minimum: 160), alignment: .leading)]
         return LazyVGrid(columns: cols, alignment: .leading, spacing: 10) {
-            fact("DOWNLOAD", down, Halo.ion)
-            fact("UPLOAD", up, Halo.volt)
+            fact("Receiving now", down, Halo.ion)
+            fact("Sending now", up, Halo.volt)
             if connectionType == .wifi {
-                fact("SIGNAL", wifi?.rssi.map { "\($0) dBm" } ?? "—", qualityColor)
-                fact("CHANNEL", channelText, Halo.textPrimary)
-                fact("SECURITY", wifi?.security ?? "—", Halo.textPrimary)
-                fact("LINK RATE", wifi?.txRateMbps.map { String(format: "%.0f Mbps", $0) } ?? "—", Halo.textPrimary)
+                fact("Wi-Fi signal", wifi?.rssi.map { "\($0) dBm" } ?? "—", qualityColor)
+                fact("Wi-Fi channel", channelText, Halo.textPrimary)
+                fact("Wi-Fi security", wifi?.security ?? "—", Halo.textPrimary)
+                fact("Local link rate", wifi?.txRateMbps.map { String(format: "%.0f Mbps", $0) } ?? "—", Halo.textPrimary)
             }
-            fact("PUBLIC IP", model.ipLocation?.ip ?? "—", Halo.textPrimary)
-            fact("LOCATION", model.ipLocation.map { "\($0.city), \($0.country)" } ?? "—", Halo.textPrimary)
         }
     }
 
@@ -162,14 +111,13 @@ struct NetworkView: View {
     private func fact(_ label: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(1.5)
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(Halo.font(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(tint)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+
         }
     }
 
@@ -177,56 +125,52 @@ struct NetworkView: View {
 
     private var speedTestCard: some View {
         let result = model.lastResult
-        let running = model.speedTestState == .running
+        let running = model.isTesting
 
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                Text("INTERNET SPEED")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
-                    .foregroundStyle(Halo.textDim)
-                Spacer()
-                if let result {
-                    Text("Tested \(result.date, style: .relative) ago · auto every 30 min")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(Halo.textDim.opacity(0.8))
-                }
+            Text("Internet speed").font(Halo.font(size: 17, weight: .semibold))
+            HStack {
                 runButton(running: running)
+                if let result {
+                    Text("Last tested \(result.date.formatted(date: .abbreviated, time: .shortened))")
+                        .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                }
             }
-
+            Text("This test sends synthetic data to Cloudflare and transfers about 18 MB. Results estimate this connection to that service; they are not a guarantee for every website.")
+                .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle("Test automatically every 30 minutes", isOn: Binding(get: { model.automaticTestsEnabled }, set: { model.setAutomaticTests($0) }))
+                .font(Halo.font(size: 13))
+            if model.speedTestState == .cancelled { FeedbackBadge(message: "Test stopped. Your previous result is still available.") }
+            if running { Button("Stop test") { model.cancelSpeedTest() }.buttonStyle(.bordered) }
             if case .failed(let message) = model.speedTestState {
                 Text(message)
-                    .font(.system(size: 11))
+                    .font(Halo.font(size: 11))
                     .foregroundStyle(Halo.flare)
             }
 
             if let result {
-                HStack(alignment: .center, spacing: 0) {
-                    statBlock(
-                        icon: "arrow.down.circle.fill", title: "DOWNLOAD",
-                        value: String(format: "%.0f", result.downloadMbps),
-                        subtitle: "Mbps", color: Halo.ion)
-                    divider
-                    statBlock(
-                        icon: "arrow.up.circle.fill", title: "UPLOAD",
-                        value: String(format: "%.0f", result.uploadMbps),
-                        subtitle: "Mbps", color: Halo.volt)
-                    divider
-                    statBlock(
-                        icon: "timer", title: "LATENCY",
-                        value: result.baseRTTMillis.map { String(format: "%.0f", $0) } ?? "—",
-                        subtitle: "ms round-trip", color: Halo.textPrimary)
-                    divider
-                    statBlock(
-                        icon: "dot.radiowaves.left.and.right", title: "RESPONSIVENESS",
-                        value: result.responsivenessRPM.map { "\($0)" } ?? "—",
-                        subtitle: "RPM under load · higher is better", color: Halo.textPrimary)
+                if result.method != "bounded-https" {
+                    Text("Saved result from the previous test method. New tests use bounded HTTPS estimates, so the results may differ.")
+                        .font(Halo.font(size: 13)).foregroundStyle(Halo.textSecondary)
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), alignment: .leading)], spacing: 20) {
+                    statBlock(icon: "arrow.down", title: "Download", value: String(format: "%.0f", result.downloadMbps), subtitle: "Mbps · receiving data", color: Halo.textPrimary)
+                    statBlock(icon: "arrow.up", title: "Upload", value: String(format: "%.0f", result.uploadMbps), subtitle: "Mbps · sending data", color: Halo.textPrimary)
+                }
+                DisclosureGroup("Test details") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let time = result.baseRTTMillis {
+                            Text(result.method == "bounded-https" ? String(format: "HTTPS request time: %.0f ms", time) : String(format: "Previous round-trip latency: %.0f ms", time))
+                        }
+                        if let rpm = result.responsivenessRPM { Text("Previous loaded responsiveness: \(rpm) round trips per minute") }
+                    }.font(Halo.font(size: 13)).padding(.top, 8)
                 }
             } else if running {
                 measuringPlaceholder
             } else {
-                Text("First test runs shortly after launch, then automatically every 30 minutes.")
-                    .font(.system(size: 12))
+                Text("No speed test yet. Choose Test internet speed to measure this connection.")
+                    .font(Halo.font(size: 12))
                     .foregroundStyle(Halo.textDim)
                     .padding(.vertical, 12)
             }
@@ -239,37 +183,19 @@ struct NetworkView: View {
     private var measuringPlaceholder: some View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
-            Text("Measuring download, upload, and responsiveness — about 20 seconds…")
-                .font(.system(size: 12))
+            Text("Measuring download, upload and request time…")
+                .font(Halo.font(size: 12))
                 .foregroundStyle(Halo.textDim)
         }
         .padding(.vertical, 12)
     }
 
     private func runButton(running: Bool) -> some View {
-        Button {
-            model.runSpeedTest()
-        } label: {
-            HStack(spacing: 6) {
-                if running {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: "gauge.with.needle")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                Text(running ? "Testing…" : "Run Test")
-                    .font(.system(size: 11, weight: .bold))
-            }
-            .foregroundStyle(running ? Halo.textDim : Halo.void)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(
-                running ? AnyShapeStyle(Halo.surface2) : AnyShapeStyle(Halo.ion),
-                in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .disabled(running)
-        .help("Runs Apple's networkQuality test — uses real bandwidth for ~20 seconds")
+        Button { model.runSpeedTest() } label: {
+            Label(running ? "Testing…" : "Test internet speed", systemImage: "network")
+        }.buttonStyle(.borderedProminent).foregroundStyle(Halo.onAccent)
+            .disabled(running)
+            .help("Uses about 18 MB of synthetic traffic to Cloudflare. You can stop the test.")
     }
 
     private var divider: some View {
@@ -282,25 +208,25 @@ struct NetworkView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 10))
+                    .font(Halo.font(size: 10))
                     .foregroundStyle(color)
                 Text(title)
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(1.5)
+                    .font(Halo.font(size: 9, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
             }
             Text(value)
-                .font(.system(size: 26, weight: .bold, design: .monospaced))
+                .font(Halo.font(size: 26, weight: .bold, design: .monospaced))
                 .foregroundStyle(color)
-                .contentTransition(.numericText())
+                .monospacedDigit()
             Text(subtitle)
-                .font(.system(size: 10))
+                .font(Halo.font(size: 10))
                 .foregroundStyle(Halo.textDim)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Throughput
@@ -312,9 +238,8 @@ struct NetworkView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("LIVE THROUGHPUT · 30 MIN")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Data transfer · 30 minutes")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Spacer()
                 legendDot(Halo.ion, "Download")
@@ -327,7 +252,7 @@ struct NetworkView: View {
                     Spacer()
                     Text("0 B/s")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(Halo.font(size: 9, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 60, alignment: .trailing)
 
@@ -347,7 +272,7 @@ struct NetworkView: View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 5, height: 5)
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(Halo.font(size: 9, weight: .semibold))
                 .foregroundStyle(Halo.textDim)
         }
     }
@@ -369,12 +294,11 @@ struct NetworkView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("SPEED HISTORY")
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2)
+                Text("Previous speed tests")
+                    .font(Halo.font(size: 10, weight: .semibold))
                     .foregroundStyle(Halo.textDim)
                 Text("\(ordered.count) tests")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.ion)
                 Spacer()
                 legendDot(Halo.ion, "Download")
@@ -389,7 +313,7 @@ struct NetworkView: View {
                 Spacer()
                 if ordered.count > 1, let last = ordered.last { Text(axisLabel(last.date)) }
             }
-            .font(.system(size: 9, design: .monospaced))
+            .font(Halo.font(size: 9, design: .monospaced))
             .foregroundStyle(Halo.textDim)
         }
         .padding(16)
@@ -406,10 +330,10 @@ struct NetworkView: View {
                 ForEach(results) { result in
                     VStack(spacing: 2) {
                         Text(String(format: "%.0f", result.downloadMbps))
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .font(Halo.font(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Halo.ion)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+
                         HStack(alignment: .bottom, spacing: 2) {
                             bar(result.downloadMbps, scale: scale, maxHeight: barMax, color: Halo.ion)
                             bar(result.uploadMbps, scale: scale, maxHeight: barMax, color: Halo.volt)
@@ -469,19 +393,16 @@ private struct QualityRing: View {
                 .trim(from: 0, to: min(max(fraction, 0), 1))
                 .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: color.opacity(0.4), radius: 12)
-                .animation(Halo.Motion.ring, value: fraction)
             VStack(spacing: 0) {
                 Text(headline)
-                    .font(.system(size: diameter * 0.3, weight: .bold, design: .rounded))
+                    .font(Halo.font(size: diameter * 0.3, weight: .bold, design: .rounded))
                     .foregroundStyle(Halo.textPrimary)
-                    .contentTransition(.numericText())
+                    .monospacedDigit()
                 Text(caption)
-                    .font(.system(size: diameter * 0.1, weight: .bold))
-                    .tracking(2)
+                    .font(Halo.font(size: diameter * 0.1, weight: .bold))
                     .foregroundStyle(color)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+
                     .padding(.horizontal, 12)
             }
         }

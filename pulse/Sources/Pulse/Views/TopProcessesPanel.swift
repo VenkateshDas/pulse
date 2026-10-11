@@ -11,16 +11,15 @@ struct TopProcessesPanel: View {
             HStack {
                 HStack(spacing: 4) {
                     Text("PROCESSES")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(2)
+                        .font(Halo.font(size: 10, weight: .semibold))
                     Image(systemName: "info.circle")
-                        .font(.system(size: 9))
+                        .font(Halo.font(size: 9))
                         .help("Top active processes ranked by CPU usage")
                 }
                 .foregroundStyle(Halo.textDim)
                 Spacer()
                 Text("CPU · RAM")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(Halo.font(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.textDim)
             }
 
@@ -46,7 +45,7 @@ struct TopProcessesPanel: View {
                 .resizable()
                 .frame(width: 14, height: 14)
             Text(process.count > 1 ? "\(process.name) (\(process.count))" : process.name)
-                .font(.system(size: 12))
+                .font(Halo.font(size: 12))
                 .foregroundStyle(Halo.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -65,12 +64,12 @@ struct TopProcessesPanel: View {
             .clipShape(Capsule())
 
             Text(String(format: "%5.1f%%", process.cpuPercent))
-                .font(.system(size: 11, design: .monospaced))
+                .font(Halo.font(size: 11, design: .monospaced))
                 .foregroundStyle(process.cpuPercent >= 80 ? Halo.amber : Halo.textDim)
                 .frame(width: 48, alignment: .trailing)
 
             Text(ByteFormat.string(process.residentBytes))
-                .font(.system(size: 11, design: .monospaced))
+                .font(Halo.font(size: 11, design: .monospaced))
                 .foregroundStyle(Halo.textDim)
                 .frame(width: 64, alignment: .trailing)
         }

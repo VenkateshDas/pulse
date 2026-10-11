@@ -16,7 +16,7 @@ struct ShortcutRecorderField: View {
             onStartRecording()
         } label: {
             Text(isRecording ? "Recording…" : combo.displayString)
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .font(Halo.font(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(isRecording ? Halo.ion : Halo.textPrimary)
                 .frame(minWidth: 110)
                 .padding(.horizontal, 10)

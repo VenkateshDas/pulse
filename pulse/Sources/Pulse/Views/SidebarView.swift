@@ -1,8 +1,7 @@
 import PulseKit
 import SwiftUI
 
-/// Navigation destinations. Only `.dashboard` is built in v0.2; the rest
-/// render dimmed with a "soon" tag — no dead UI pretending to work.
+/// Stable identifiers are retained for existing shortcuts and stored routes.
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case agent = "Agent"
@@ -16,258 +15,141 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case health = "Health"
     case settings = "Settings"
     case diagnostics = "Diagnostics"
+    case startup = "Startup"
+    case benchmark = "Benchmark"
 
     var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .dashboard: "Home"
+        case .agent: "Ask Pulse"
+        case .storage: "Free up space"
+        case .timeline: "Activity"
+        case .optimize: "Maintenance"
+        case .uninstall: "Apps"
+        case .monitor: "App activity"
+        case .network: "Internet"
+        case .displays: "Displays"
+        case .health: "Battery & energy"
+        case .settings: "Settings"
+        case .diagnostics: "Diagnostics"
+        case .startup: "Startup helpers"
+        case .benchmark: "Performance test"
+        }
+    }
 
     var symbol: String {
         switch self {
-        case .dashboard: "heart.fill"
-        case .agent: "sparkles"
-        case .storage: "internaldrive.fill"
-        case .timeline: "chart.xyaxis.line"
-        case .optimize: "sparkles"
-        case .uninstall: "trash.slash.fill"
+        case .dashboard: "house"
+        case .agent: "bubble.left.and.text.bubble.right"
+        case .storage: "internaldrive"
+        case .timeline: "clock.arrow.circlepath"
+        case .optimize: "wrench.and.screwdriver"
+        case .uninstall: "square.grid.2x2"
         case .monitor: "waveform.path.ecg"
         case .network: "wifi"
         case .displays: "display"
-        case .health: "stethoscope"
-        case .settings: "gearshape.fill"
-        case .diagnostics: "wrench.and.screwdriver.fill"
+        case .health: "battery.75percent"
+        case .settings: "gearshape"
+        case .diagnostics: "stethoscope"
+        case .startup: "power"
+        case .benchmark: "gauge.with.needle"
         }
     }
 
     var isAvailable: Bool { true }
-
-    /// Rows collapsed behind the sidebar's "Advanced" disclosure in
-    /// `.simple` mode — power-user tools a non-technical user doesn't need
-    /// to see by default, but can still reach in one tap.
-    static let advancedGatedItems: Set<SidebarItem> = [.monitor, .diagnostics]
-}
-
-enum SidebarSection: String, CaseIterable {
-    case overview = "OVERVIEW"
-    case insights = "INSIGHTS"
-    case system = "SYSTEM"
-    case tools = "TOOLS"
-
-    var items: [SidebarItem] {
-        switch self {
-        case .overview: [.dashboard, .agent]
-        case .insights: [.storage, .timeline]
-        case .system: [.monitor, .network, .displays, .health]
-        case .tools: [.optimize, .uninstall, .settings, .diagnostics]
-        }
-    }
-
-    /// Items in this section shown as top-level rows for the given mode.
-    /// `.simple` holds back `SidebarItem.advancedGatedItems` — they still
-    /// exist in `items`/`allCases` (hotkeys keep working), just not as a
-    /// row here; the sidebar surfaces them behind a single "Advanced"
-    /// disclosure instead.
-    func visibleItems(for mode: DisplayMode) -> [SidebarItem] {
-        switch mode {
-        case .pro: items
-        case .simple: items.filter { !SidebarItem.advancedGatedItems.contains($0) }
-        }
-    }
+    static let everyday: [SidebarItem] = [.dashboard, .storage, .uninstall, .health, .network, .displays, .timeline]
+    static let advanced: [SidebarItem] = [.monitor, .optimize, .startup, .benchmark, .diagnostics]
+    static let advancedGatedItems = Set(advanced)
 }
 
 struct SidebarView: View {
     @Environment(DashboardModel.self) private var model
-    @Environment(StorageModel.self) private var storage
     @Binding var selection: SidebarItem
-    @State private var hoveredItem: SidebarItem?
     @State private var showAdvanced = false
 
     var body: some View {
-        // Registers an Observation dependency on the current display mode so
-        // the sidebar re-renders when it's changed from Settings/Onboarding.
-        let mode = DisplayModeManager.shared.current
         VStack(alignment: .leading, spacing: 0) {
-            logo
-                .padding(.bottom, Halo.Space.xxl)
+            HStack(spacing: 10) {
+                Image(systemName: "circle.inset.filled")
+                    .foregroundStyle(Halo.interactive)
+                    .accessibilityHidden(true)
+                Text("Pulse")
+                    .font(Halo.font(size: 22, weight: .semibold, design: .rounded))
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
 
-            ForEach(SidebarSection.allCases, id: \.self) { section in
-                Text(section.rawValue)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(Halo.textDim.opacity(0.6))
-                    .padding(.leading, 10)
-                    .padding(.top, section == .overview ? 0 : Halo.Space.lg)
-                    .padding(.bottom, Halo.Space.xs)
-                ForEach(section.visibleItems(for: mode)) { item in
-                    row(item)
+            List(selection: Binding<SidebarItem?>(
+                get: { selection }, set: { if let item = $0 { selection = item } }
+            )) {
+                ForEach(SidebarItem.everyday) { item in row(item) }
+                Section("More") {
+                    row(.agent)
+                    DisclosureGroup("Advanced tools", isExpanded: $showAdvanced) {
+                        ForEach(SidebarItem.advanced) { item in row(item) }
+                    }
+                    row(.settings)
                 }
             }
+            .listStyle(.sidebar)
+            .font(Halo.font(size: 14))
+            .accessibilityLabel("Navigation")
 
-            if mode == .simple {
-                advancedDisclosure
-            }
-
-            Spacer()
-            Divider().overlay(Halo.borderSubtle).padding(.bottom, Halo.Space.sm)
-            footer
+            Label(statusText, systemImage: statusSymbol)
+                .font(Halo.font(size: 12))
+                .foregroundStyle(Halo.textSecondary)
+                .padding(16)
+                .accessibilityElement(children: .combine)
         }
-        .padding(Halo.Space.lg)
-        .frame(width: 216)
-        .background { GlassLayer(material: .ultraThinMaterial, tint: Halo.void.opacity(0.7)) }
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(Halo.borderSubtle).frame(width: 1)
-        }
-    }
-
-    @ViewBuilder
-    private var logo: some View {
-        if let image = Bundle.module.image(forResource: "Logo") ?? NSImage(named: "Logo") {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 160, height: 56, alignment: .center)
-                .clipped()
-                .padding(.leading, -8) // slight shift to align the dot nicely with the layout
-        } else {
-            // Fallback if logo not found
-            Text("PULSE")
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .tracking(3)
-                .foregroundStyle(Halo.textPrimary)
-        }
+        .foregroundStyle(Halo.textPrimary)
+        .background(Halo.void)
+        .onAppear { revealSelection() }
+        .onChange(of: selection) { _, _ in revealSelection() }
     }
 
     private func row(_ item: SidebarItem) -> some View {
-        let isSelected = selection == item
-        let isHover = hoveredItem == item && !isSelected
-        return Button {
-            if item.isAvailable {
-                withAnimation(Halo.Motion.snappy) { selection = item }
-            }
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: item.symbol)
-                    .font(.system(size: 13))
-                    .frame(width: 18)
-                Text(item.rawValue)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                Spacer()
-                badge(item)
-            }
-            .foregroundStyle(rowColor(item))
-            .padding(.horizontal, 10)
-            .padding(.vertical, Halo.Space.sm)
-            .background(
-                isSelected
-                    ? Halo.interactive.opacity(0.10)
-                    : (isHover ? Halo.surface2.opacity(0.6) : .clear),
-                in: RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in hoveredItem = hovering ? item : nil }
+        Label(item.title, systemImage: item.symbol)
+            .padding(.vertical, 4)
+            .tag(item)
+            .accessibilityLabel(item.title)
     }
 
-    @ViewBuilder
-    private func badge(_ item: SidebarItem) -> some View {
-        if item == .storage, let snapshot = model.snapshot {
-            Text("\(Int(snapshot.diskUsedFraction * 100))%")
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Halo.statusColor(snapshot.diskUsedFraction))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Halo.surface2, in: Capsule())
-        } else if !item.isAvailable {
-            Text("soon")
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(Halo.textDim.opacity(0.7))
-        }
+    private func revealSelection() {
+        if SidebarItem.advancedGatedItems.contains(selection) { showAdvanced = true }
     }
 
-    private func rowColor(_ item: SidebarItem) -> Color {
-        if selection == item { return Halo.interactive }
-        return item.isAvailable ? Halo.textPrimary.opacity(0.8) : Halo.textDim.opacity(0.6)
+    private var statusText: String {
+        guard model.snapshot != nil else { return "Checking your Mac…" }
+        return Self.statusText(mode: .simple,
+                              hasCritical: model.diagnosis.severity == .critical,
+                              hasWarning: model.diagnosis.severity == .warn || !model.attentionItems.isEmpty)
     }
 
-    /// Single collapsed row that reveals Monitor + Diagnostics on tap, so
-    /// `.simple` mode never fully hides a feature — just defers it one tap.
-    private var advancedDisclosure: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(Halo.Motion.snappy) { showAdvanced.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 13))
-                        .frame(width: 18)
-                    Text("Advanced")
-                        .font(.system(size: 13))
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .rotationEffect(.degrees(showAdvanced ? 90 : 0))
-                }
-                .foregroundStyle(Halo.textPrimary.opacity(0.8))
-                .padding(.horizontal, 10)
-                .padding(.vertical, Halo.Space.sm)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if showAdvanced {
-                // `allCases`-ordered, not `Set` iteration order, so the two
-                // rows land in a stable position every render.
-                ForEach(SidebarItem.allCases.filter { SidebarItem.advancedGatedItems.contains($0) }) { item in
-                    row(item)
-                }
-            }
-        }
-        .padding(.top, Halo.Space.lg)
+    private var statusSymbol: String {
+        model.snapshot == nil ? "clock" : (model.diagnosis.severity >= .warn ? "exclamationmark.circle" : "checkmark.circle")
     }
 
-    private var footer: some View {
-        VStack(alignment: .leading, spacing: Halo.Space.xs) {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
-                    .shadow(color: statusColor.opacity(0.5), radius: 6)
-                Text(Self.statusText(mode: DisplayModeManager.shared.current,
-                                      hasCritical: model.alerts.contains { $0.severity == .critical },
-                                      hasWarning: model.alerts.contains { $0.severity == .warning }))
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(statusColor)
-            }
-            Text("\(SystemInfo.chipName) · up \(uptimeText)")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(Halo.textDim)
-        }
-    }
-
-    private var statusColor: Color {
-        if model.alerts.contains(where: { $0.severity == .critical }) { return Halo.flare }
-        if model.alerts.contains(where: { $0.severity == .warning }) { return Halo.amber }
-        return Halo.pulseGreen
-    }
-
-    /// Pure so it's unit-testable without a live `DashboardModel`. Pro mode
-    /// keeps the original ops-console phrasing; Simple mode says it plainly.
     static func statusText(mode: DisplayMode, hasCritical: Bool, hasWarning: Bool) -> String {
-        switch mode {
-        case .pro:
-            if hasCritical { return "ATTENTION NEEDED" }
-            if hasWarning { return "MINOR ISSUES" }
-            return "ALL SYSTEMS NOMINAL"
-        case .simple:
-            if hasCritical { return "Needs attention" }
-            if hasWarning { return "A couple of small things" }
-            return "Everything's fine"
-        }
+        if hasCritical { return "Needs attention" }
+        if hasWarning { return "Something to review" }
+        return "No urgent issues detected"
     }
+}
 
-    private var uptimeText: String {
-        let minutes = Int(model.snapshot?.uptime ?? 0) / 60
-        let hours = minutes / 60
-        if hours >= 24 { return "\(hours / 24)d \(hours % 24)h" }
-        if hours >= 1 { return "\(hours)h" }
-        return "\(minutes)m"
+/// Used by Home, search and contextual links. Navigation never executes an action.
+@MainActor
+enum PulseNavigation {
+    private(set) static var pending: (destination: SidebarItem, diskTab: Int?)?
+    static func takePending() -> (destination: SidebarItem, diskTab: Int?)? {
+        defer { pending = nil }
+        return pending
+    }
+    static let notification = Notification.Name("PulseNavigateToDestination")
+    static func open(_ item: SidebarItem, diskTab: Int? = nil) {
+        pending = (item, diskTab)
+        var info: [String: Any] = ["destination": item.rawValue]
+        if let diskTab { info["diskTab"] = diskTab }
+        NotificationCenter.default.post(name: notification, object: nil, userInfo: info)
     }
 }
