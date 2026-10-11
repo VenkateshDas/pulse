@@ -113,3 +113,9 @@
 ## [2026-10-11] Accessible redesign foundation | Implemented approved task-led navigation, readable light/dark themes, Larger text, Home and onboarding; native brightness control, reviewed duplicate workflows, opt-in bounded native network estimates and explicitly selected maintenance tasks. Build passed; whole-app implementation and runtime/CI verification remain in progress.
 
 ## [2026-10-11] Accessible redesign workflows | Added search-first app removal review, task-led menu bar, adaptive inspectors, cleanup cancellation, estimated energy explanations, actual removal records, provider setup and robust conversation stop handling. Removed prohibited legacy shell collection/action paths and kept truthful unavailable guidance. Fixed a runtime split-view sizing failure; Home, Apps/search and Battery/Internet inspected in the release app. 351 tests passed; remaining runtime matrix, release performance, final review and PR/CI gates remain open.
+
+## [2026-10-11] Redesign implementation checkpoint | Task-led shell and reviewed interactions committed in 52a2e2a; 351-test suite and latest debug build pass. Release/runtime/performance gates remain open. Recovery audit identified GUI Trash journaling and main-thread Finder event fixes for the next checkpoint.
+
+## [2026-10-11] Harden GUI removal recovery | Native app and related-file Trash moves now journal atomically with rollback. Finder permission events run on MainActor only for denied file moves. Added three recovery fixtures; 354-test suite passed before final error typing. Release UI verified Internet first layer; visible RSS exceeds budget and remains an open gate.
+
+Final recovery refinement: make test passed 354 tests in 80 suites; Battery overview disclosures and charge-history accessibility were checked in the release app.
