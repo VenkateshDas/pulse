@@ -33,7 +33,8 @@ def create_pulse_agent(session_id=None, run_id=None, db_path=None, model=None, c
     if not (directory / "SKILL.md").is_file(): raise RuntimeError("Bundled Pulse skill missing")
     skills = ReadOnlySkills(loaders=[LocalSkills(str(directory))])
     if not skills._skills: raise RuntimeError("Pulse skill could not be loaded")
-    # Include whole runs only, preserving assistant/tool pairing. Reserve room
+    # Replay dialogue, not old tool payloads. Large skill/native results must
+    # not erase conversation history. Results remain persisted. Reserve room
     # for skills/tool schemas, memory, current request and requested output.
     history_runs = 4
     from agno.db.base import SessionType
@@ -42,14 +43,14 @@ def create_pulse_agent(session_id=None, run_id=None, db_path=None, model=None, c
         available_chars = max(0, (config.context_tokens - config.output_tokens - 12000))
         consumed = 0; history_runs = 0
         for run in reversed(session.runs or []):
-            size = sum(len(str(m.content or '')) + len(json.dumps(m.tool_calls or [])) for m in run.messages or [] if not m.from_history)
+            size = sum(len(str(m.content or '')) for m in run.messages or [] if not m.from_history and m.role in {'user', 'assistant'})
             if consumed + size > available_chars: break
             consumed += size; history_runs += 1
     return Agent(id="pulse-agent", name="Ask Pulse", model=active_model, db=db,
         user_id=USER_ID, session_id=session_id, tools=[PulseToolkit(run_id=run_id, session_id=session_id)],
         skills=skills, instructions=build_system_instructions(), additional_context=context, telemetry=False,
         tool_call_limit=16, add_history_to_context=history_runs > 0, num_history_runs=history_runs,
-        max_tool_calls_from_history=4, store_history_messages=False,
+        max_tool_calls_from_history=0, store_history_messages=False,
         offload_tool_results=ResultStore(db=db, threshold_chars=6000, preview_chars=1000, preview_lines=12, ttl_seconds=7*86400),
         learning=LearningMachine(custom_stores={"pulse": PulseMemoryStore(session_id, config.memory_enabled)}, namespace=USER_ID),
         enable_session_summaries=True, add_session_summary_to_context=True,

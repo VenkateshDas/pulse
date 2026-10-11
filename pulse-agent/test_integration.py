@@ -40,6 +40,25 @@ class AgnoIntegrationTests(unittest.IsolatedAsyncioTestCase):
             users=[m for m in messages if m.role=='user']
             self.assertEqual(4,len(users))
 
+    async def test_large_tool_result_preserves_dialogue_after_restart(self):
+        class RecallModel(FixtureModel):
+            async def ainvoke_stream(self, messages, assistant_message, **kwargs):
+                if messages[-1].content == 'Recall earlier answer':
+                    self.asserted_history = any(m.role == 'assistant' and m.content == 'Native evidence received. No mutation performed.' for m in messages[:-1])
+                    yield ModelResponse(role='assistant', content='Recalled')
+                else:
+                    async for chunk in super().ainvoke_stream(messages, assistant_message, **kwargs): yield chunk
+        with tempfile.TemporaryDirectory() as d:
+            sid = str(uuid.uuid4())
+            config = ProviderConfiguration(memory_enabled=False)
+            with patch('pulse_toolkit.native_request', new=AsyncMock(return_value={'json': 'x' * 24000, 'exit_code': 0})):
+                first = create_pulse_agent(session_id=sid, db_path=d+'/agent.db', model=FixtureModel(id='fixture'), configuration=config)
+                async for _ in first.arun('Read context', stream=True): pass
+            model = RecallModel(id='fixture')
+            restarted = create_pulse_agent(session_id=sid, db_path=d+'/agent.db', model=model, configuration=config)
+            async for _ in restarted.arun('Recall earlier answer', stream=True): pass
+            self.assertTrue(model.asserted_history)
+
     async def test_actual_agno_approval_pauses_and_resumes_once(self):
         class ApprovalModel(FixtureModel):
             async def ainvoke_stream(self, messages, assistant_message, **kwargs):
