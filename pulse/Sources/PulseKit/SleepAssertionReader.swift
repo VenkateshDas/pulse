@@ -6,6 +6,7 @@ import IOKit.pwr_mgt
 /// Apps currently holding "don't sleep" power assertions — the classic
 /// "Teams kept my Mac awake all night" detector. Public IOKit API, no root.
 final class SleepAssertionReader {
+    private(set) var unavailable: String?
     /// Assertion types that actually block idle system sleep.
     private static let blockingTypes: Set<String> = [
         kIOPMAssertionTypePreventUserIdleSystemSleep as String,
@@ -13,10 +14,11 @@ final class SleepAssertionReader {
     ]
 
     func sample() -> [SleepAssertion] {
+        unavailable = nil
         var raw: Unmanaged<CFDictionary>?
         guard IOPMCopyAssertionsByProcess(&raw) == kIOReturnSuccess,
             let byProcess = raw?.takeRetainedValue() as? [NSNumber: [[String: Any]]]
-        else { return [] }
+        else { unavailable = "Sleep assertions unavailable"; return [] }
 
         var assertions: [SleepAssertion] = []
         for (pidNumber, entries) in byProcess {

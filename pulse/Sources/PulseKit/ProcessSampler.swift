@@ -11,6 +11,8 @@ final class ProcessSampler {
     // timebase conversion is needed (and applying one to only the wall delta
     // inflated it ~42× on Apple Silicon, crushing every process's CPU% by that
     // same factor). Compare the raw deltas directly.
+    private(set) var coverage = ProcessCoverage()
+    private var previousStarts: [pid_t: String] = [:]
     private var previousTaskTime: [pid_t: UInt64] = [:]
     private var previousSampleAt: UInt64 = 0
     private var nameCache: [pid_t: String] = [:]
@@ -23,18 +25,12 @@ final class ProcessSampler {
         let firstSample = previousSampleAt == 0
         defer { previousSampleAt = now }
 
-        var pids = [pid_t](repeating: 0, count: 8192)
-        // proc_listallpids returns the number of *bytes* written into the
-        // buffer, not a pid count — dividing by the stride recovers the
-        // actual count. Clamp to the buffer's own bounds as well, since a
-        // process count exceeding the fixed 8192-slot buffer would otherwise
-        // report more bytes than the buffer can hold.
-        let bytesWritten = pids.withUnsafeMutableBufferPointer { buffer in
-            proc_listallpids(buffer.baseAddress, Int32(buffer.count * MemoryLayout<pid_t>.size))
-        }
-        guard bytesWritten > 0 else { return [] }
-        let pidCount = min(Int(bytesWritten) / MemoryLayout<pid_t>.size, pids.count)
+        let enumeration = NativeProcesses.list()
+        let pids = enumeration.pids
+        coverage = enumeration.coverage
+        let pidCount = pids.count
 
+        var nextStarts: [pid_t: String] = [:]
         var nextTaskTime: [pid_t: UInt64] = [:]
         nextTaskTime.reserveCapacity(pidCount)
         var samples: [ProcessSample] = []
@@ -47,14 +43,19 @@ final class ProcessSampler {
             )
             guard size == Int32(MemoryLayout<proc_taskinfo>.size) else { continue }
 
+            let startToken = NativeProcesses.startToken(pid)
+            if let startToken { nextStarts[pid] = startToken }
             let taskTime = info.pti_total_user &+ info.pti_total_system
             nextTaskTime[pid] = taskTime
 
             var cpuPercent = 0.0
-            if !firstSample, wallDelta > 0, let prev = previousTaskTime[pid], taskTime >= prev {
-                cpuPercent = Double(taskTime - prev) / Double(wallDelta) * 100
+            if !firstSample, wallDelta > 0, let startToken, previousStarts[pid] == startToken, let prev = previousTaskTime[pid], taskTime >= prev {
+                cpuPercent = NativeProcesses.cpuPercent(taskDelta: taskTime - prev, wallTicks: wallDelta)
             }
 
+            if previousStarts[pid] != startToken {
+                nameCache.removeValue(forKey: pid); appCache.removeValue(forKey: pid)
+            }
             let name: String
             if let cached = nameCache[pid] {
                 name = cached
@@ -84,14 +85,16 @@ final class ProcessSampler {
                     name: name,
                     cpuPercent: cpuPercent,
                     residentBytes: info.pti_resident_size,
-                    appName: appName
+                    appName: appName, startToken: startToken
                 )
             )
         }
 
+        coverage.readable = samples.count
+        previousStarts = nextStarts
         previousTaskTime = nextTaskTime
         let livePIDs = Set(nextTaskTime.keys)
-        if nameCache.count > livePIDs.count * 2 {
+        do {
             nameCache = nameCache.filter { livePIDs.contains($0.key) }
             appCache = appCache.filter { livePIDs.contains($0.key) }
         }

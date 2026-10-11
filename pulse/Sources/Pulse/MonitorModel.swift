@@ -11,6 +11,7 @@ import PulseKit
 @Observable
 final class MonitorModel {
     private(set) var rows: [ProcessExtendedSample] = []
+    private(set) var coverage = ProcessCoverage()
     private(set) var roots: [ProcessNode] = []
     private(set) var networks: [NetworkSample] = []
     /// 60-tick rate history (bytes/sec) summed across interfaces.
@@ -19,11 +20,13 @@ final class MonitorModel {
     private(set) var selectedPID: Int32?
     /// 60-tick CPU history for the selected process only.
     private(set) var selectedCPUHistory: [Double] = []
-    /// Feedback from the last action ("Sent Quit to Chrome Helper").
+    /// Current selected identity and feedback from a graceful application quit.
+    private(set) var selectedIdentity: ProcessIdentity?
     var actionFeedback: String?
 
     var sortKey: MonitorEngine.SortKey = .cpu { didSet { resample() } }
     var sortAscending = false { didSet { resample() } }
+    var groupMode = false
     var treeMode = false { didSet { resample() } }
     var filter = ""
 
@@ -103,6 +106,7 @@ final class MonitorModel {
         let sampledNames = await engine.names()
         let sampledNetworks = await engine.networkDeltas()
 
+        coverage = await engine.coverage
         rows = sampled
         roots = sampledRoots
         parents = sampledParents
@@ -117,6 +121,9 @@ final class MonitorModel {
 
         if let pid = selectedPID {
             if let row = byPID[pid] {
+                let current = ProcessIdentity.read(pid)
+                if current?.startToken != selectedIdentity?.startToken { selectedCPUHistory = [] }
+                selectedIdentity = current
                 append(row.cpuPercent, to: &selectedCPUHistory)
             } else {
                 // Process exited — keep the selection honest.
@@ -136,8 +143,9 @@ final class MonitorModel {
     // MARK: - Selection
 
     func select(_ pid: Int32) {
-        guard pid != selectedPID else { return }
+        guard pid != selectedPID else { selectedIdentity = ProcessIdentity.read(pid); return }
         selectedPID = pid
+        selectedIdentity = ProcessIdentity.read(pid)
         selectedCPUHistory = byPID[pid].map { [$0.cpuPercent] } ?? []
     }
 
@@ -158,14 +166,38 @@ final class MonitorModel {
         return rows.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
     }
 
+    var appRows: [ProcessExtendedSample] {
+        Dictionary(grouping: filteredRows, by: { $0.appName ?? $0.name }).map { name, members in
+            let top = members.max { sortKey == .memory ? $0.residentBytes < $1.residentBytes : $0.cpuPercent < $1.cpuPercent }!
+            return ProcessExtendedSample(pid: top.pid, name: name + " (\(members.count))",
+                cpuPercent: members.reduce(0) { $0 + $1.cpuPercent }, residentBytes: members.reduce(0) { $0 + $1.residentBytes },
+                virtualBytes: members.reduce(0) { $0 + $1.virtualBytes }, threadCount: members.reduce(0) { $0 + $1.threadCount },
+                pageFaultRate: members.reduce(0) { $0 + $1.pageFaultRate }, appName: name)
+        }.sorted {
+            switch sortKey {
+            case .cpu: return sortAscending ? $0.cpuPercent < $1.cpuPercent : $0.cpuPercent > $1.cpuPercent
+            case .memory: return sortAscending ? $0.residentBytes < $1.residentBytes : $0.residentBytes > $1.residentBytes
+            case .threads: return sortAscending ? $0.threadCount < $1.threadCount : $0.threadCount > $1.threadCount
+            case .pageFaults: return sortAscending ? $0.pageFaultRate < $1.pageFaultRate : $0.pageFaultRate > $1.pageFaultRate
+            case .name: return sortAscending ? $0.name < $1.name : $0.name > $1.name
+            case .pid: return sortAscending ? $0.pid < $1.pid : $0.pid > $1.pid
+            }
+        }
+    }
+
     // MARK: - Actions
 
-    /// Sends SIGTERM — the polite quit, same contract as the dashboard.
+    /// Native application quit, bound to the inspected start token.
     func quitProcess(pid: Int32, name: String) {
-        actionFeedback =
-            kill(pid, SIGTERM) == 0
-            ? "Sent Quit to \(name)"
-            : "Couldn't quit \(name) — it may be a system process"
+        guard let identity = selectedIdentity, identity.pid == pid else {
+            actionFeedback = "Inspect this application again before quitting"; return
+        }
+        Task {
+            do {
+                let result = try await AppQuit.run(pid: pid, startToken: identity.startToken, dryRun: false)
+                actionFeedback = result.message
+            } catch { actionFeedback = error.localizedDescription }
+        }
     }
 
     private func append(_ value: Double, to buffer: inout [Double]) {

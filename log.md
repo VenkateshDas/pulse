@@ -106,3 +106,5 @@
 ## [2026-09-19] fix | Package skill under its required `pulse` name and load persisted user-visible session history instead of clearing conversation on selection.
 ## [2026-09-19] fix | Coalesce eight streamed Agent answer chunks per SwiftUI publication; prevents provider token bursts from monopolizing the main actor.
 ## [2026-09-19] fix | Keep Agno tool-event content out of final answers, preserve complete final text, collapse tool details by default, and clear working progress when answer begins.
+
+## [2026-10-10] Diagnostic investigation | Correct PID enumeration and CPU accounting; add native VM/storage interval activity, bounded shared observation, process detail/tree/grouping, network timing, history with coverage limits, startup/sleep inspection, identity-bound graceful quit, Monitor investigation UI, agent failure preservation and focused Pulse skill references. Optimize reports successful Trash moves without claiming reclaimed space.

@@ -24,6 +24,15 @@ public enum ProcsCmd {
         let limit = parser.intOption("limit", "n", default: 10) ?? 10
         let sortBy = parser.stringOption("by", "sort")?.lowercased() ?? "cpu"
 
+        if parser.hasFlag("tree") {
+            let monitor = MonitorEngine()
+            _ = await monitor.sample(sortKey: .cpu, ascending: false)
+            try? await Task.sleep(for: .milliseconds(600))
+            let roots = await monitor.tree()
+            struct Tree: Encodable { let roots: [ProcessNode]; let coverage: ProcessCoverage }
+            output.emitJSON(Tree(roots: roots, coverage: await monitor.coverage))
+            return
+        }
         let engine = PulseEngine(recordsHistory: false)
         // First sample establishes baseline
         _ = await engine.sample(topProcessLimit: Int.max)
@@ -38,6 +47,12 @@ public enum ProcsCmd {
             procs.sort { $0.cpuPercent > $1.cpuPercent }
         }
 
+        if parser.hasFlag("grouped") {
+            let groups = ProcessGrouper.group(procs, byMemory: sortBy == "mem")
+            struct Grouped: Encodable { let groups: [ProcessGroup]; let coverage: ProcessCoverage; let timestamp: Date }
+            output.emitJSON(Grouped(groups: Array(groups.prefix(limit)), coverage: snapshot.processCoverage, timestamp: snapshot.timestamp))
+            return
+        }
         let sliced = Array(procs.prefix(limit)).map { ProcessDTO(sample: $0) }
 
         if output.isJSON {

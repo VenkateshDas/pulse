@@ -5,14 +5,16 @@ public struct OptimizeResult: Sendable, Equatable {
     public let success: Bool
     public let summary: String       // "Cleared 312 MB of saved app state"
     public let bytesFreed: Int64
+    public let bytesMovedToTrash: Int64
     /// True when the task moved files to the Trash (drives the trash sound).
     public let trashed: Bool
 
-    public init(success: Bool, summary: String, bytesFreed: Int64 = 0, trashed: Bool = false) {
+    public init(success: Bool, summary: String, bytesFreed: Int64 = 0, trashed: Bool = false, bytesMovedToTrash: Int64 = 0) {
         self.success = success
         self.summary = summary
         self.bytesFreed = bytesFreed
         self.trashed = trashed
+        self.bytesMovedToTrash = bytesMovedToTrash
     }
 }
 
@@ -186,6 +188,7 @@ public enum OptimizeEngine {
         await MenuBarFlash.shared.flash("bolt.heart.fill")
         var completed: [String] = []
         var totalFreed: Int64 = 0
+        var totalMoved: Int64 = 0
         for task in inProcessTasks {
             if let skip = await task.skipCheck() {
                 completed.append("\(task.label): \(skip)")
@@ -194,11 +197,13 @@ public enum OptimizeEngine {
             do {
                 let result = try await task.run()
                 totalFreed += result.bytesFreed
+                totalMoved += result.bytesMovedToTrash
                 completed.append(result.summary)
             } catch {
                 completed.append("\(task.label): failed")
             }
         }
+        if totalMoved > 0 { return "Moved \(ByteFormat.string(UInt64(totalMoved))) to Trash · space remains allocated" }
         if totalFreed > 0 {
             return "Optimized · freed \(ByteFormat.string(UInt64(totalFreed)))"
         }
@@ -232,33 +237,23 @@ public enum OptimizeEngine {
         }.value
     }
 
-    /// Moves every entry in `dir` to the Trash (reversible). Returns bytes freed.
+    /// Journal every successful move; Trash is not reclaimed capacity.
     static func trashContents(of dir: URL, label: String) async -> OptimizeResult {
-        let bytes = await dirBytes(dir)
         let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(
-            at: dir, includingPropertiesForKeys: nil) else {
+        guard let entries = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
             return OptimizeResult(success: false, summary: "Couldn't read \(label)")
         }
-        var moved = 0
-        var trashedItems: [TrashedItem] = []
+        var movedBytes: Int64 = 0, moved = 0, failed = 0
         for entry in entries {
-            var trashedURL: NSURL?
-            if (try? fm.trashItem(at: entry, resultingItemURL: &trashedURL)) != nil {
-                moved += 1
-                if let trashPath = trashedURL?.path {
-                    trashedItems.append(TrashedItem(originalPath: entry.path, trashPath: trashPath))
-                }
-            }
+            let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .fileAllocatedSizeKey])
+            let bytes = values?.isDirectory == true ? await dirBytes(entry) : Int64(values?.fileAllocatedSize ?? 0)
+            do {
+                _ = try await UndoJournal.shared.trashItem(at: entry, operation: "Optimize (\(label))", bytes: UInt64(max(0, bytes)))
+                moved += 1; movedBytes += bytes
+            } catch { failed += 1 }
         }
-        if !trashedItems.isEmpty {
-            await UndoJournal.shared.record(UndoEntry(op: "Optimize (\(label))", items: trashedItems, bytesFreed: bytes))
-        }
-        let ok = moved > 0 || entries.isEmpty
-        return OptimizeResult(
-            success: ok,
-            summary: "Moved \(moved) \(label) item(s) to Trash",
-            bytesFreed: ok ? bytes : 0,
-            trashed: moved > 0)
+        return OptimizeResult(success: failed == 0,
+            summary: "Moved \(moved) \(label) item(s) to Trash; \(failed) failed. Space remains allocated.",
+            trashed: moved > 0, bytesMovedToTrash: movedBytes)
     }
 }

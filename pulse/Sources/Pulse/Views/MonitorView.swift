@@ -5,10 +5,11 @@ import SwiftUI
 /// card for the selected process, and per-interface network throughput.
 struct MonitorView: View {
     @Environment(MonitorModel.self) private var model
+    @State private var investigating = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            header
+            HStack(alignment: .top) { header; Button("Investigate…") { investigating = true } }
             HStack(alignment: .top, spacing: 16) {
                 ProcessListCard()
                 ProcessDetailCard()
@@ -21,6 +22,8 @@ struct MonitorView: View {
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background { ZStack { Halo.void; Halo.meshBackground } }
+        .onChange(of: investigating) { _, showing in showing ? model.disappeared() : model.appeared() }
+        .sheet(isPresented: $investigating) { InvestigationView() }
         .onAppear { model.appeared() }
         .onDisappear { model.disappeared() }
     }
@@ -29,7 +32,7 @@ struct MonitorView: View {
         PageHeader(
             "Monitor",
             subtitle:
-                "Every process with CPU, memory, threads and page-fault rates, plus live per-interface network throughput. Per-process network needs private Apple entitlements — Pulse won't pretend otherwise."
+                "Every process with CPU, memory, threads and page-in rates, plus live per-interface network throughput. Per-process network needs private Apple entitlements — Pulse won't pretend otherwise."
         )
     }
 }
@@ -49,11 +52,12 @@ private struct ProcessListCard: View {
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(2)
                     .foregroundStyle(Halo.textDim)
-                Text("\(model.rows.count)")
+                Text("\(model.rows.count)/\(model.coverage.enumerated)").help("Readable tasks / enumerated processes; some tasks may be denied or exited")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Halo.ion)
                 Spacer()
-                modePicker
+                Toggle("Apps", isOn: $model.groupMode).toggleStyle(.checkbox).help("Aggregate readable processes by owning app; CPU or memory ordering")
+                modePicker.disabled(model.groupMode)
                 sortMenu
             }
 
@@ -100,7 +104,7 @@ private struct ProcessListCard: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("SIGTERM asks the process to exit. Unsaved work in it may be lost.")
+            Text("Asks the application to quit normally. Save prompts may require your attention. Helpers and protected apps are refused.")
         }
     }
 
@@ -126,6 +130,7 @@ private struct ProcessListCard: View {
     /// flat filtered list — filtering a tree hides matches under collapsed
     /// ancestors, which reads as "missing".
     private var displayRows: [DisplayRow] {
+        if model.groupMode { return model.appRows.map { DisplayRow(process: $0, depth: 0) } }
         if model.treeMode, model.filter.trimmingCharacters(in: .whitespaces).isEmpty {
             var rows: [DisplayRow] = []
             func walk(_ node: ProcessNode, depth: Int) {
@@ -200,7 +205,7 @@ private struct ProcessListCard: View {
         case .cpu: "CPU"
         case .memory: "MEMORY"
         case .threads: "THREADS"
-        case .pageFaults: "FAULTS"
+        case .pageFaults: "PAGE-INS"
         case .name: "NAME"
         case .pid: "PID"
         }
@@ -240,7 +245,7 @@ private struct ProcessListCard: View {
             sortableColumn("CPU", key: .cpu).frame(width: 52, alignment: .trailing)
             sortableColumn("MEM", key: .memory).frame(width: 60, alignment: .trailing)
             sortableColumn("THR", key: .threads).frame(width: 36, alignment: .trailing)
-            sortableColumn("FLT/S", key: .pageFaults).frame(width: 44, alignment: .trailing)
+            sortableColumn("IN/S", key: .pageFaults).frame(width: 44, alignment: .trailing)
         }
         .font(.system(size: 9, weight: .semibold, design: .monospaced))
         .tracking(1)
@@ -354,6 +359,7 @@ private struct ProcessDetailCard: View {
     @State private var confirmQuit = false
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 14) {
             if let process = model.selectedProcess {
                 detail(process)
@@ -362,6 +368,7 @@ private struct ProcessDetailCard: View {
             }
         }
         .padding(16)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .premiumCard(padding: 0, cornerRadius: Halo.Radius.large)
     }
@@ -397,7 +404,7 @@ private struct ProcessDetailCard: View {
             fact("VIRTUAL", ByteFormat.string(process.virtualBytes), Halo.textPrimary)
             fact("THREADS", "\(process.threadCount)", Halo.textPrimary)
             fact(
-                "PAGE FAULTS",
+                "PAGE-INS",
                 String(format: "%.0f/s", process.pageFaultRate), Halo.textPrimary)
             fact("PARENT", model.selectedParentName ?? "—", Halo.textPrimary)
         }
@@ -414,6 +421,14 @@ private struct ProcessDetailCard: View {
                 .background(Halo.void.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
         }
 
+        if let identity = model.selectedIdentity {
+            Text(identity.role).font(.callout)
+            Text(identity.executable).font(.caption).foregroundStyle(.secondary).lineLimit(2).textSelection(.enabled)
+            Text("Footprint: " + (identity.footprintBytes.map(ByteFormat.string) ?? "Unavailable")).font(.callout).monospacedDigit()
+            Text("Started " + identity.startedAt.formatted()).font(.caption).foregroundStyle(.secondary)
+            if identity.parentPID > 1 { Button("Inspect parent (\(identity.parentPID))") { model.select(identity.parentPID) } }
+        }
+        Text("CPU 100% = one core. Memory is RSS; page-ins are not all page faults.").font(.caption).foregroundStyle(.secondary)
         Spacer()
 
         if let feedback = model.actionFeedback {
@@ -435,7 +450,7 @@ private struct ProcessDetailCard: View {
             .background(Halo.flare.opacity(0.12), in: Capsule())
         }
         .buttonStyle(.plain)
-        .help("Send SIGTERM — asks the process to exit politely")
+        .help("Ask this application to quit normally")
         .confirmationDialog(
             "Send Quit to \(process.name)?",
             isPresented: $confirmQuit, titleVisibility: .visible
@@ -444,7 +459,7 @@ private struct ProcessDetailCard: View {
                 model.quitProcess(pid: process.pid, name: process.name)
             }
         } message: {
-            Text("SIGTERM asks the process to exit. Unsaved work in it may be lost.")
+            Text("Asks the application to quit normally. Save prompts may require your attention. Helpers and protected apps are refused.")
         }
     }
 

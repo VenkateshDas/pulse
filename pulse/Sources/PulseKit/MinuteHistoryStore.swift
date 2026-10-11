@@ -6,7 +6,7 @@ import Foundation
 /// minute rolls over. Gaps (app closed, Mac asleep) stay gaps — `series`
 /// returns nil for minutes with no data instead of interpolating.
 public final class MinuteHistoryStore {
-    public struct Entry: Codable, Equatable {
+    public struct Entry: Codable, Equatable, Sendable {
         /// Whole minutes since the Unix epoch (timeIntervalSince1970 / 60).
         public let minute: Int
         public let value: Double

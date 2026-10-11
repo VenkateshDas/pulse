@@ -15,7 +15,7 @@ public enum ConnectionType: String, Sendable, Equatable {
 
 /// Live Wi-Fi radio info for the connected network. Fields stay nil where
 /// the value isn't available on this Mac or this macOS version.
-public struct WiFiInfo: Sendable, Equatable {
+public struct WiFiInfo: Codable, Sendable, Equatable {
     /// nil unless the app holds Location authorization (CoreWLAN gate).
     public let ssid: String?
     public let rssi: Int?
@@ -72,7 +72,7 @@ public actor WiFiSampler {
 
     public func sample() -> WiFiInfo? {
         guard let interface = CWWiFiClient.shared().interface(),
-            interface.powerOn(), interface.ssid() != nil || interface.bssid() != nil
+            interface.powerOn(), interface.wlanChannel() != nil
         else {
             return nil
         }

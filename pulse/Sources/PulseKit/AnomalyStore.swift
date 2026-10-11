@@ -8,6 +8,7 @@ public struct AnomalyRecord: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let processName: String
     public let pid: Int32
+    public let startToken: String?
     public let cpuPercent: Double
     public let date: Date
     public let sustainedSeconds: TimeInterval
@@ -18,7 +19,8 @@ public struct AnomalyRecord: Codable, Equatable, Sendable, Identifiable {
 
     public init(id: UUID = UUID(), processName: String, pid: Int32,
                 cpuPercent: Double, date: Date = .now, sustainedSeconds: TimeInterval,
-                kind: Kind? = .cpu, growthBytes: Int64? = nil) {
+                kind: Kind? = .cpu, growthBytes: Int64? = nil, startToken: String? = nil) {
+        self.startToken = startToken
         self.id = id
         self.processName = processName
         self.pid = pid

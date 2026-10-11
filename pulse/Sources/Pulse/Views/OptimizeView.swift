@@ -30,6 +30,10 @@ struct OptimizeView: View {
             "Optimize",
             subtitle: "Safe maintenance tasks. Removals go to the Trash — reversible."
         ) {
+            if model.totalBytesMovedToTrash > 0 {
+                Text("Moved \(ByteFormat.string(UInt64(model.totalBytesMovedToTrash))) to Trash")
+                    .font(.system(size: 12, weight: .semibold)).help("Space remains allocated until Trash is emptied")
+            }
             if model.totalBytesFreed > 0 {
                 Text("Freed \(ByteFormat.string(UInt64(max(0, model.totalBytesFreed))))")
                     .font(.system(size: 12, weight: .semibold))

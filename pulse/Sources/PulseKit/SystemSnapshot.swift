@@ -10,16 +10,18 @@ public struct ProcessSample: Sendable, Identifiable, Equatable {
     /// Owning-app name from the first "*.app" bundle in the executable path
     /// (helpers live inside the parent bundle); nil when not app-hosted.
     public let appName: String?
+    public let startToken: String?
 
     public var id: Int32 { pid }
 
     public init(pid: Int32, name: String, cpuPercent: Double, residentBytes: UInt64,
-                appName: String? = nil) {
+                appName: String? = nil, startToken: String? = nil) {
         self.pid = pid
         self.name = name
         self.cpuPercent = cpuPercent
         self.residentBytes = residentBytes
         self.appName = appName
+        self.startToken = startToken
     }
 }
 
@@ -62,6 +64,10 @@ public struct SleepAssertion: Sendable, Equatable {
 /// Point-in-time view of the whole system. Immutable value handed to the UI.
 public struct SystemSnapshot: Sendable, Equatable {
     public let timestamp: Date
+    public let activity: ActivityReadings
+    public let processCoverage: ProcessCoverage
+    public let memoryContributors: [ProcessGroup]
+    public let memoryProcesses: [ProcessSample]
 
     /// Total CPU usage across all cores, 0–100.
     public let cpuTotalPercent: Double
@@ -120,11 +126,12 @@ public struct SystemSnapshot: Sendable, Equatable {
             networkBytesOutPerSecond: networkBytesOutPerSecond,
             connectionType: connectionType, wifiInfo: wifiInfo,
             thermal: thermal, sensors: sensors, sleepAssertions: sleepAssertions,
-            topProcesses: processes, uptime: uptime, battery: battery, gpuUsage: gpuUsage)
+            topProcesses: processes, uptime: uptime, battery: battery, gpuUsage: gpuUsage,
+            activity: activity, processCoverage: processCoverage, memoryContributors: memoryContributors, memoryProcesses: memoryProcesses)
     }
 
     public var diskUsedFraction: Double {
-        diskTotalBytes == 0 ? 0 : Double(diskTotalBytes - diskFreeBytes) / Double(diskTotalBytes)
+        diskTotalBytes == 0 ? 0 : Double(diskTotalBytes > diskFreeBytes ? diskTotalBytes - diskFreeBytes : 0) / Double(diskTotalBytes)
     }
 
     public init(
@@ -154,8 +161,16 @@ public struct SystemSnapshot: Sendable, Equatable {
         topProcesses: [ProcessSample],
         uptime: TimeInterval,
         battery: BatteryHealth? = nil,
-        gpuUsage: GPUUsage? = nil
+        gpuUsage: GPUUsage? = nil,
+        activity: ActivityReadings = ActivityReadings(),
+        processCoverage: ProcessCoverage = ProcessCoverage(),
+        memoryContributors: [ProcessGroup] = [],
+        memoryProcesses: [ProcessSample] = []
     ) {
+        self.activity = activity
+        self.processCoverage = processCoverage
+        self.memoryContributors = memoryContributors
+        self.memoryProcesses = memoryProcesses
         self.timestamp = timestamp
         self.cpuTotalPercent = cpuTotalPercent
         self.cpuPerCore = cpuPerCore

@@ -57,22 +57,24 @@ public enum DiagnosisEngine {
         }
 
         // 2 · Memory pressure
-        switch s.memoryPressure {
-        case .critical, .warning:
-            let sev: Diagnosis.Severity = s.memoryPressure == .critical ? .critical : .warn
-            if let p = leadingMemoryProcess(s.topProcesses) {
-                return Diagnosis(line: "\(blame(p)) memory pressure",
-                                 severity: sev, culpritPID: p.topPID, factor: .memory)
+        if !s.activity.unavailable.contains("Memory pressure unavailable") {
+            switch s.memoryPressure {
+            case .critical, .warning:
+                let sev: Diagnosis.Severity = s.memoryPressure == .critical ? .critical : .warn
+                if let p = s.memoryContributors.first ?? leadingMemoryProcess(s.topProcesses) {
+                    return Diagnosis(line: "Memory pressure · largest observed: \(blame(p))",
+                                     severity: sev, culpritPID: p.topPID, factor: .memory)
+                }
+                return Diagnosis(line: "Memory pressure", severity: sev,
+                                 culpritPID: nil, factor: .memory)
+            case .normal:
+                break
             }
-            return Diagnosis(line: "Memory pressure", severity: sev,
-                             culpritPID: nil, factor: .memory)
-        case .normal:
-            break
         }
 
-        // 2b · Confirmed memory leak — outranks a full disk, not active pressure.
+        // 2b · Sustained memory growth — outranks a full disk, not active pressure.
         if let leak {
-            return Diagnosis(line: "\(shorten(leak.name)) leaking memory",
+            return Diagnosis(line: "\(shorten(leak.name)) memory keeps growing",
                              severity: .warn, culpritPID: leak.pid, factor: .memory)
         }
 
@@ -104,6 +106,10 @@ public enum DiagnosisEngine {
         if diskPct > HealthFactor.disk.normal {
             return Diagnosis(line: "Disk filling up", severity: .info,
                              culpritPID: nil, factor: .disk)
+        }
+
+        if !s.activity.unavailable.isEmpty {
+            return Diagnosis(line: "Some measurements unavailable", severity: .info, culpritPID: nil, factor: nil)
         }
 
         return Diagnosis(line: "All clear", severity: .clear, culpritPID: nil, factor: nil)
