@@ -9,7 +9,6 @@ struct CleanView: View {
     @Environment(StorageModel.self) private var storage
     @Environment(InsightsModel.self) private var insights
     @Environment(CleanModel.self) private var cleanModel
-    @State private var hoveredID: String?
     @State private var collapsedCategories: Set<String> = []
 
     var body: some View {
@@ -17,7 +16,7 @@ struct CleanView: View {
             header
             PermissionHelp(permission: .fullDiskAccess)
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     if storage.scanState == .scanning && storage.scan == nil {
                         scanning
                     } else if let scan = storage.scan {
@@ -105,7 +104,7 @@ struct CleanView: View {
         let subtotal = items.reduce(0) { $0 + $1.sizeBytes }
         let collapsed = collapsedCategories.contains(category)
         let selectedCount = items.filter { storage.selection.contains($0.id) }.count
-        return VStack(alignment: .leading, spacing: 4) {
+        return LazyVStack(alignment: .leading, spacing: 4) {
             Button {
                 withAnimation(Halo.Motion.snappy) {
                     if collapsed { collapsedCategories.remove(category) } else { collapsedCategories.insert(category) }
@@ -168,7 +167,7 @@ struct CleanView: View {
                 .padding(.horizontal, 4)
 
                 if hasProtected {
-                    VStack(alignment: .leading, spacing: 4) {
+                    LazyVStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Image(systemName: "shield.fill")
                                 .font(Halo.font(size: 10))
@@ -200,8 +199,7 @@ struct CleanView: View {
 
     private func insightRow(_ insight: Insight) -> some View {
         HStack(spacing: 10) {
-            Image(nsImage: FileIconCache.icon(forPath: insight.path, isDirectory: true))
-                .resizable()
+            FileIconView(path: insight.path)
                 .frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(insight.label)
@@ -231,10 +229,7 @@ struct CleanView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(
-            Halo.surface2.opacity(hoveredID == insight.id ? 0.75 : 0.4),
-            in: RoundedRectangle(cornerRadius: 8))
-        .onHover { hoveredID = $0 ? insight.id : nil }
+        .modifier(CleanupRowHover())
     }
 
     private var scanning: some View {
@@ -261,8 +256,7 @@ struct CleanView: View {
 
             }
 
-            Image(nsImage: FileIconCache.icon(forPath: item.path))
-                .resizable()
+            FileIconView(path: item.path)
                 .frame(width: 16, height: 16)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -343,10 +337,7 @@ struct CleanView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(
-            Halo.surface2.opacity(hoveredID == item.id ? 0.75 : 0.4),
-            in: RoundedRectangle(cornerRadius: 8))
-        .onHover { hoveredID = $0 ? item.id : nil }
+        .modifier(CleanupRowHover())
     }
 
     private func detailLine(_ item: CleanItem) -> String {
@@ -530,3 +521,14 @@ struct AutoCleanCard: View {
 }
 
 
+
+/// Hover changes only this row, not the whole cleanup scan and its grouping.
+private struct CleanupRowHover: ViewModifier {
+    @State private var hovered = false
+    func body(content: Content) -> some View {
+        content
+            .background(Halo.surface2.opacity(hovered ? 0.75 : 0.4),
+                        in: RoundedRectangle(cornerRadius: 8))
+            .onHover { hovered = $0 }
+    }
+}

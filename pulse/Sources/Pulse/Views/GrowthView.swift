@@ -91,8 +91,7 @@ struct GrowthView: View {
                     .font(Halo.font(size: 9, weight: .bold))
                     .foregroundStyle(Halo.textDim)
                     .rotationEffect(.degrees(expanded ? 90 : 0))
-                Image(nsImage: FileIconCache.icon(forPath: group.path))
-                    .resizable().frame(width: 18, height: 18)
+                FileIconView(path: group.path).frame(width: 18, height: 18)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(displayPath(group.path))
@@ -132,8 +131,7 @@ struct GrowthView: View {
 
     private func fileRow(_ file: RecentFile) -> some View {
         HStack(spacing: 8) {
-            Image(nsImage: FileIconCache.icon(forPath: file.path))
-                .resizable().frame(width: 14, height: 14)
+            FileIconView(path: file.path).frame(width: 14, height: 14)
             Text(file.name)
                 .font(Halo.font(size: 11))
                 .foregroundStyle(Halo.textPrimary)

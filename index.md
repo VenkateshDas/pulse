@@ -96,3 +96,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Ask Pulse stop lifecycle:** generation-scoped stream and cancellation acknowledgements prevent stale events/status from changing a later conversation; controlled cancellation fixtures cover out-of-order replies.
 
 - **Redesign review:** draft PR #84 (https://github.com/VenkateshDas/pulse/pull/84); 360 tests pass. User delegated budget interpretation: enforce <1% CPU/<50 MB RSS in background two-second monitoring, report interactive costs separately. Background proof and human visual/functional approval remain open.
+
+- **Storage scrolling (2026-10-11):** Cleanup categories/protected rows use lazy stacks; hover is row-local. Cleanup, Files, Changes and storage inspectors resolve/rasterise file icons asynchronously, retain per-row thumbnails and share a bounded cache. Regression verifies off-main lookup and cache reuse. Previous full freeze was not reproduced after restart; runtime stress evidence is tracked in the redesign plan.

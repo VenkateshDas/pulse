@@ -13,8 +13,7 @@ struct StorageDetailPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Image(nsImage: FileIconCache.icon(forPath: cell.node.path))
-                    .resizable().frame(width: 28, height: 28)
+                FileIconView(path: cell.node.path).frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(cell.node.name)
                         .font(Halo.font(size: 14, weight: .bold))
