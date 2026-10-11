@@ -220,3 +220,7 @@ Open the implementation PR into `main`, attach it to this chat, wait for require
 ## Design approval
 
 The user approved implementation in goal mode on October 11. This confirms the task-led native direction, proposed navigation, outcome summaries, and accessibility-first visual system, including the calmer theme discussed afterward. All current capabilities remain reachable, technical detail becomes secondary, and automatic bandwidth-consuming tests become opt-in. Merge still requires separate visual and functional approval.
+
+### Performance budget interpretation — user delegated decision
+
+On October 11 the user delegated the decision about applying the RSS target to background monitoring versus all interactive states (“you choose the best answer”). Apply <1% CPU and <50 MB RSS to normal two-second background monitoring with the window closed. Measure open pages and explicitly started scans/benchmarks separately, report their observed costs, and prevent retained rendering/work from making background monitoring exceed the target. This is not a claim that all interactive states meet 50 MB; background compliance still needs proof.

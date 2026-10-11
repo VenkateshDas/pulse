@@ -94,3 +94,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 
 - **Ask Pulse provider setup:** explicit field labels, remote HTTPS/loopback HTTP validation, verified Keychain save feedback and duplicate-save guard. Invalid endpoints are blocked before starting the optional agent.
 - **Ask Pulse stop lifecycle:** generation-scoped stream and cancellation acknowledgements prevent stale events/status from changing a later conversation; controlled cancellation fixtures cover out-of-order replies.
+
+- **Redesign review:** draft PR #84 (https://github.com/VenkateshDas/pulse/pull/84); 360 tests pass. User delegated budget interpretation: enforce <1% CPU/<50 MB RSS in background two-second monitoring, report interactive costs separately. Background proof and human visual/functional approval remain open.
