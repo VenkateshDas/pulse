@@ -173,3 +173,5 @@ Cold launch correction: user opening Ask Pulse requests interactive existing-Key
 Live restart regression verified: the real DeepSeek provider recalled the original “Pulse live provider connected.” response after reopening the persisted conversation and corrected its earlier missing-history answer.
 
 ## [2026-10-11] Release unused heap pages after hidden teardown | vmmap showed 21.5 MiB allocator fragmentation after chat. Use macOS malloc_zone_pressure_relief once on a utility task after renderer/sidecar teardown; preserves live state and frees unused pages only. Final prior cold-launch sample: 0.80% CPU, RSS 48.3→56.4 MiB. No strict RSS compliance claim.
+
+## [2026-10-11] Release hidden navigation views | RootView now renders navigation only while its window is visible and the screen unlocked. Existing root models and selected page remain retained; notification/lifecycle handlers remain mounted. This releases hidden native view graphs alongside the chat renderer rather than retaining every control after close. Reopen/performance verification pending.

@@ -33,6 +33,8 @@ struct RootView: View {
         // the user switches presets in Settings.
         let _ = ThemeManager.shared.selected
         let _ = ThemeManager.shared.largerText
+        Group {
+        if windowVisible && !screenLocked {
         NavigationSplitView(columnVisibility: $columns) {
             SidebarView(selection: $selection)
                 .navigationSplitViewColumnWidth(min: 190, ideal: 218, max: 260)
@@ -61,6 +63,8 @@ struct RootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        } else { Color.clear }
+        }
         .frame(minWidth: 860, minHeight: 600)
         .tint(Halo.interactive)
         .toolbar {
