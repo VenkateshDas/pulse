@@ -167,3 +167,5 @@ Harness verification: 367 Swift tests/86 suites and 20 Python tests pass; CLI sm
 Live provider verification: packaged OpenRouter/DeepSeek replied to a minimal prompt, then used the bundled Pulse skill and explained its approval/identity rules in the same session. No machine telemetry or mutation sent. Settings unlocked the existing Keychain read; re-entering Ask Pulse reached Ready. Hidden owned sidecar exited.
 
 ## [2026-10-11] Preserve dialogue after large tool results | Live reopen exposed empty provider history after a large skill read consumed the history budget. Budget conversational text and let Agno discard historical tool calls/results while preserving complete dialogue turns. Added an actual Agno restart regression with a 24 KB tool result; all 21 Python tests pass. Final real-provider hidden sample: 0.70% CPU, RSS 66.3→59.1 MiB over 30 seconds; strict RSS target remains unmet in this sample.
+
+Cold launch correction: user opening Ask Pulse requests interactive existing-Keychain access directly; Settings is no longer required first. Both interactive and silent reads use a five-second deadline with separate coalescing.

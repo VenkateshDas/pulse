@@ -64,12 +64,11 @@ public enum AgentConfiguration {
     }
 
     public static func loadAPIKey(interactive: Bool = false) async -> String {
-        if interactive { return await Task.detached(priority: .userInitiated) { readAPIKey(interactive: true) }.value }
-        let endpoint = baseURL
+        let endpoint = baseURL + (interactive ? "#interactive" : "#silent")
         let read = pendingReads.withLock { reads -> CredentialRead? in
             if let existing = reads[endpoint] { return existing }
             guard reads.count < 8 else { return nil }
-            let item = CredentialRead(task: Task.detached(priority: .userInitiated) { readAPIKey(interactive: false) })
+            let item = CredentialRead(task: Task.detached(priority: .userInitiated) { readAPIKey(interactive: interactive) })
             reads[endpoint] = item; return item
         }
         guard let read else { return "" }
@@ -83,7 +82,7 @@ public enum AgentConfiguration {
                 if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: value) }
             }
             Task {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(5))
                 if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: "") }
             }
         }

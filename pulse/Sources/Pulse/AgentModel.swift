@@ -62,7 +62,7 @@ final class AgentModel {
     func start() async {
         guard !isBusy else { return }
         state = .starting; status = "Unlocking provider credentials…"
-        let key = await AgentConfiguration.loadAPIKey()
+        let key = await AgentConfiguration.loadAPIKey(interactive: true)
         state = .idle
         hasApiKey = AgentConfiguration.isReady(baseURL: AgentConfiguration.baseURL, apiKey: key, provider: AgentConfiguration.provider)
         guard hasApiKey else { status = "Set up an AI provider to ask Pulse"; return }
