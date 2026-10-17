@@ -155,3 +155,5 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 ## [2026-10-17] Fix grouped app quit | Grouped App activity rows select the regular application PID rather than the busiest helper; preserves aggregate metrics and existing graceful-quit identity/protection checks. Added CPU/memory grouping regression coverage.
 
 ## [2026-10-17] Publish beta download | Release v0.3.0-beta.5 from main with grouped-app quit fix; expose direct DMG download on landing page and clarify optional waitlist.
+
+## [2026-10-17] Refresh landing feature coverage | Align feature grid, advanced tools, metadata, illustrative demos, FAQ and beta offer with released main. Include Ask Pulse, duplicates, battery history, investigations and CLI; correct privacy, recovery and performance claims.
