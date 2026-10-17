@@ -4,8 +4,11 @@ import PulseKit
 public struct CLIOutput: Sendable {
     public let isJSON: Bool
     public let isTTY: Bool
+    private let sink: (@Sendable (String) -> Void)?
+    private let statusSink: (@Sendable (Int32) -> Void)?
 
-    public init(isJSON: Bool = false) {
+    public init(isJSON: Bool = false, sink: (@Sendable (String) -> Void)? = nil, statusSink: (@Sendable (Int32) -> Void)? = nil) {
+        self.sink = sink; self.statusSink = statusSink
         self.isJSON = isJSON
         self.isTTY = isatty(STDOUT_FILENO) == 1
     }
@@ -14,10 +17,12 @@ public struct CLIOutput: Sendable {
 
     public func emitJSON<T: Encodable>(_ value: T) {
         do {
-            print(try Self.json(value))
+            let text = try Self.json(value)
+            if let sink { sink(text) } else { print(text) }
         } catch {
-            fputs("error: JSON encoding failed: \(error)\n", stderr)
-            exit(1)
+            if let sink { sink("{\"error\":\"JSON encoding failed\"}") }
+            else { fputs("error: JSON encoding failed: \(error)\n", stderr) }
+            finish(1)
         }
     }
 
@@ -30,6 +35,10 @@ public struct CLIOutput: Sendable {
 
     public static func bytes(_ value: Int64) -> String {
         (value < 0 ? "-" : "") + ByteFormat.string(value.magnitude)
+    }
+
+    public func finish(_ status: Int32) {
+        if let statusSink { statusSink(status) } else { exit(status) }
     }
 
     // MARK: - ANSI Color Helpers

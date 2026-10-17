@@ -99,3 +99,12 @@ install-cli: fix-toolchain
 .PHONY: cli-smoke
 cli-smoke: cli
 	python3 scripts/cli-smoke.py
+
+# Packaged chat assets are committed for offline native builds. Rebuild them
+# explicitly when editing pulse-assistant; CI checks the source and lock.
+.PHONY: assistant agent-test
+assistant:
+	cd ../pulse-assistant && npm ci --no-audit --no-fund && npm run build
+
+agent-test:
+	uv run --project ../pulse-agent --frozen --no-dev python -m unittest discover -s ../pulse-agent -p 'test_*.py'

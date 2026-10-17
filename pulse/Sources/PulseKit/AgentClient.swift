@@ -78,16 +78,19 @@ public actor AgentClient {
         stream(path: "/runs", body: ["message": message, "session_id": sessionId ?? ""])
     }
 
-    public func continueRun(runId: String, approved: Bool) -> AsyncThrowingStream<AgentEnvelope, Error> {
-        stream(path: "/runs/\(runId)/continue", body: ["approved": approved])
+    public func continueRun(runId: String, approved: Bool, approvalId: String) -> AsyncThrowingStream<AgentEnvelope, Error> {
+        stream(path: "/runs/\(runId)/continue", body: ["approved": approved, "approval_id": approvalId])
     }
 
     public func cancel(runId: String) async throws {
-        _ = try await URLSession.shared.data(for: request(path: "/runs/\(runId)/cancel", method: "POST"))
+        let (_, response) = try await URLSession.shared.data(for: request(path: "/runs/\(runId)/cancel", method: "POST"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
     }
 
     public func updateConfiguration(baseURL: String, apiKey: String, model: String) async throws {
-        let body: [String: Any] = ["base_url": baseURL, "api_key": apiKey, "model": model]
+        let body: [String: Any] = ["base_url": baseURL, "api_key": apiKey, "model": model,
+                                 "provider": AgentConfiguration.provider, "memory_enabled": AgentConfiguration.memoryEnabled,
+                                 "context_tokens": AgentConfiguration.contextTokens, "output_tokens": AgentConfiguration.outputTokens]
         var request = request(path: "/config", method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -107,6 +110,23 @@ public actor AgentClient {
         let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history"))
         struct Response: Decodable { let messages: [AgentHistoryMessage] }
         return try JSONDecoder.agent.decode(Response.self, from: data).messages
+    }
+
+    public struct HistoryPage: Decodable, Sendable {
+        public let messages: [AgentHistoryMessage]
+        public let hasMore: Bool
+        enum CodingKeys: String, CodingKey { case messages; case hasMore = "has_more" }
+    }
+    public func fetchHistoryPage(sessionId: String, page: Int) async throws -> HistoryPage {
+        let (data, response) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history?page=\(page)"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder.agent.decode(HistoryPage.self, from: data)
+    }
+
+    public func memoryRequest(path: String = "/memory", method: String = "GET") async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request(path: path, method: method))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return data
     }
 
     private func stream(path: String, body: [String: Any]) -> AsyncThrowingStream<AgentEnvelope, Error> {

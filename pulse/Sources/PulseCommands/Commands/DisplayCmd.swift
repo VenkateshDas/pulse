@@ -6,7 +6,7 @@ public enum DisplayCmd {
         do {
             let action = parser.positional.first ?? "get"
             let value = parser.positional.dropFirst().first.flatMap(Double.init)
-            let reply = try await AppControl.send(.init(action: "display.\(action)", value: value, displayID: parser.stringOption("display").flatMap(UInt32.init)))
+            let reply = try await NativeCommandControl.send(.init(action: "display.\(action)", value: value, displayID: parser.stringOption("display").flatMap(UInt32.init)))
             if let error = reply.error { throw CLIUsageError(error) }
             if output.isJSON { output.emitJSON(reply.displays ?? []) }
             else {
@@ -15,6 +15,6 @@ public enum DisplayCmd {
                     output.printRow(label: "\(display.name) [\(display.id)]", value: String(format: "%.0f%%", display.brightness * 100))
                 }
             }
-        } catch { output.printError(error.localizedDescription); exit(1) }
+        } catch { output.printError(error.localizedDescription); output.finish(1); return }
     }
 }

@@ -20,7 +20,11 @@ struct SettingsView: View {
     /// re-read `KeybindingStore`, which isn't `@Observable`.
     @State private var keybindingsVersion = 0
     @State private var agentBaseURL = AgentConfiguration.baseURL
-    @State private var agentAPIKey = AgentConfiguration.apiKey
+    @State private var agentAPIKey = ""
+    @State private var agentKeyLoaded = false
+    @State private var agentContextTokens = AgentConfiguration.contextTokens
+    @State private var agentOutputTokens = AgentConfiguration.outputTokens
+    @State private var agentProvider = AgentConfiguration.provider
     @State private var agentModel = AgentConfiguration.model
     @State private var agentStatus: String?
     @State private var savingAgentSettings = false
@@ -60,6 +64,7 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Halo.void)
+        .task { if !agentKeyLoaded { agentAPIKey = await AgentConfiguration.loadAPIKey(interactive: true); agentKeyLoaded = true } }
     }
 
     // MARK: - Appearance
@@ -199,14 +204,25 @@ struct SettingsView: View {
     private var agentSection: some View {
         section(
             "Ask Pulse provider", icon: "sparkles", tint: Halo.interactive,
-            footnote: "The API key is stored in this Mac’s Keychain. Your provider receives questions and requested diagnostic results. Provider charges may apply."
+            footnote: "The API key is stored in this Mac’s Keychain. Your provider receives questions, a cached performance snapshot and requested diagnostic results. Provider charges may apply."
         ) {
-            settingsRow(title: "Provider", detail: "OpenRouter-compatible OpenAI endpoint.") {
-                Button("Use OpenRouter") {
-                    agentBaseURL = "https://openrouter.ai/api/v1"
+            settingsRow(title: "Provider", detail: "Choose the API transport your model supports.") {
+                Picker("Provider transport", selection: $agentProvider) {
+                    Text("OpenAI Chat / compatible").tag("openai-chat")
+                    Text("OpenAI Responses").tag("openai-responses")
+                    Text("Anthropic").tag("anthropic")
+                    Text("Google Gemini").tag("google")
+                    Text("Ollama").tag("ollama")
+                }.labelsHidden().frame(maxWidth: 240)
+                .onChange(of: agentProvider) { _, provider in
+                    switch provider {
+                    case "openai-responses": agentBaseURL = "https://api.openai.com/v1"; agentModel = "gpt-4.1-mini"
+                    case "anthropic": agentBaseURL = "https://api.anthropic.com"; agentModel = "claude-sonnet-4-5"
+                    case "google": agentBaseURL = "https://generativelanguage.googleapis.com"; agentModel = "gemini-2.5-flash"
+                    case "ollama": agentBaseURL = "http://127.0.0.1:11434"; agentModel = "qwen3:8b"
+                    default: agentBaseURL = "https://openrouter.ai/api/v1"; agentModel = "openai/gpt-4.1-mini"
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
             rowDivider
             VStack(alignment: .leading, spacing: 6) {
@@ -232,6 +248,17 @@ struct SettingsView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(Halo.font(size: 12, design: .monospaced))
             }
+            rowDivider
+            DisclosureGroup("Context and response limits") {
+                Text("Set the context limit supported by your model. Pulse reserves response space and stops when its estimated prompt budget is reached.")
+                    .font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary)
+                HStack {
+                    Text("Context tokens")
+                    TextField("32768", value: $agentContextTokens, format: .number).textFieldStyle(.roundedBorder)
+                    Text("Response tokens")
+                    TextField("4096", value: $agentOutputTokens, format: .number).textFieldStyle(.roundedBorder)
+                }.font(Halo.font(size: 12)).padding(.top, 6)
+            }
             HStack {
                 Button(savingAgentSettings ? "Saving provider…" : "Save provider settings") { saveAgentSettings() }
                     .buttonStyle(.borderedProminent)
@@ -246,23 +273,34 @@ struct SettingsView: View {
     private func saveAgentSettings() {
         let baseURL = agentBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = agentModel.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !savingAgentSettings else { return }
-        guard AgentConfiguration.providerURL(baseURL) != nil, !model.isEmpty, !agentAPIKey.isEmpty else {
-            agentStatus = "Enter an HTTPS provider URL, API key and model. HTTP is allowed only for localhost, 127.0.0.1 or ::1. Omit URL credentials, queries and fragments."
+        guard !savingAgentSettings, agentKeyLoaded else { return }
+        guard AgentConfiguration.providerURL(baseURL) != nil, !model.isEmpty, AgentConfiguration.isReady(baseURL: baseURL, apiKey: agentAPIKey, provider: agentProvider) else {
+            agentStatus = "Enter a valid provider URL and model. Hosted providers also need an API key. HTTP is allowed only for localhost, 127.0.0.1 or ::1. Omit URL credentials, queries and fragments."
             return
         }
-        AgentConfiguration.apiKey = agentAPIKey
-        guard AgentConfiguration.apiKey == agentAPIKey else {
-            agentStatus = "The key could not be saved to Keychain. Unlock this Mac and try again."
+        guard (8192...262144).contains(agentContextTokens), (512...16384).contains(agentOutputTokens), agentOutputTokens < agentContextTokens / 2 else {
+            agentStatus = "Use 8,192–262,144 context tokens and 512–16,384 response tokens. Response space must be less than half the context."
             return
         }
+        if agentProvider == "anthropic", baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) != "https://api.anthropic.com" {
+            agentStatus = "Anthropic uses https://api.anthropic.com. Select OpenAI Chat for a compatible gateway."; return
+        }
+        if agentProvider == "google", baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) != "https://generativelanguage.googleapis.com" {
+            agentStatus = "Google Gemini uses https://generativelanguage.googleapis.com."; return
+        }
+        AgentConfiguration.contextTokens = agentContextTokens
+        AgentConfiguration.outputTokens = agentOutputTokens
+        AgentConfiguration.provider = agentProvider
         AgentConfiguration.baseURL = baseURL
         AgentConfiguration.model = model
         agentStatus = "Saved to Keychain"
         savingAgentSettings = true
         Task {
             defer { savingAgentSettings = false }
-            guard await AgentDaemonManager.shared.ensureRunning() else { return }
+            guard await AgentConfiguration.saveAPIKey(agentAPIKey) else {
+                agentStatus = "The key could not be saved to Keychain. Unlock this Mac and try again."; return
+            }
+            guard await AgentClient.shared.checkStatus().isOnline else { agentStatus = "Saved. Open Ask Pulse to connect."; return }
             do {
                 try await AgentClient.shared.updateConfiguration(baseURL: baseURL, apiKey: agentAPIKey, model: model)
                 agentStatus = "Saved for Ask Pulse. The provider is checked when you send a question."

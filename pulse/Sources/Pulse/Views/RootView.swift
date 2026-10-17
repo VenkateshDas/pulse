@@ -11,10 +11,12 @@ struct RootView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
     @Environment(TimelineModel.self) private var timeline
+    @State private var agentModel = AgentModel()
     @State private var selection: SidebarItem = .dashboard
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
     @State private var windowVisible = true
+    @State private var screenLocked = false
     @State private var showPalette = false
     @State private var columns: NavigationSplitViewVisibility = .all
     @State private var showOnboarding = PermissionsGate.shouldPromptOnLaunch()
@@ -38,7 +40,7 @@ struct RootView: View {
             GeometryReader { geometry in
             Group {
                 switch selection {
-                case .agent: AgentView()
+                case .agent: AgentView(model: agentModel, visible: windowVisible && !screenLocked)
                 case .storage: DiskView()
                 case .timeline: TimelineView()
                 case .optimize: OptimizeView()
@@ -119,6 +121,8 @@ struct RootView: View {
             if let pid = note.object as? Int32 { monitorModel.select(pid) }
             selection = .monitor
         }
+        .onReceive(DistributedNotificationCenter.default().publisher(for: .init("com.apple.screenIsLocked"))) { _ in screenLocked = true }
+        .onReceive(DistributedNotificationCenter.default().publisher(for: .init("com.apple.screenIsUnlocked"))) { _ in screenLocked = false }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)

@@ -1,9 +1,38 @@
 import Testing
+import Observation
+import os
 @testable import Pulse
 import PulseKit
 
 @MainActor
 struct AgentModelTests {
+    @Test func rendererSnapshotTracksReadyState() {
+        let model = AgentModel()
+        let changed = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = AgentWebView.snapshot(for: model, largerText: false) } onChange: { changed.withLock { $0 = true } }
+        model.hasApiKey = true
+        #expect(changed.withLock { $0 })
+        #expect(AgentWebView.snapshot(for: model, largerText: false).ready)
+    }
+
+    @Test func toolIdentityIsScopedToItsRun() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "first", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "reused"]))
+        model.apply(.init(sequence: 2, runId: "second", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "reused"]))
+        model.apply(.init(sequence: 3, runId: "second", sessionId: "session", kind: "tool.completed", payload: ["tool_call_id": "reused", "detail": "Second result"]))
+        #expect(model.items.count == 2)
+        #expect(model.items[0].isRunning)
+        #expect(model.items[1].detail == "Second result")
+        #expect(model.items[0].id != model.items[1].id)
+    }
+
+    @Test func startedRunRetainsConversationIdentity() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "run.started", payload: [:]))
+        #expect(model.sessionId == "session")
+        #expect(model.activeRunId == "run")
+    }
+
     @Test func duplicateEnvelopeDoesNotDuplicateTimeline() {
         let model = AgentModel()
         let event = AgentEnvelope(eventId: "once", sequence: 1, runId: "run", sessionId: "session", kind: "tool.started", payload: ["tool_call_id": "tool", "title": "Reading system vitals"])
