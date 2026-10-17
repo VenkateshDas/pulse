@@ -1,23 +1,35 @@
 # Ask Pulse harness
 
-Agno 3.0.9 runs locally on demand. Swift owns telemetry and executes the closed native command grammar in process; Python never launches a collector. The optional runtime requires `uv` and Python 3.12. `start.sh` installs the committed lock into Application Support, where sessions, memories, offloaded results and a private runtime log live. First setup needs network access; subsequent startup uses the installed environment.
+Pinned OpenWorker `TurnEngine` runs locally on demand inside the existing Swift host. Pulse constructs the engine directly: upstream SessionManager, shell, workspace probes, connectors and sandbox tools are never assembled or registered. Swift owns telemetry, native command execution, Keychain and UndoJournal. Python never launches a collector. `uv` and Python 3.12 are required; `start.sh` installs the committed lock into Application Support. First setup needs network access.
 
-## Context and tools
+## Source boundary
 
-Each run gets an immutable provider configuration, a timestamped native snapshot and up to four complete history runs. Large tool results use Agno ResultStore (6,000 character threshold, 1,000 character preview, seven day expiry). Summaries run every four turns. A conservative UTF-8 prompt estimate reserves the configured output budget before each model request. Provider tokenization remains authoritative; the estimate cannot guarantee every model's context window.
+OpenWorker MIT source is pinned to `5bf0d2fb8c728932fdbc6b49a24113aebc2a4ddd` in `pyproject.toml` and `uv.lock`; see `OPENWORKER-LICENSE`. Upstream owns turn iteration, pairing repair, provider transports and compaction algorithms. `openworker_runtime.py` adapts async Pulse tools, consent, cancellation, context/result bounds and persistence. `providers.py` constructs immutable provider clients. `server.py` retains authenticated loopback HTTP/SSE. Agno 3.0.9 and SQLAlchemy remain solely for one-time legacy import through public storage APIs; they do not execute runs.
 
-Typed tools use authenticated loopback RPC, bounded connections/output and short caching for cheap reads. Independent performance reads are batched. Mutations are never automatically retried. Cleanup, uninstall, quit and restore require a fresh, consumed preview plus Agno requirement-specific human approval. Native guards and UndoJournal remain authoritative. Stopping cancels provider/native tasks cooperatively; already-started file operations may still finish.
+## Long conversations and recovery
 
-One writer per session, four active runs, 32 retained runs, 512 replay events and a 15 minute run expiry bound runtime state. Replay gaps are explicit. History uses supported Agno storage APIs and paginated user/assistant messages. Legacy `~/.pulse/agent.db` is backed up into Application Support without deleting the original.
+`conversation_store.py` stores canonical messages, restart checkpoints, decisions, executions, memories and offloaded results in transactional SQLite WAL. Structured compaction state survives reopen without nesting old summaries inside new summaries. Earlier canonical dialogue remains searchable; summary failure uses an explicit trim notice rather than inventing remembered details. UTF-8 prompt estimates reserve tool schema and output capacity before requests. Provider tokenization remains authoritative.
 
-## Memory
+Large nested tool results spill above 6 KB into session-scoped storage, with 1,000-character previews, bounded 4,000-character retrieval pages, a 4 MB item cap, seven-day expiry and 128 MB quota. Canonical history is paginated 50 rows at a time. It deliberately remains on disk until users manage local app data; it is not loaded wholesale for rendering. Checkpoint message IDs make uncertain transaction retries idempotent. A separate bounded replay buffer retains 512 events per run. Reconnect resumes observation without resubmitting model/native actions; replay gaps fail explicitly and cancel the unseen run. Restart marks unfinished executions interrupted and expires decisions.
 
-A custom Agno LearningStore saves at most 100 explicit preferences or troubleshooting lessons, with bounded evidence, session provenance and a stable local user namespace. No automatic extraction model runs. The agent is instructed to record lessons only after before/after observation; validation requires evidence text but cannot independently prove its truth. Treat recalled memory as untrusted context. Inspect, disable, remove or clear it in the interface. Disable prevents both recall and writes. Changes wait until active runs stop. Secret/path filters are a best-effort safeguard, not complete data-loss prevention.
+Only one writer per conversation and four active runs are allowed; 32 retained runs, 15-minute run expiry, 128 KB answers, 16 tool calls and 12 model iterations bound work. Streaming uses a 128-item queue. A shared four-worker limit includes blocked provider streams and compaction calls until their threads actually exit. Stop cooperates with provider/native cancellation and preserves partial output; already-started file operations may finish. Transport inactivity and interaction deadlines prevent indefinite waits. The SDKs may retain blocked threads until their own network deadlines; capacity remains reserved during that interval.
 
-## Models
+## Tools and consent
 
-Settings selects OpenAI Chat compatible, OpenAI Responses, Anthropic, Google Gemini or Ollama. Remote endpoints require TLS. Local Chat/Ollama endpoints can omit a key. Anthropic/Gemini use their SDK-supported official endpoints. Keys remain in native Keychain and the sidecar process; they never enter browser state. Selected models must support tools and the configured output/context budget. No claim that every arbitrary model has those capabilities.
+The closed registry contains the existing Pulse tools plus bounded skill loading, conversation search, result paging, explicit memory, questions and plans. Unknown tools fail closed. Native preview/revalidation and UndoJournal remain authoritative. Every mutation requires its own exact, single-use decision; plan acceptance never grants mutation authority. Investigate mode denies mutations and persistent memory writes. Questions require text answers and cannot approve actions. Mutations are never automatically retried.
+
+## Memory and migration
+
+At most 100 explicit preferences/lessons are stored with bounded evidence and provenance; there is no automatic extraction model. Disabled memory stops both recall and writes. Inspect/delete controls remain native. Evidence validation cannot independently prove an agent's claim. Secret/path filters are best-effort safeguards.
+
+Legacy Agno sessions and explicit memory import once, after a SQLite backup including WAL contents. Import and marker commit together; failures roll back and can be retried. The old DB and backup remain intact. Historical approvals are never imported as authority. Large imported dialogue has a bounded initial replay tail; canonical dialogue stays searchable.
+
+## Credentials and diagnostics
+
+Save writes the endpoint-bound API key immediately to native Keychain, then updates settings only on success. Reads coalesce off-main, time out and cache successful saves; routine Security operations prohibit authentication UI. JavaScript receives no keys or bridge tokens. A locked Keychain or changed signing identity can still deny access: Pulse reports failure rather than repeatedly requesting a password. Use the stable development signing identity when testing across rebuilds.
+
+Application Support/Pulse/agent contains `harness.jsonl` (2 MB × four files) and rotated startup `runtime.log`. Settings → Show Ask Pulse debug logs opens this folder. Structured diagnostics allow only metadata: run/session/call IDs, operation, provider, status, error type, timing, estimates and counts. They exclude prompts, arguments, results, API keys, endpoint URLs and display reasoning. Provider continuity sidecars may remain in the private checkpoint DB when required by a transport; they never enter public history, browser state or structured logs. Native OSLog records credential status codes and bridge timing. Startup stderr can include dependency/runtime diagnostics; inspect it before sharing externally.
 
 ## Development
 
-From `pulse/`: `make agent-test`, `make assistant`, `make build`, `make test`, `make bundle`. Deterministic model fixtures exercise actual Agno streaming, tools, storage and checkpoint summaries without paid API calls or operations on real user files.
+From `pulse/`: `make agent-test`, `make assistant`, `make build`, `make test`, `make bundle`. Deterministic providers exercise the real pinned engine without paid model calls or operations on user files. See `docs/superpowers/plans/2026-10-17-openworker-pulse-port.md` for verified evidence and release gates.

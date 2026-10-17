@@ -12,10 +12,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from agno.tools import Toolkit
 
 
-class PulseToolkit(Toolkit):
+class PulseToolkit:
     def __init__(self, run_id: str, session_id: str, **kwargs):
         self.run_id = run_id
         self.session_id = session_id
@@ -65,21 +64,15 @@ class PulseToolkit(Toolkit):
             self.get_cached_speedtest,
         ]
 
-        super().__init__(
-            name="pulse_toolkit",
-            tools=tools,
-            # Server-enforced HITL. Prompt instructions are not an authority
-            # boundary; all mutations pause before the tool receives control.
-            requires_confirmation_tools=[
+        self.tools = tools
+        self.mutations = frozenset([
                 "quit_application",
                 "clean_target",
                 "uninstall_app",
                 "restore_undo_item",
                 "set_display_brightness",
                 "set_keep_awake",
-            ],
-            **kwargs,
-        )
+            ])
 
     async def _run_cmd(self, args: List[str], timeout: int = 30) -> Any:
         """Closed native RPC. Never launches an executable or retries a mutation."""

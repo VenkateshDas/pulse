@@ -55,7 +55,7 @@ jobs:
           cache: npm
           cache-dependency-path: pulse-assistant/package-lock.json
 
-      - name: Verify packaged assistant-ui assets
+      - name: Verify packaged Ask Pulse assets
         run: |
           make assistant
           git diff --exit-code -- Sources/Pulse/Resources/Assistant

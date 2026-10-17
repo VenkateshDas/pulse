@@ -1,83 +1,155 @@
-"""Actual Agno streaming/tool/summary/storage lifecycle with a local fake model."""
-import json, tempfile, unittest, uuid
+"""Real pinned OpenWorker loop + Pulse native bridge/storage, without model network calls."""
+import asyncio
+import json
+import tempfile
+import unittest
+import uuid
 from unittest.mock import AsyncMock, patch
-from agno.models.openai import OpenAIChat
-from agno.models.response import ModelResponse
-from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
-from agno.metrics import MessageMetrics
-from agno.db.base import SessionType
-from agent import create_pulse_agent
+from coworker.engine import TurnEngine
+from coworker.providers.base import AssistantTurn, ModelCapabilities, ProviderClient, StreamChunk, ToolCall
+from conversation_store import ConversationStore
+from openworker_runtime import PulseTurnEngine, estimate
 from providers import ProviderConfiguration
+from memory import PulseMemoryStore
 import server
 
-class FixtureModel(OpenAIChat):
-    async def ainvoke_stream(self, messages, assistant_message, **kwargs):
-        if messages[-1].role == 'user':
-            yield ModelResponse(role='assistant', tool_calls=[ChoiceDeltaToolCall(index=0,id=str(uuid.uuid4()),type='function',function={'name':'read_current_context','arguments':'{}'})])
+class FixtureProvider(ProviderClient):
+    def __init__(self, action=None):self.action=action;self.calls=[]
+    def capabilities(self,model):return ModelCapabilities()
+    def complete(self,**kwargs):
+        # Eight upstream required headings; preserve mandate and the fixture preference.
+        return AssistantTurn(text='\n'.join(f'## {h}\nVerified user preference: concise answers. Continue the original task using native evidence; no action approval has been granted.' for h in
+            ['Primary request','Key concepts','Artifacts and files','Errors and fixes','User messages','Pending tasks','Current work','Next step']))
+    def stream(self,*,messages,**kwargs):
+        self.calls.append(messages)
+        if messages[-1]['role']=='user' and self.action:
+            name,args=self.action
+            yield StreamChunk(turn=AssistantTurn(tool_calls=[ToolCall(str(uuid.uuid4()),name,args)],finish_reason='tool_calls'))
         else:
-            yield ModelResponse(role='assistant', content='Native evidence received. No mutation performed.')
-    async def ainvoke(self, messages, **kwargs):
-        return ModelResponse(role='assistant', content='{"summary":"Verified fixture evidence, no mutation.","topics":["fixture"]}')
+            yield StreamChunk(text_delta='Native evidence received. ')
+            yield StreamChunk(turn=AssistantTurn(text='Native evidence received. No mutation performed.',finish_reason='stop'))
 
-class AgnoIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_real_stream_tools_persistence_and_checkpoint_summary(self):
+class RuntimeTests(unittest.IsolatedAsyncioTestCase):
+    def engine(self,directory,sid=None,provider=None,config=None):
+        config=config or ProviderConfiguration(memory_enabled=False)
+        store=ConversationStore(directory+'/conversations.db');sid=sid or str(uuid.uuid4())
+        return PulseTurnEngine(configuration=config,store=store,session_id=sid,run_id=str(uuid.uuid4()),provider=provider or FixtureProvider(),
+                               memory=PulseMemoryStore(sid,config.memory_enabled,store=store))
+    async def drive(self,engine,text='Check context'):
+        events=[]
+        async for event in engine.run(text):
+            events.append(event)
+            await engine.checkpoint()
+        return events
+    async def test_upstream_loop_native_tools_and_restart_history(self):
         with tempfile.TemporaryDirectory() as d:
-            sid=str(uuid.uuid4())
-            with patch('pulse_toolkit.native_request',new=AsyncMock(return_value={'json':'{"timestamp":"fixture","cpu":12}','exit_code':0})) as rpc:
-                for index in range(4):
-                    rid=str(uuid.uuid4())
-                    instance=create_pulse_agent(session_id=sid,run_id=rid,db_path=d+'/agent.db',
-                        model=FixtureModel(id='fixture'),configuration=ProviderConfiguration(memory_enabled=False))
-                    r=server.Run(rid,sid,instance,ProviderConfiguration());r.message='Check current context'
-                    lines=[line async for line in server.serve(r)]
-                    kinds=[json.loads(line.split('data: ')[1])['kind'] for line in lines]
-                    self.assertIn('tool.started',kinds);self.assertIn('tool.completed',kinds)
-                    self.assertIn('answer.final',kinds);self.assertEqual('run.completed',kinds[-1])
-                self.assertEqual(4,rpc.await_count)
-            stored=instance.db.get_session(sid,session_type=SessionType.AGENT)
-            self.assertEqual(4,len(stored.runs));self.assertIsNotNone(stored.summary)
-            messages=stored.get_messages(skip_roles=['system','tool'])
-            users=[m for m in messages if m.role=='user']
-            self.assertEqual(4,len(users))
-
-    async def test_large_tool_result_preserves_dialogue_after_restart(self):
-        class RecallModel(FixtureModel):
-            async def ainvoke_stream(self, messages, assistant_message, **kwargs):
-                if messages[-1].content == 'Recall earlier answer':
-                    self.asserted_history = any(m.role == 'assistant' and m.content == 'Native evidence received. No mutation performed.' for m in messages[:-1])
-                    yield ModelResponse(role='assistant', content='Recalled')
-                else:
-                    async for chunk in super().ainvoke_stream(messages, assistant_message, **kwargs): yield chunk
+            provider=FixtureProvider(('read_current_context',{}));first=self.engine(d,provider=provider)
+            self.assertIsInstance(first,TurnEngine)
+            with patch('pulse_toolkit.native_request',new=AsyncMock(return_value={'json':'{"cpu":12}','exit_code':0})) as rpc:
+                events=await self.drive(first)
+                self.assertEqual(1,rpc.await_count)
+            self.assertEqual('completed',events[-1].data['status'])
+            second_provider=FixtureProvider();second=self.engine(d,sid=first.session_id,provider=second_provider)
+            await self.drive(second,'What did you conclude?')
+            self.assertTrue(any(m.get('content')=='Native evidence received. No mutation performed.' for m in second_provider.calls[0]))
+            history=second.store.history(first.session_id)
+            self.assertEqual(4,len([m for m in history['messages'] if m['role'] in {'user','assistant'}]))
+    async def test_human_approval_and_duplicate_rejection(self):
         with tempfile.TemporaryDirectory() as d:
-            sid = str(uuid.uuid4())
-            config = ProviderConfiguration(memory_enabled=False)
-            with patch('pulse_toolkit.native_request', new=AsyncMock(return_value={'json': 'x' * 24000, 'exit_code': 0})):
-                first = create_pulse_agent(session_id=sid, db_path=d+'/agent.db', model=FixtureModel(id='fixture'), configuration=config)
-                async for _ in first.arun('Read context', stream=True): pass
-            model = RecallModel(id='fixture')
-            restarted = create_pulse_agent(session_id=sid, db_path=d+'/agent.db', model=model, configuration=config)
-            async for _ in restarted.arun('Recall earlier answer', stream=True): pass
-            self.assertTrue(model.asserted_history)
-
-    async def test_actual_agno_approval_pauses_and_resumes_once(self):
-        class ApprovalModel(FixtureModel):
-            async def ainvoke_stream(self, messages, assistant_message, **kwargs):
-                if messages[-1].role == 'user':
-                    yield ModelResponse(role='assistant',tool_calls=[ChoiceDeltaToolCall(index=0,id='fixture-action',type='function',function={'name':'set_keep_awake','arguments':'{"until_seconds":60}'})])
-                else: yield ModelResponse(role='assistant',content='Approved fixture action completed.')
-        with tempfile.TemporaryDirectory() as d:
-            sid,rid=str(uuid.uuid4()),str(uuid.uuid4())
-            instance=create_pulse_agent(session_id=sid,run_id=rid,db_path=d+'/agent.db',model=ApprovalModel(id='fixture'),configuration=ProviderConfiguration(memory_enabled=False))
-            r=server.Run(rid,sid,instance,ProviderConfiguration());r.message='Enable fixture keep awake'
-            server.runs[rid]=r;server.session_writers[sid]=rid
+            engine=self.engine(d,provider=FixtureProvider(('set_keep_awake',{'until_seconds':60})))
+            r=server.Run(engine.run_id,engine.session_id,engine,engine.configuration,message='Keep awake')
+            server.session_writers[r.session_id]=r.id;server.runs[r.id]=r
             try:
                 with patch('pulse_toolkit.native_request',new=AsyncMock(return_value={'json':'{"ok":true}','exit_code':0})) as rpc:
-                    lines=[line async for line in server.serve(r)]
-                    self.assertIsNotNone(r.paused);self.assertIsNotNone(r.approval_id)
-                    self.assertTrue(any('approval.requested' in line for line in lines))
+                    r.task=asyncio.create_task(server.serve(r))
+                    lines=[line async for line in server.observe(r)]
+                    self.assertTrue(any('approval.requested' in line for line in lines));self.assertEqual(0,rpc.await_count)
+                    approval=r.approval_id
+                    with self.assertRaises(server.HTTPException):
+                        await server.continue_run(r.id,server.ContinueRequest(approved=True,approval_id=approval,answer='yes'))
                     self.assertEqual(0,rpc.await_count)
-                    response=await server.continue_run(rid,server.ContinueRequest(approved=True,approval_id=r.approval_id))
-                    continued=[line async for line in response.body_iterator]
+                    response=await server.continue_run(r.id,server.ContinueRequest(approved=True,approval_id=approval))
+                    lines=[line async for line in response.body_iterator]
+                    await r.task
                     self.assertTrue(r.terminal);self.assertEqual(1,rpc.await_count)
-                    self.assertTrue(any('run.completed' in line for line in continued))
-            finally: server.runs.pop(rid,None);server.session_writers.pop(sid,None)
+                    with self.assertRaises(server.HTTPException):await server.continue_run(r.id,server.ContinueRequest(approved=True,approval_id=approval))
+            finally:
+                server.runs.pop(r.id,None);server.session_writers.pop(r.session_id,None)
+    async def test_read_only_mode_denies_native_mutations_and_memory(self):
+        with tempfile.TemporaryDirectory() as d:
+            for action in [('set_keep_awake',{'until_seconds':60}),
+                           ('save_pulse_memory',{'content':'Prefer concise answers','evidence':'Explicit request'})]:
+                engine=self.engine(d,provider=FixtureProvider(action),config=ProviderConfiguration(memory_enabled=True))
+                engine.read_only=True
+                with patch('pulse_toolkit.native_request',new=AsyncMock()) as rpc:
+                    events=await self.drive(engine)
+                    self.assertEqual(0,rpc.await_count)
+                results=[e for e in events if e.type.value=='tool_finished']
+                self.assertEqual('denied',results[0].data['status'])
+                self.assertEqual([],engine.store.memory_rows())
+    async def test_question_requires_answer_and_cannot_execute_native_action(self):
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d,provider=FixtureProvider(('ask_user',{'question':'Which app?','options':['Browser','Editor']})))
+            r=server.Run(engine.run_id,engine.session_id,engine,engine.configuration,message='Diagnose')
+            server.runs[r.id]=r;server.session_writers[r.session_id]=r.id
+            try:
+                with patch('pulse_toolkit.native_request',new=AsyncMock()) as rpc:
+                    r.task=asyncio.create_task(server.serve(r))
+                    lines=[line async for line in server.observe(r)]
+                    self.assertTrue(any('question' in line for line in lines))
+                    with self.assertRaises(server.HTTPException):
+                        await server.continue_run(r.id,server.ContinueRequest(approved=True,approval_id=r.approval_id))
+                    response=await server.continue_run(r.id,server.ContinueRequest(approved=False,approval_id=r.approval_id,answer='Browser'))
+                    _=[line async for line in response.body_iterator]
+                    await r.task
+                    self.assertTrue(r.terminal);self.assertEqual(0,rpc.await_count)
+                    self.assertTrue(any('Browser' in str(m.get('content','')) for m in engine.messages if m.get('role')=='tool'))
+            finally:
+                server.runs.pop(r.id,None);server.session_writers.pop(r.session_id,None)
+    async def test_nested_result_is_bounded_and_retrievable(self):
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d)
+            original={'nested':[['evidence-'+str(i)+'x'*1000] for i in range(50)]}
+            event=engine._record_result(ToolCall('c','get_vitals',{}),original,'ok')
+            detail=event.data['detail']
+            self.assertLess(len(json.dumps(detail).encode()),6000)
+            recovered='';offset=0
+            while True:
+                page=await engine.read_tool_result(detail['result_id'],offset)
+                recovered+=page['text']
+                if page['next_offset'] is None:break
+                offset=page['next_offset']
+            self.assertEqual(original,json.loads(recovered))
+            other=self.engine(d)
+            self.assertIn('error',await other.read_tool_result(detail['result_id']))
+    async def test_long_conversation_compacts_and_remains_searchable(self):
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d,config=ProviderConfiguration(context_tokens=16384,output_tokens=2048,memory_enabled=False))
+            first={'role':'user','content':'Remember: the project name is copper-otter. Prefer concise answers.'}
+            history=[first]
+            for i in range(60):
+                history.extend([{'role':'user','content':f'Question {i} '+('context '*100)},
+                                {'role':'assistant','content':f'Answer {i} '+('evidence '*100)}])
+            engine.store.checkpoint(engine.session_id,history,history,engine.run_id,'completed')
+            restarted=self.engine(d,sid=engine.session_id,config=engine.configuration)
+            before=estimate(restarted._outbound_messages(),restarted.registry.schemas())
+            await self.drive(restarted,'Continue with the preference stated at the beginning.')
+            after=estimate(restarted._outbound_messages(),restarted.registry.schemas())
+            self.assertLess(after,before)
+            found=await restarted.search_conversation('copper-otter')
+            self.assertIn('copper-otter',found['matches'][0]['text'])
+            again=self.engine(d,sid=engine.session_id,config=engine.configuration)
+            self.assertLess(estimate(again._outbound_messages(),again.registry.schemas()),before)
+    async def test_unknown_tool_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d,provider=FixtureProvider(('run_shell',{'command':'echo forbidden'})))
+            events=await self.drive(engine)
+            failed=[e for e in events if e.type.value=='tool_finished']
+            self.assertEqual('error',failed[0].data['status'])
+    async def test_malformed_question_returns_tool_error_without_breaking_stream(self):
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d,provider=FixtureProvider(('ask_user',{'question':'Which app?','options':[{'unsafe':'shape'}]})))
+            events=await self.drive(engine)
+            self.assertFalse(any(e.type.value=='permission_required' for e in events))
+            self.assertEqual('error',next(e for e in events if e.type.value=='tool_finished').data['status'])
+            self.assertEqual('completed',events[-1].data['status'])

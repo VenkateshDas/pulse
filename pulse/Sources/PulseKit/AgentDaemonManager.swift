@@ -1,6 +1,6 @@
 import Foundation
 
-/// Starts the explicitly permitted local Agno sidecar only when Agent needs it.
+/// Starts the explicitly permitted local OpenWorker sidecar only when Ask Pulse needs it.
 public actor AgentDaemonManager {
     public static let shared = AgentDaemonManager()
     private var isStarting = false
@@ -20,7 +20,8 @@ public actor AgentDaemonManager {
         process?.terminate(); process = nil
     }
 
-    public func ensureRunning(apiKey: String? = nil) async -> Bool {
+    public func ensureRunning(apiKey: String? = nil, providerEnvironment: [String: String]? = nil) async -> Bool {
+        let selection = providerEnvironment ?? AgentConfiguration.runtimeEnvironment
         await AgentClient.shared.configure(bearerToken: token, port: port)
         if await AgentClient.shared.checkStatus().isOnline { return true }
         guard !isStarting else { return await waitForStatus() }
@@ -31,20 +32,14 @@ public actor AgentDaemonManager {
             .appendingPathComponent("Pulse/agent", isDirectory: true)
         try? FileManager.default.createDirectory(at: runtimeDirectory, withIntermediateDirectories: true)
         let selectedKey: String
-        if let apiKey { selectedKey = apiKey } else { selectedKey = await AgentConfiguration.loadAPIKey() }
+        if let apiKey { selectedKey = apiKey } else { selectedKey = await AgentConfiguration.loadAPIKey(endpoint: selection["OPENAI_BASE_URL"]) }
         let process = Process()
         process.executableURL = script; process.currentDirectoryURL = script.deletingLastPathComponent()
-        process.environment = ProcessInfo.processInfo.environment.merging([
+        process.environment = ProcessInfo.processInfo.environment.merging(selection) { _, new in new }.merging([
             "PULSE_PARENT_PID": String(ProcessInfo.processInfo.processIdentifier),
             "PULSE_AGENT_TOKEN": token,
             "PULSE_AGENT_PORT": "\(port)",
             "OPENAI_API_KEY": selectedKey,
-            "OPENAI_BASE_URL": AgentConfiguration.baseURL,
-            "PULSE_MODEL_ID": AgentConfiguration.model,
-            "PULSE_PROVIDER": AgentConfiguration.provider,
-            "PULSE_CONTEXT_TOKENS": String(AgentConfiguration.contextTokens),
-            "PULSE_OUTPUT_TOKENS": String(AgentConfiguration.outputTokens),
-            "PULSE_MEMORY_ENABLED": AgentConfiguration.memoryEnabled ? "true" : "false",
             "PULSE_NATIVE_PORT": nativePort.map(String.init) ?? "",
             "PULSE_NATIVE_TOKEN": nativeToken,
             "PULSE_AGENT_RUNTIME_DIR": runtimeDirectory.path,
@@ -52,8 +47,18 @@ public actor AgentDaemonManager {
         ]) { _, new in new }
         process.standardOutput = FileHandle.nullDevice
         let logURL = runtimeDirectory.appendingPathComponent("runtime.log")
-        FileManager.default.createFile(atPath: logURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
-        process.standardError = (try? FileHandle(forWritingTo: logURL)) ?? FileHandle.nullDevice
+        if let size = try? FileManager.default.attributesOfItem(atPath: logURL.path)[.size] as? NSNumber, size.intValue > 1_000_000 {
+            let previous = runtimeDirectory.appendingPathComponent("runtime.previous.log")
+            try? FileManager.default.removeItem(at: previous)
+            try? FileManager.default.moveItem(at: logURL, to: previous)
+        }
+        if !FileManager.default.fileExists(atPath: logURL.path) {
+            FileManager.default.createFile(atPath: logURL.path, contents: nil, attributes: [.posixPermissions: 0o600])
+        }
+        let logHandle = try? FileHandle(forWritingTo: logURL)
+        _ = try? logHandle?.seekToEnd()
+        process.standardError = logHandle ?? FileHandle.nullDevice
+        defer { try? logHandle?.close() }
         do { try process.run() } catch { return false }
         self.process = process
         return await waitForStatus()

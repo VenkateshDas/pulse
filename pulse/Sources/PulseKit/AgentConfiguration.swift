@@ -52,78 +52,171 @@ public enum AgentConfiguration {
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: modelKey) }
     }
 
-    private struct CredentialRead: Sendable {
-        let id = UUID()
-        let task: Task<String, Never>
-    }
-    private static let pendingReads = OSAllocatedUnfairLock(initialState: [String: CredentialRead]())
     private static let credentialEndpointKey = "PulseAgentCredentialEndpoint"
+    private static let credentials = AgentCredentialStore(read: readAPIKey, write: writeAPIKey)
+    private static let credentialLog = Logger(subsystem: "com.pulse.app", category: "AgentCredentials")
 
     public static func credentialsMatch(selectedEndpoint: String, storedEndpoint: String) -> Bool {
         selectedEndpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == storedEndpoint.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
-    public static func loadAPIKey(interactive: Bool = false) async -> String {
-        let endpoint = baseURL + (interactive ? "#interactive" : "#silent")
-        let read = pendingReads.withLock { reads -> CredentialRead? in
-            if let existing = reads[endpoint] { return existing }
-            guard reads.count < 8 else { return nil }
-            let item = CredentialRead(task: Task.detached(priority: .userInitiated) { readAPIKey(interactive: interactive) })
-            reads[endpoint] = item; return item
-        }
-        guard let read else { return "" }
-        // Legacy macOS Keychain calls can wait for securityd despite no-UI.
-        // Coalesce pending reads and bound UI startup without blocking an actor.
-        return await withCheckedContinuation { continuation in
-            let completed = OSAllocatedUnfairLock(initialState: false)
-            Task {
-                let value = await read.task.value
-                pendingReads.withLock { if $0[endpoint]?.id == read.id { $0[endpoint] = nil } }
-                if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: value) }
-            }
-            Task {
-                try? await Task.sleep(for: .seconds(interactive ? 30 : 5))
-                if completed.withLock({ done in if done { return false }; done = true; return true }) { continuation.resume(returning: "") }
-            }
-        }
-    }
-    public static func saveAPIKey(_ value: String) async -> Bool {
-        await Task.detached(priority: .userInitiated) { apiKey = value; return apiKey == value }.value
+    /// Compatibility flag retained; routine credential access never presents authentication UI.
+    public static func loadAPIKey(interactive: Bool = false, endpoint: String? = nil) async -> String {
+        await credentials.load(endpoint: endpoint ?? baseURL)
     }
 
-    private static func readAPIKey(interactive: Bool) -> String {
-        // Never forward a saved provider's secret to a newly selected endpoint.
-        // Legacy keys belong to the endpoint in the persisted app settings.
+    /// Captured before awaits; never pair an old key with newly edited settings.
+    public static var runtimeEnvironment: [String: String] {
+        ["OPENAI_BASE_URL": baseURL, "PULSE_MODEL_ID": model, "PULSE_PROVIDER": provider,
+         "PULSE_CONTEXT_TOKENS": String(contextTokens), "PULSE_OUTPUT_TOKENS": String(outputTokens),
+         "PULSE_MEMORY_ENABLED": memoryEnabled ? "true" : "false"]
+    }
+
+    public static func saveAPIKey(_ value: String, endpoint: String? = nil) async -> Bool {
+        let selectedEndpoint = endpoint ?? baseURL
+        return await Task.detached(priority: .userInitiated) {
+            credentials.save(value, endpoint: selectedEndpoint)
+        }.value
+    }
+
+    private static func readAPIKey(endpoint: String) -> String? {
+        // Legacy keys stay bound to the endpoint recorded when saved.
         let persisted = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "com.pulse.app")
         let savedEndpoint = UserDefaults.standard.string(forKey: credentialEndpointKey) ?? persisted?[baseURLKey] as? String ?? "https://openrouter.ai/api/v1"
-        guard credentialsMatch(selectedEndpoint: baseURL, storedEndpoint: savedEndpoint) else { return "" }
-        var query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
-                                       kSecAttrAccount: account, kSecReturnData: true]
-        if !interactive { query[kSecUseAuthenticationUI] = kSecUseAuthenticationUIFail }
+        guard credentialsMatch(selectedEndpoint: endpoint, storedEndpoint: savedEndpoint) else { return nil }
+        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
+            kSecAttrAccount: account, kSecReturnData: true, kSecUseAuthenticationUI: kSecUseAuthenticationUIFail]
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return "" }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status != errSecSuccess && status != errSecItemNotFound { credentialLog.error("Silent credential read failed status=\(status)") }
+        guard status == errSecSuccess,
+              let data = result as? Data else { return nil }
         return String(decoding: data, as: UTF8.self)
     }
 
+    private static func writeAPIKey(_ value: String, endpoint: String) -> Bool {
+        let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
+            kSecAttrAccount: account, kSecUseAuthenticationUI: kSecUseAuthenticationUIFail]
+        if value.isEmpty {
+            let status = SecItemDelete(query as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else { credentialLog.error("Credential delete failed status=\(status)"); return false }
+            UserDefaults.standard.removeObject(forKey: credentialEndpointKey)
+            return true
+        }
+        let data = Data(value.utf8)
+        var status = SecItemUpdate(query as CFDictionary, [kSecValueData: data] as CFDictionary)
+        if status == errSecItemNotFound {
+            var insert = query
+            insert[kSecValueData] = data
+            insert[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            status = SecItemAdd(insert as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else { credentialLog.error("Credential save failed status=\(status)"); return false }
+        UserDefaults.standard.set(endpoint, forKey: credentialEndpointKey)
+        return true
+    }
+
     public static var apiKey: String {
-        get { readAPIKey(interactive: false) }
-        set {
-            let data = Data(newValue.utf8)
-            let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service,
-                                           kSecAttrAccount: account]
-            if newValue.isEmpty {
-                if SecItemDelete(query as CFDictionary) == errSecSuccess { UserDefaults.standard.removeObject(forKey: credentialEndpointKey) }
-                return
+        get { credentials.loadSynchronously(endpoint: baseURL) }
+        set { _ = credentials.save(newValue, endpoint: baseURL) }
+    }
+}
+
+/// Instance-owned seam keeps credential tests away from the user's Keychain.
+/// Security calls run outside the state lock; generations reject superseded reads.
+final class AgentCredentialStore: Sendable {
+    private struct PendingRead: Sendable {
+        let id = UUID()
+        let generation: UInt64
+        let task: Task<String?, Never>
+    }
+    private struct State {
+        var generation: UInt64 = 0
+        var cache: (endpoint: String, value: String)?
+        var pending: [String: PendingRead] = [:]
+        var writing = false
+    }
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let writes = OSAllocatedUnfairLock(initialState: false)
+    private let read: @Sendable (String) -> String?
+    private let write: @Sendable (String, String) -> Bool
+
+    init(read: @escaping @Sendable (String) -> String?, write: @escaping @Sendable (String, String) -> Bool) {
+        self.read = read
+        self.write = write
+    }
+
+    private func cached(_ endpoint: String, in state: State) -> String? {
+        guard let cache = state.cache,
+              AgentConfiguration.credentialsMatch(selectedEndpoint: endpoint, storedEndpoint: cache.endpoint) else { return nil }
+        return cache.value
+    }
+
+    func load(endpoint: String) async -> String {
+        let selection = state.withLock { state -> (String?, PendingRead?) in
+            if let value = cached(endpoint, in: state) { return (value, nil) }
+            guard !state.writing else { return ("", nil) }
+            if let pending = state.pending[endpoint] { return (nil, pending) }
+            guard state.pending.count < 8 else { return ("", nil) }
+            let read = self.read
+            let pending = PendingRead(generation: state.generation,
+                task: Task.detached(priority: .userInitiated) { read(endpoint) })
+            state.pending[endpoint] = pending
+            return (nil, pending)
+        }
+        if let cached = selection.0 { return cached }
+        guard let pending = selection.1 else { return "" }
+        // Even no-UI securityd requests can stall. Keep UI startup bounded.
+        return await withCheckedContinuation { continuation in
+            let completed = OSAllocatedUnfairLock(initialState: false)
+            Task {
+                let value = await pending.task.value
+                let accepted = state.withLock { state -> String in
+                    if state.pending[endpoint]?.id == pending.id { state.pending[endpoint] = nil }
+                    guard state.generation == pending.generation, !state.writing else { return "" }
+                    if let value { state.cache = (endpoint, value) }
+                    return value ?? ""
+                }
+                if completed.withLock({ done in if done { return false }; done = true; return true }) {
+                    continuation.resume(returning: accepted)
+                }
             }
-            let update = [kSecValueData: data] as CFDictionary
-            var status = SecItemUpdate(query as CFDictionary, update)
-            if status == errSecItemNotFound {
-                var insert = query; insert[kSecValueData] = data
-                insert[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-                status = SecItemAdd(insert as CFDictionary, nil)
+            Task {
+                try? await Task.sleep(for: .seconds(5))
+                if completed.withLock({ done in if done { return false }; done = true; return true }) {
+                    continuation.resume(returning: "")
+                }
             }
-            if status == errSecSuccess { UserDefaults.standard.set(baseURL, forKey: credentialEndpointKey) }
+        }
+    }
+
+    func loadSynchronously(endpoint: String) -> String {
+        let snapshot = state.withLock { state in (cached(endpoint, in: state), state.generation, state.writing) }
+        if let value = snapshot.0 { return value }
+        guard !snapshot.2 else { return "" }
+        let value = read(endpoint)
+        return state.withLock { state in
+            guard state.generation == snapshot.1, !state.writing else { return "" }
+            if let value { state.cache = (endpoint, value) }
+            return value ?? ""
+        }
+    }
+
+    func save(_ value: String, endpoint: String) -> Bool {
+        // Serialize writes while allowing an older securityd read to finish independently.
+        writes.withLock { _ in
+            state.withLock { state in
+                state.generation &+= 1
+                state.writing = true
+                state.cache = nil
+                state.pending.removeAll()
+            }
+            let succeeded = write(value, endpoint)
+            state.withLock { state in
+                state.writing = false
+                if succeeded { state.cache = (endpoint, value) }
+            }
+            return succeeded
         }
     }
 }

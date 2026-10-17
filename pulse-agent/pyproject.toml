@@ -1,7 +1,7 @@
 [project]
 name = "pulse-agent"
 version = "0.2.0"
-description = "Bounded local Pulse harness powered by Agno"
+description = "Bounded local Pulse harness powered by pinned OpenWorker"
 requires-python = ">=3.12"
 dependencies = [
     "agno==3.0.9",
@@ -13,5 +13,8 @@ dependencies = [
     "openai==2.29.0",
     "anthropic==0.84.0",
     "google-genai>=1.0,<2.0",
-    "ollama>=0.6,<1.0",
+    "openworker",
 ]
+
+[tool.uv.sources]
+openworker = { git = "https://github.com/andrewyng/openworker.git", rev = "5bf0d2fb8c728932fdbc6b49a24113aebc2a4ddd" }

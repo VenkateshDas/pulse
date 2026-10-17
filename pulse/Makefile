@@ -104,7 +104,7 @@ cli-smoke: cli
 # explicitly when editing pulse-assistant; CI checks the source and lock.
 .PHONY: assistant agent-test
 assistant:
-	cd ../pulse-assistant && npm ci --no-audit --no-fund && npm run build
+	cd ../pulse-assistant && npm ci --no-audit --no-fund && npm test && npm run build
 
 agent-test:
 	uv run --project ../pulse-agent --frozen --no-dev python -m unittest discover -s ../pulse-agent -p 'test_*.py'

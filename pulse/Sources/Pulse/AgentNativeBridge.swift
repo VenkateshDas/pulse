@@ -1,8 +1,9 @@
 import Foundation
 import Network
 import PulseCommands
+import os
 
-/// Loopback, length-bounded JSON RPC for the authenticated Agno sidecar.
+/// Loopback, length-bounded JSON RPC for the authenticated OpenWorker sidecar.
 /// The browser never receives this credential. Commands execute in this process.
 actor AgentNativeBridge {
     static let shared = AgentNativeBridge()
@@ -15,6 +16,7 @@ actor AgentNativeBridge {
     private var cancelledRuns: [String: Date] = [:]
     private var contextProvider: (@MainActor @Sendable () -> String)?
     private let queue = DispatchQueue(label: "com.pulse.agent.native")
+    private let logger = Logger(subsystem: "com.pulse.app", category: "AgentNativeBridge")
 
     struct Request: Decodable, Sendable {
         let version: Int
@@ -108,18 +110,22 @@ actor AgentNativeBridge {
             taskRuns[request.requestID] = request.runID
             let contextProvider = self.contextProvider
             tasks[request.requestID] = Task.detached { [weak self] in
+                let started = ContinuousClock.now
                 let result: NativeCommandExecutor.Result
                 if request.arguments == ["context"] {
                     result = .init(json: await contextProvider?() ?? "{\"unavailable\":\"No current snapshot\"}", exitCode: 0)
                 } else { result = await NativeCommandExecutor.execute(request.arguments) }
-                await self?.finished(connection, id: id, request: request, result: result)
+                let elapsed = ContinuousClock.now - started
+                await self?.finished(connection, id: id, request: request, result: result, elapsed: elapsed)
             }
         } else if complete { close(connection, id: id) }
         else { receive(connection, id: id, buffer: bytes) }
     }
 
-    private func finished(_ connection: NWConnection, id: UUID, request: Request, result: NativeCommandExecutor.Result) {
+    private func finished(_ connection: NWConnection, id: UUID, request: Request, result: NativeCommandExecutor.Result, elapsed: Duration) {
         tasks[request.requestID] = nil; taskRuns[request.requestID] = nil
+        let milliseconds = elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000
+        logger.info("Native request finished run=\(request.runID, privacy: .public) request=\(request.requestID, privacy: .public) status=\(result.exitCode) elapsed_ms=\(milliseconds)")
         reply(connection, id: id, request: request, result: result)
     }
     private func reply(_ connection: NWConnection, id: UUID, request: Request, result: NativeCommandExecutor.Result) {

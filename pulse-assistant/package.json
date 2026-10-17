@@ -1,6 +1,24 @@
 {
-  "name": "pulse-assistant", "version": "0.2.0", "private": true, "type": "module",
-  "scripts": {"build": "tsc --noEmit && vite build", "dev": "vite --host 127.0.0.1"},
-  "dependencies": {"@assistant-ui/react": "0.15.27", "@assistant-ui/react-markdown": "0.14.20", "react": "19.2.0", "react-dom": "19.2.0", "lucide-react": "0.468.0", "remark-gfm": "4.0.1"},
-  "devDependencies": {"@types/react": "19.2.0", "@types/react-dom": "19.2.0", "typescript": "5.9.3", "vite": "6.4.1"}
+  "name": "pulse-assistant",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "test": "node --test src/*.test.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "typescript": "5.9.3",
+    "vite": "6.4.1"
+  }
 }

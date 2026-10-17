@@ -35,22 +35,27 @@ class ProviderConfiguration(BaseModel):
     def ready(self):
         return bool(self.api_key) or (self.provider in {"openai-chat", "ollama"} and urlsplit(self.base_url).hostname in {"localhost", "127.0.0.1", "::1"})
 
-    def make_model(self):
-        common = dict(id=self.model, retries=0)
-        if self.provider == "openai-chat":
-            from agno.models.openai import OpenAIChat
-            return OpenAIChat(**common, base_url=self.base_url, api_key=self.api_key or "local", max_completion_tokens=self.output_tokens, timeout=60, max_retries=0, retry_with_guidance=False)
-        if self.provider == "openai-responses":
-            from agno.models.openai import OpenAIResponses
-            return OpenAIResponses(**common, base_url=self.base_url, api_key=self.api_key, max_output_tokens=self.output_tokens, timeout=60, max_retries=0, retry_with_guidance=False)
+    def make_provider(self):
+        """Use pinned OpenWorker transports with explicit run-local SDK clients."""
+        if self.provider in {"openai-chat", "openai-responses", "ollama"}:
+            from openai import OpenAI
+            from coworker.providers.openai_provider import OpenAIProvider
+            from coworker.providers.openai_responses import OpenAIResponsesProvider
+            endpoint = self.base_url.rstrip("/")
+            if self.provider == "ollama" and not endpoint.endswith("/v1"):
+                endpoint += "/v1"
+            client = OpenAI(api_key=self.api_key or "local", base_url=endpoint, timeout=60, max_retries=0)
+            kind = OpenAIResponsesProvider if self.provider == "openai-responses" else OpenAIProvider
+            return kind(client=client, default_model=self.model)
         if self.provider == "anthropic":
-            from agno.models.anthropic import Claude
-            return Claude(**common, api_key=self.api_key, max_tokens=self.output_tokens, timeout=60, retry_with_guidance=False)
-        if self.provider == "google":
-            from agno.models.google import Gemini
-            return Gemini(**common, api_key=self.api_key, max_output_tokens=self.output_tokens)
-        from agno.models.ollama import Ollama
-        return Ollama(**common, host=self.base_url, api_key=self.api_key or None, options={"num_predict": self.output_tokens, "num_ctx": self.context_tokens})
+            from anthropic import Anthropic
+            from coworker.providers.anthropic_provider import AnthropicProvider
+            return AnthropicProvider(client=Anthropic(api_key=self.api_key, timeout=60, max_retries=0), default_model=self.model, thinking_budget=0)
+        from google import genai
+        from google.genai import types
+        from coworker.providers.gemini_provider import GeminiProvider
+        return GeminiProvider(client=genai.Client(api_key=self.api_key, http_options=types.HttpOptions(timeout=60000,
+                              retry_options=types.HttpRetryOptions(attempts=1))), default_model=self.model)
 
     @classmethod
     def from_environment(cls):

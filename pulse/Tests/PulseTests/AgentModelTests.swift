@@ -82,6 +82,40 @@ struct AgentModelTests {
 @Suite("Conversation controls")
 @MainActor
 struct ConversationControlTests {
+    @Test func stopBeforeFirstEventUsesAllocatedRequestID() async throws {
+        let requests = OSAllocatedUnfairLock(initialState: [String]())
+        let model = AgentModel(cancelRun: { id in requests.withLock { $0.append(id) } })
+        model.send("Fixture question")
+        let request = model.activeRunId
+        #expect(request != nil)
+        model.cancel()
+        for _ in 0..<50 where requests.withLock({ $0.isEmpty }) { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(requests.withLock { $0 } == [request!])
+    }
+
+    @Test func failedBufferedAnswerCannotLeakIntoNewConversation() async throws {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "old", sessionId: "old", kind: "answer.delta", payload: ["text": "Old partial"]))
+        model.apply(.init(sequence: 2, runId: "old", sessionId: "old", kind: "run.failed", payload: ["text": "Interrupted"]))
+        model.newConversation()
+        try await Task.sleep(for: .milliseconds(60))
+        #expect(model.items.isEmpty)
+    }
+
+    @Test func failuresWithoutStartedEventsRetainOutcome() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "r", sessionId: "s", kind: "tool.failed", payload: ["tool_call_id": "c", "status": "denied"]))
+        #expect(model.items.first?.outcome == "denied")
+    }
+
+    @Test func draftEvictionKeepsRecentConversations() {
+        let model = AgentModel()
+        for i in 0..<52 { model.sessionId = "s\(i)"; model.setDraft("Draft \(i)") }
+        model.sessionId = "s50"; #expect(model.draft == "Draft 50")
+        model.sessionId = "s51"; #expect(model.draft == "Draft 51")
+        model.sessionId = "s0"; #expect(model.draft.isEmpty)
+    }
+
     @Test func stopBeforeRunIDIsAvailableStillStopsLocalState() {
         let model = AgentModel()
         model.state = .running

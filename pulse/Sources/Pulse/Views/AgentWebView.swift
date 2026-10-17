@@ -41,9 +41,11 @@ struct AgentWebView: NSViewRepresentable {
     }
 
     struct Snapshot: Encodable {
-        let items: [AgentTimelineItem]; let sessions: [AgentSessionItem]; let sessionId: String?
+        var items: [AgentTimelineItem]; let sessions: [AgentSessionItem]; let sessionId: String?
         let status: String; let busy: Bool; let ready: Bool; let state: String; let model: String; let provider: String
         let memories: [AgentMemoryItem]; let memoryEnabled: Bool; let memoryStatus: String; let largerText: Bool; let hasEarlier: Bool
+        let draft: String
+        let readOnly: Bool
     }
 
     static func snapshot(for model: AgentModel, largerText: Bool) -> Snapshot {
@@ -56,7 +58,7 @@ struct AgentWebView: NSViewRepresentable {
             status: model.status, busy: model.isBusy, ready: model.hasApiKey, state: String(describing: model.state),
             model: AgentConfiguration.model, provider: AgentConfiguration.provider,
             memories: model.memories, memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
-            largerText: largerText, hasEarlier: model.hasEarlier)
+            largerText: largerText, hasEarlier: model.hasEarlier, draft: model.draft, readOnly: model.investigationOnly)
     }
 
     @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
@@ -67,13 +69,23 @@ struct AgentWebView: NSViewRepresentable {
         var ready = false
         var active = true
         private var previous: Data?
+        private var renderedItems: [String: AgentTimelineItem] = [:]
+        private var renderedOrder: [String] = []
         init(model: AgentModel, snapshot: Snapshot, failure: Binding<String?>) { self.model = model; self.snapshot = snapshot; self.failure = failure }
 
         func publish() {
-            guard ready, active, let data = try? JSONEncoder().encode(snapshot), data != previous,
-                  let state = try? JSONSerialization.jsonObject(with: data) else { return }
-            previous = data
-            view?.callAsyncJavaScript("window.pulseReceive(state)", arguments: ["state": state], in: nil, in: .page, completionHandler: { _ in })
+            guard ready, active else { return }
+            var metadata = snapshot; metadata.items = []
+            guard let data = try? JSONEncoder().encode(metadata) else { return }
+            let changed = snapshot.items.filter { renderedItems[$0.id] != $0 }
+            let order = snapshot.items.map(\.id)
+            guard data != previous || !changed.isEmpty || order != renderedOrder else { return }
+            struct Patch: Encodable { let state: Snapshot?; let items: [AgentTimelineItem]; let order: [String]? }
+            let patch = Patch(state: data != previous ? metadata : nil, items: changed, order: order != renderedOrder ? order : nil)
+            guard let encoded = try? JSONEncoder().encode(patch), let value = try? JSONSerialization.jsonObject(with: encoded) else { return }
+            previous = data; renderedItems = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) }); renderedOrder = order
+            // Stream only changed rows; loaded history is not re-encoded for each token.
+            view?.callAsyncJavaScript("window.pulsePatch(patch)", arguments: ["patch": value], in: nil, in: .page, completionHandler: { _ in })
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -86,9 +98,23 @@ struct AgentWebView: NSViewRepresentable {
             case "send":
                 guard model.hasApiKey, let text = body["text"] as? String, text.utf8.count <= 12_000 else { return }
                 model.send(text)
+            case "draft":
+                guard let text = body["text"] as? String else { return }
+                model.setDraft(text)
+            case "mode":
+                guard let readOnly = body["readOnly"] as? Bool else { return }
+                model.setInvestigationOnly(readOnly)
+            case "answer":
+                guard let id = body["id"] as? String, id == model.approvalId, let answer = body["text"] as? String else { return }
+                model.answerQuestion(answer)
             case "copy":
                 guard let text = body["text"] as? String, text.utf8.count <= 128_000 else { return }
-                NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+                NSPasteboard.general.clearContents()
+                let success = NSPasteboard.general.setString(text, forType: .string)
+                if let id = body["id"] as? String, id.utf8.count <= 128 {
+                    view?.callAsyncJavaScript("window.dispatchEvent(new CustomEvent('pulse-copy', {detail: {id, success}}))",
+                        arguments: ["id": id, "success": success], in: nil, in: .page, completionHandler: { _ in })
+                }
             case "stop": model.cancel()
             case "new": model.newConversation()
             case "session":

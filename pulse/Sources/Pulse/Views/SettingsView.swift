@@ -22,6 +22,7 @@ struct SettingsView: View {
     @State private var agentBaseURL = AgentConfiguration.baseURL
     @State private var agentAPIKey = ""
     @State private var agentKeyLoaded = false
+    @State private var agentKeyRevision = UUID()
     @State private var agentContextTokens = AgentConfiguration.contextTokens
     @State private var agentOutputTokens = AgentConfiguration.outputTokens
     @State private var agentProvider = AgentConfiguration.provider
@@ -64,7 +65,17 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Halo.void)
-        .task { if !agentKeyLoaded { agentAPIKey = await AgentConfiguration.loadAPIKey(interactive: true); agentKeyLoaded = true } }
+        .task {
+            guard !agentKeyLoaded else { return }
+            let revision = agentKeyRevision
+            let key = await AgentConfiguration.loadAPIKey(endpoint: agentBaseURL)
+            guard revision == agentKeyRevision else { return }
+            agentAPIKey = key; agentKeyLoaded = true
+        }
+        .onChange(of: agentBaseURL) { _, _ in
+            // A loaded credential must never be rebound to another destination.
+            agentKeyRevision = UUID(); agentAPIKey = ""; agentKeyLoaded = true
+        }
     }
 
     // MARK: - Appearance
@@ -235,7 +246,9 @@ struct SettingsView: View {
             rowDivider
             VStack(alignment: .leading, spacing: 6) {
                 Text("API Key").font(Halo.font(size: 13, weight: .medium)).foregroundStyle(Halo.textPrimary)
-                SecureField("sk-or-v1-…", text: $agentAPIKey)
+                SecureField("sk-or-v1-…", text: Binding(get: { agentAPIKey }, set: {
+                    agentKeyRevision = UUID(); agentAPIKey = $0; agentKeyLoaded = true
+                }))
                     .accessibilityLabel("Provider API key")
                     .textFieldStyle(.roundedBorder)
                     .font(Halo.font(size: 12, design: .monospaced))
@@ -267,7 +280,14 @@ struct SettingsView: View {
                 if let agentStatus { Text(agentStatus).font(Halo.font(size: 11)).foregroundStyle(Halo.textDim) }
             }
             .padding(.top, 4)
+            Button("Show Ask Pulse debug logs") {
+                let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+                    .appendingPathComponent("Pulse/agent", isDirectory: true)
+                try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+                NSWorkspace.shared.open(directory)
+            }.buttonStyle(.link)
         }
+        .disabled(savingAgentSettings)
     }
 
     private func saveAgentSettings() {
@@ -288,21 +308,28 @@ struct SettingsView: View {
         if agentProvider == "google", baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) != "https://generativelanguage.googleapis.com" {
             agentStatus = "Google Gemini uses https://generativelanguage.googleapis.com."; return
         }
-        AgentConfiguration.contextTokens = agentContextTokens
-        AgentConfiguration.outputTokens = agentOutputTokens
-        AgentConfiguration.provider = agentProvider
-        AgentConfiguration.baseURL = baseURL
-        AgentConfiguration.model = model
-        agentStatus = "Saved to Keychain"
+        let key = agentAPIKey
+        let provider = agentProvider
+        let contextTokens = agentContextTokens
+        let outputTokens = agentOutputTokens
+        agentStatus = "Saving to Keychain…"
         savingAgentSettings = true
         Task {
             defer { savingAgentSettings = false }
-            guard await AgentConfiguration.saveAPIKey(agentAPIKey) else {
+            guard await AgentConfiguration.saveAPIKey(key, endpoint: baseURL) else {
                 agentStatus = "The key could not be saved to Keychain. Unlock this Mac and try again."; return
             }
+            AgentConfiguration.contextTokens = contextTokens
+            AgentConfiguration.outputTokens = outputTokens
+            AgentConfiguration.provider = provider
+            AgentConfiguration.baseURL = baseURL
+            AgentConfiguration.model = model
             guard await AgentClient.shared.checkStatus().isOnline else { agentStatus = "Saved. Open Ask Pulse to connect."; return }
             do {
-                try await AgentClient.shared.updateConfiguration(baseURL: baseURL, apiKey: agentAPIKey, model: model)
+                try await AgentClient.shared.updateConfiguration(baseURL: baseURL, apiKey: key, model: model, configuration: [
+                    "PULSE_PROVIDER": provider, "PULSE_CONTEXT_TOKENS": String(contextTokens),
+                    "PULSE_OUTPUT_TOKENS": String(outputTokens), "PULSE_MEMORY_ENABLED": AgentConfiguration.memoryEnabled ? "true" : "false"
+                ])
                 agentStatus = "Saved for Ask Pulse. The provider is checked when you send a question."
             } catch { agentStatus = "Saved; agent will use this after restart." }
         }

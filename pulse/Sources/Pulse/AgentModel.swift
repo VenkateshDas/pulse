@@ -4,7 +4,7 @@ import PulseKit
 
 enum AgentRunState: Equatable { case idle, starting, running, awaitingApproval, completed, failed, cancelled }
 
-struct AgentTimelineItem: Identifiable, Codable {
+struct AgentTimelineItem: Identifiable, Codable, Equatable {
     enum Kind: String, Equatable, Codable { case user, answer, progress, tool, approval, error }
     let id: String
     var kind: Kind
@@ -13,6 +13,9 @@ struct AgentTimelineItem: Identifiable, Codable {
     var approvalID: String? = nil
     var isExpanded = false
     var isRunning = false
+    var outcome: String? = nil
+    var interaction: String? = nil
+    var options: [String]? = nil
 }
 
 /// Main-actor event reducer. Event IDs make replay and SSE reconnect safe.
@@ -28,6 +31,16 @@ final class AgentModel {
     var surfaceVisible = false
     var hasEarlier = false
     @ObservationIgnored private var historyPage = 1
+    @ObservationIgnored private var drafts: [String: String] = [:]
+    @ObservationIgnored private var draftOrder: [String] = []
+    var draft: String { drafts[sessionId ?? "new"] ?? "" }
+    func setDraft(_ text: String) {
+        guard text.utf8.count <= 12_000 else { return }
+        let key = sessionId ?? "new"
+        draftOrder.removeAll { $0 == key }; draftOrder.append(key)
+        while draftOrder.count > 50 { drafts.removeValue(forKey: draftOrder.removeFirst()) }
+        drafts[key] = text
+    }
     var memories: [AgentMemoryItem] = []
     var memoryStatus = ""
     var memoryEnabled = AgentConfiguration.memoryEnabled
@@ -37,6 +50,11 @@ final class AgentModel {
     @ObservationIgnored private var runExpiry = Date.distantFuture
     @ObservationIgnored private var shutdownTask: Task<Void, Never>?
     var hasApiKey = false
+    var investigationOnly = UserDefaults.standard.bool(forKey: "PulseAgentReadOnly")
+    func setInvestigationOnly(_ value: Bool) {
+        guard !isBusy else { return }
+        investigationOnly = value; UserDefaults.standard.set(value, forKey: "PulseAgentReadOnly")
+    }
     @ObservationIgnored private var streamTask: Task<Void, Never>?
     @ObservationIgnored private var streamGeneration = UUID()
     @ObservationIgnored private var ignoresCancelledEvents = false
@@ -50,6 +68,7 @@ final class AgentModel {
 
     func newConversation() {
         guard !isBusy else { return }
+        resetStream()
         sessionId = nil; activeRunId = nil; approvalId = nil; items = []; hasEarlier = false; historyPage = 1; state = .idle; status = "Ready"
     }
     private var seenEventIDs = Set<String>()
@@ -61,12 +80,19 @@ final class AgentModel {
 
     func start() async {
         guard !isBusy else { return }
-        state = .starting; status = "Unlocking provider credentials…"
-        let key = await AgentConfiguration.loadAPIKey(interactive: true)
+        let selection = AgentConfiguration.runtimeEnvironment
+        let endpoint = selection["OPENAI_BASE_URL"] ?? ""
+        let provider = selection["PULSE_PROVIDER"] ?? ""
+        let model = selection["PULSE_MODEL_ID"] ?? ""
+        state = .starting; status = "Loading provider settings…"
+        let key = await AgentConfiguration.loadAPIKey(endpoint: endpoint)
         state = .idle
-        hasApiKey = AgentConfiguration.isReady(baseURL: AgentConfiguration.baseURL, apiKey: key, provider: AgentConfiguration.provider)
+        guard selection == AgentConfiguration.runtimeEnvironment else {
+            hasApiKey = false; status = "Provider settings changed. Reconnect to use them."; return
+        }
+        hasApiKey = AgentConfiguration.isReady(baseURL: endpoint, apiKey: key, provider: provider)
         guard hasApiKey else { status = "Set up an AI provider to ask Pulse"; return }
-        guard AgentConfiguration.providerURL(AgentConfiguration.baseURL) != nil else {
+        guard AgentConfiguration.providerURL(endpoint) != nil else {
             state = .failed; status = "Review the provider URL in Settings before asking Pulse"
             return
         }
@@ -76,12 +102,16 @@ final class AgentModel {
             let port = try await AgentNativeBridge.shared.start(token: nativeToken)
             await AgentDaemonManager.shared.configureNativeBridge(port: port, token: nativeToken)
         } catch { state = .failed; status = "Native tools could not start"; return }
-        guard await AgentDaemonManager.shared.ensureRunning(apiKey: key) else {
+        guard await AgentDaemonManager.shared.ensureRunning(apiKey: key, providerEnvironment: selection) else {
             state = .failed; status = "Pulse Agent could not start"
             items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent unavailable", detail: "Check that the local agent runtime is installed."))
             return
         }
-        try? await AgentClient.shared.updateConfiguration(baseURL: AgentConfiguration.baseURL, apiKey: key, model: AgentConfiguration.model)
+        guard selection == AgentConfiguration.runtimeEnvironment else {
+            hasApiKey = false; state = .idle; status = "Provider settings changed. Reconnect to use them."; return
+        }
+        do { try await AgentClient.shared.updateConfiguration(baseURL: endpoint, apiKey: key, model: model, configuration: selection) }
+        catch { hasApiKey = false; state = .failed; status = "Provider settings could not be applied. Reconnect before sending a question."; return }
         let daemon = await AgentClient.shared.checkStatus()
         hasApiKey = daemon.hasApiKey; state = .idle; status = daemon.summary ?? "Ready"
         sessions = (try? await AgentClient.shared.fetchSessions()) ?? []
@@ -90,14 +120,18 @@ final class AgentModel {
     func send(_ text: String) {
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, state == .idle || state == .completed || state == .failed || state == .cancelled else { return }
+        setDraft("")
         items.append(.init(id: UUID().uuidString, kind: .user, title: message, detail: ""))
         state = .running; status = "Working…"; lastSequence = 0; seenEventIDs.removeAll()
-        activeRunId = nil; ignoresCancelledEvents = false; approvalExpiryTask?.cancel()
+        let runId = UUID().uuidString
+        activeRunId = runId; sessionId = sessionId ?? UUID().uuidString
+        ignoresCancelledEvents = false; approvalExpiryTask?.cancel()
         pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll(); answerFlushTask?.cancel(); answerFlushTask = nil
         let generation = UUID(); streamGeneration = generation
         streamTask = Task {
+            guard !Task.isCancelled, generation == streamGeneration else { return }
             do {
-                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId) {
+                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId, runId: runId, readOnly: investigationOnly) {
                     guard generation == streamGeneration, !Task.isCancelled else { return }
                     apply(event)
                 }
@@ -111,7 +145,23 @@ final class AgentModel {
         let generation = streamGeneration
         streamTask = Task {
             do {
-                for try await event in await AgentClient.shared.continueRun(runId: runId, approved: approved, approvalId: approvalId) {
+                for try await event in await AgentClient.shared.continueRun(runId: runId, approved: approved, approvalId: approvalId, afterSequence: lastSequence) {
+                    guard generation == streamGeneration, !Task.isCancelled else { return }
+                    apply(event)
+                }
+            } catch { if generation == streamGeneration, !Task.isCancelled { fail(error.localizedDescription) } }
+        }
+    }
+
+    func answerQuestion(_ answer: String) {
+        guard state == .awaitingApproval, let runId = activeRunId, let approvalId,
+              items.last(where: { $0.approvalID == approvalId })?.interaction == "question",
+              !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, answer.utf8.count <= 12_000 else { return }
+        state = .running; status = "Continuing…"
+        let generation = streamGeneration
+        streamTask = Task {
+            do {
+                for try await event in await AgentClient.shared.answerQuestion(runId: runId, approvalId: approvalId, answer: answer, afterSequence: lastSequence) {
                     guard generation == streamGeneration, !Task.isCancelled else { return }
                     apply(event)
                 }
@@ -148,16 +198,13 @@ final class AgentModel {
 
     func loadSession(_ id: String) async {
         guard !isBusy else { return }
+        resetStream()
         sessionId = id; items = []; state = .starting; status = "Loading conversation…"
         do {
             let page = try await AgentClient.shared.fetchHistoryPage(sessionId: id, page: 1)
             historyPage = 1; hasEarlier = page.hasMore
-            items = page.messages.map { message in
-                .init(id: UUID().uuidString, kind: message.role == "user" ? .user : .answer,
-                      title: message.role == "user" ? message.content : "Pulse Agent",
-                      detail: message.role == "user" ? "" : message.content)
-            }
-            state = .idle; status = "Ready"
+            items = page.messages.map(Self.historyItem)
+            state = .idle; status = page.interrupted == true ? "Previous run interrupted. Review completed actions before continuing." : "Ready"
         } catch {
             state = .failed; status = "Could not load conversation"
         }
@@ -169,12 +216,16 @@ final class AgentModel {
         do {
             let page = try await AgentClient.shared.fetchHistoryPage(sessionId: sessionId, page: historyPage + 1)
             historyPage += 1; hasEarlier = page.hasMore && items.count + page.messages.count < 500
-            let earlier = page.messages.map { message in
-                AgentTimelineItem(id: UUID().uuidString, kind: message.role == "user" ? .user : .answer,
-                    title: message.role == "user" ? message.content : "Ask Pulse", detail: message.role == "user" ? "" : message.content)
-            }
+            let earlier = page.messages.map(Self.historyItem)
             items.insert(contentsOf: earlier, at: 0); state = .idle
         } catch { state = .failed; status = "Earlier messages could not load" }
+    }
+
+    private static func historyItem(_ message: AgentHistoryMessage) -> AgentTimelineItem {
+        let kind: AgentTimelineItem.Kind = message.role == "user" ? .user : message.role == "tool" ? .tool : message.role == "notice" ? .progress : .answer
+        return .init(id: "history-\(message.id ?? UUID().uuidString)", kind: kind,
+            title: kind == .user ? message.content : kind == .tool ? (message.name ?? "Tool result").replacingOccurrences(of: "_", with: " ") : "Ask Pulse",
+            detail: kind == .user ? "" : message.content, outcome: message.status)
     }
 
     func apply(_ event: AgentEnvelope) {
@@ -183,12 +234,18 @@ final class AgentModel {
         lastSequence = event.sequence; activeRunId = event.runId; sessionId = event.sessionId
         let text = event.payload["text"] ?? ""
         switch event.kind {
+        case "answer.reset":
+            clearPendingAnswer(runId: event.runId)
+            items.removeAll { $0.id == "answer-\(event.runId)" }
         case "run.started": runExpiry = .now.addingTimeInterval(900); status = "Working…"; state = .running
         case "reasoning.summary.delta": appendOrUpdate(id: "reasoning-\(event.runId)", kind: .progress, title: "Working on it", detail: text)
         case "answer.delta":
             removeProgress(runId: event.runId)
             bufferAnswerDelta(runId: event.runId, text: text)
-        case "answer.interim": items.append(.init(id: event.eventId, kind: .progress, title: "Progress update", detail: text))
+        case "answer.interim":
+            clearPendingAnswer(runId: event.runId)
+            items.removeAll { $0.id == "answer-\(event.runId)" }
+            if !text.isEmpty { items.append(.init(id: event.eventId, kind: .progress, title: "Progress update", detail: text)) }
         case "answer.final":
             removeProgress(runId: event.runId)
             clearPendingAnswer(runId: event.runId)
@@ -196,20 +253,26 @@ final class AgentModel {
         case "tool.started": items.append(.init(id: "tool-\(event.runId)-\(event.payload["tool_call_id"] ?? event.eventId)", kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
         case "tool.completed", "tool.failed":
             let id = "tool-\(event.runId)-\(event.payload["tool_call_id"] ?? event.eventId)"
-            if let index = items.firstIndex(where: { $0.id == id }) { items[index].detail = event.payload["detail"] ?? text; items[index].isRunning = false }
-            else { items.append(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"])) }
+            if let index = items.firstIndex(where: { $0.id == id }) { items[index].detail = event.payload["detail"] ?? text; items[index].isRunning = false; items[index].outcome = event.payload["status"] ?? (event.kind == "tool.failed" ? "error" : "ok") }
+            else { items.append(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"], outcome: event.payload["status"] ?? (event.kind == "tool.failed" ? "error" : "ok"))) }
         case "approval.requested":
             approvalId = event.payload["approval_id"]
+            items.removeAll { $0.kind == .approval && $0.approvalID == approvalId }
             approvalExpiryTask?.cancel()
             let expected = approvalId
-            let wait = max(0, min(900, runExpiry.timeIntervalSinceNow))
+            let wait = max(0, min(300, runExpiry.timeIntervalSinceNow))
             approvalExpiryTask = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(wait))
                 guard let self, !Task.isCancelled, self.state == .awaitingApproval, self.approvalId == expected else { return }
                 self.cancel()
             }
             state = .awaitingApproval; status = "Approval required"
-            items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"]))
+            let options = event.payload["options"].flatMap { $0.data(using: .utf8) }.flatMap { try? JSONDecoder().decode([String].self, from: $0) }
+            items.append(.init(id: event.eventId, kind: .approval, title: event.payload["title"] ?? "Review action", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"], interaction: event.payload["interaction"] ?? "action", options: options))
+        case "approval.resolved":
+            if let index = items.firstIndex(where: { $0.approvalID == event.payload["approval_id"] }) {
+                items[index].outcome = text; items[index].isRunning = false
+            }
         case "run.completed": approvalId = nil; Task { sessions = (try? await AgentClient.shared.fetchSessions()) ?? sessions }; removeProgress(runId: event.runId); state = .completed; status = "Complete"
         case "run.cancelled": state = .cancelled; status = "Cancelled"
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
@@ -304,7 +367,19 @@ final class AgentModel {
         } else { items.append(.init(id: id, kind: kind, title: title, detail: detail)) }
     }
 
-    private func fail(_ detail: String) { state = .failed; status = "Something went wrong"; items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent run failed", detail: detail)); if !surfaceVisible { scheduleShutdown() } }
+    private func resetStream() {
+        streamGeneration = UUID(); streamTask?.cancel(); streamTask = nil
+        answerFlushTask?.cancel(); answerFlushTask = nil; approvalExpiryTask?.cancel()
+        pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll()
+    }
+
+    private func fail(_ detail: String) {
+        flushAnswers(); resetStream()
+        for index in items.indices where items[index].isRunning { items[index].isRunning = false; items[index].outcome = "unknown" }
+        state = .failed; status = "Request stopped"
+        items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent run failed", detail: detail))
+        if !surfaceVisible { scheduleShutdown() }
+    }
 }
 
 struct AgentMemoryItem: Codable, Identifiable {
