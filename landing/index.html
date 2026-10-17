@@ -258,7 +258,7 @@
     /* ===== HERO ===== */
     .hero {
       padding: 180px 24px 120px;
-      position: relative;
+      position: relative; overflow: clip;
     }
     .hero::before {
       content: "";
@@ -735,7 +735,7 @@
       transition: max-height 0.5s cubic-bezier(0.16, 1, 0.3, 1), padding 0.4s;
       padding-top: 0;
     }
-    .faq-item.open .faq-a { max-height: 300px; padding-top: 16px; }
+    .faq-item.open .faq-a { max-height: none; padding-top: 16px; }
 
     /* ===== FINAL CTA ===== */
     .cta-section {
@@ -915,7 +915,7 @@
 
     /* ===== "8 → 1" MERGE BAND ===== */
     .merge {
-      max-width: 1120px; margin: 0 auto; padding: 80px 24px; text-align: center;
+      max-width: 1120px; margin: 0 auto; padding: 80px 24px; text-align: center; overflow: clip;
       content-visibility: auto;
       contain-intrinsic-size: auto none auto 480px;
     }
