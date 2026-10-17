@@ -1,3 +1,4 @@
+import AppKit
 import Darwin
 import Foundation
 import Observation
@@ -167,9 +168,19 @@ final class MonitorModel {
     }
 
     var appRows: [ProcessExtendedSample] {
-        Dictionary(grouping: filteredRows, by: { $0.appName ?? $0.name }).map { name, members in
+        Self.appRows(filteredRows, sortKey: sortKey, ascending: sortAscending,
+            regularAppPIDs: Set(NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular && !$0.isTerminated }
+                .map(\.processIdentifier)))
+    }
+
+    static func appRows(_ rows: [ProcessExtendedSample], sortKey: MonitorEngine.SortKey,
+        ascending sortAscending: Bool, regularAppPIDs: Set<Int32>) -> [ProcessExtendedSample] {
+        Dictionary(grouping: rows, by: { $0.appName ?? $0.name }).map { name, members in
             let top = members.max { sortKey == .memory ? $0.residentBytes < $1.residentBytes : $0.cpuPercent < $1.cpuPercent }!
-            return ProcessExtendedSample(pid: top.pid, name: name + " (\(members.count))",
+            // Group selection must inspect the application, not its busiest helper.
+            let target = members.first { regularAppPIDs.contains($0.pid) } ?? top
+            return ProcessExtendedSample(pid: target.pid, name: name + " (\(members.count))",
                 cpuPercent: members.reduce(0) { $0 + $1.cpuPercent }, residentBytes: members.reduce(0) { $0 + $1.residentBytes },
                 virtualBytes: members.reduce(0) { $0 + $1.virtualBytes }, threadCount: members.reduce(0) { $0 + $1.threadCount },
                 pageFaultRate: members.reduce(0) { $0 + $1.pageFaultRate }, appName: name)

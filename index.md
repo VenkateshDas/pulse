@@ -106,3 +106,11 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Ask Pulse timeline correction:** Native List replaces lazy message layout after live hang capture. Answer text wraps vertically and renders inline Markdown off-main after streaming, retaining paragraph breaks; provider/actions unchanged.
 
 - **Ask Pulse tool calls:** Consecutive calls are grouped behind a native disclosure, collapsed by default. Each result has its own disclosure; answers and action approvals remain visible.
+
+- **Grouped app quit (2026-10-17):** App activity groups inspect the regular application PID instead of the busiest helper, so Brave/Chromium renderer load cannot redirect Send Quit to a refused helper. Aggregate totals and exact PID/start-token quit guards remain unchanged. Regression: `MonitorGroupingTests`.
+
+- **Beta download (2026-10-17):** Landing navigation and hero link directly to the universal v0.3.0-beta.5 DMG; waitlist remains available for updates. Release includes the grouped app quit fix.
+
+- **Landing feature coverage (2026-10-17):** [Approved content plan](docs/superpowers/specs/2026-10-17-landing-current-features-design.md). Landing copy covers released app features, optional AI/provider costs, history and restore limits; removes unshipped plans and unsupported guarantees.
+
+- **Ask Pulse branch sync (2026-10-17):** `feat/pulse-agent-harness` includes main through landing PR #88 and grouped-app quit fix #86. Local review bundle is stamped `0.3.0-beta.5-harness.dev`.

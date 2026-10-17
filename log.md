@@ -175,3 +175,10 @@ Live restart regression verified: the real DeepSeek provider recalled the origin
 ## [2026-10-11] Keep proven chat-only teardown | Removed whole-window navigation teardown after close/reopen became unreliable, and removed allocator pressure relief without controlled evidence of a benefit. Retain renderer/owned-sidecar teardown and bounded conversation state. Later resource sampling overlapped the user’s live native-tool questions; those samples are invalid idle evidence. Strict RSS compliance remains unresolved.
 
 ## [2026-10-11] Release closed native tool connections | Connection timeout closures captured every NWConnection strongly for 660 seconds, even after cancellation and removal from the bridge. Use a weak capture so completed tool sockets can release immediately. Keep the existing timeout and connection limits.
+## [2026-10-17] Fix grouped app quit | Grouped App activity rows select the regular application PID rather than the busiest helper; preserves aggregate metrics and existing graceful-quit identity/protection checks. Added CPU/memory grouping regression coverage.
+
+## [2026-10-17] Publish beta download | Release v0.3.0-beta.5 from main with grouped-app quit fix; expose direct DMG download on landing page and clarify optional waitlist.
+
+## [2026-10-17] Refresh landing feature coverage | Align feature grid, advanced tools, metadata, illustrative demos, FAQ and beta offer with released main. Include Ask Pulse, duplicates, battery history, investigations and CLI; correct privacy, recovery and performance claims. Desktop and 390px mobile review verified wrapping and FAQ expansion; clip decorative overflow and remove fixed FAQ answer-height cap.
+
+## [2026-10-17] Sync Ask Pulse harness with main | Merge latest main into feat/pulse-agent-harness, preserving both wiki histories and including grouped-app quit and landing-page updates. Rebuild the local app for continued harness work.
