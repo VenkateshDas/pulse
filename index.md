@@ -106,3 +106,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Ask Pulse tool calls:** Consecutive calls are grouped behind a native disclosure, collapsed by default. Each result has its own disclosure; answers and action approvals remain visible.
 
 - **Grouped app quit (2026-10-17):** App activity groups inspect the regular application PID instead of the busiest helper, so Brave/Chromium renderer load cannot redirect Send Quit to a refused helper. Aggregate totals and exact PID/start-token quit guards remain unchanged. Regression: `MonitorGroupingTests`.
+
+- **Beta download (2026-10-17):** Landing navigation and hero link directly to the universal v0.3.0-beta.5 DMG; waitlist remains available for updates. Release includes the grouped app quit fix.

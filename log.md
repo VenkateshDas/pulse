@@ -153,3 +153,5 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 ## [2026-10-11] Collapse Ask Pulse tool calls | Group consecutive tools behind collapsed native disclosures, keep individual results expandable and approvals visible. Release bundle and all 364 tests across 85 suites pass. Removed an invalid test assumption that NSCache cannot evict under memory pressure; off-main icon lookup and thumbnail checks remain.
 
 ## [2026-10-17] Fix grouped app quit | Grouped App activity rows select the regular application PID rather than the busiest helper; preserves aggregate metrics and existing graceful-quit identity/protection checks. Added CPU/memory grouping regression coverage.
+
+## [2026-10-17] Publish beta download | Release v0.3.0-beta.5 from main with grouped-app quit fix; expose direct DMG download on landing page and clarify optional waitlist.
