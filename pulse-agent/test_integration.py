@@ -153,3 +153,15 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(any(e.type.value=='permission_required' for e in events))
             self.assertEqual('error',next(e for e in events if e.type.value=='tool_finished').data['status'])
             self.assertEqual('completed',events[-1].data['status'])
+    async def test_transport_diagnostics_keep_status_without_provider_error_body(self):
+        class Rejected(RuntimeError):status_code=401
+        class RejectedProvider(FixtureProvider):
+            def stream(self,**kwargs):raise Rejected('secret provider response body')
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d,provider=RejectedProvider())
+            with patch('openworker_runtime.record') as log:
+                with self.assertRaises(Rejected):_=[chunk async for chunk in engine._astream()]
+            event=next(call for call in log.call_args_list if call.args[0]=='provider.transport_failed')
+            self.assertEqual(401,event.kwargs['status_code'])
+            self.assertEqual('Rejected',event.kwargs['error_type'])
+            self.assertNotIn('secret',str(log.call_args_list))

@@ -319,6 +319,7 @@ class PulseTurnEngine(TurnEngine):
         def produce():
             stream=None
             last_activity=0
+            started=time.monotonic()
             try:
                 stream=self.provider.stream(model=self.model,messages=messages,tools=tools,**self.model_settings)
                 for chunk in stream:
@@ -340,7 +341,12 @@ class PulseTurnEngine(TurnEngine):
                             if not send("activity",None):break
                         continue
                     if not send("chunk",chunk):break
-            except Exception as exc:send("error",exc)
+            except Exception as exc:
+                code=getattr(exc,"status_code",None)
+                record("provider.transport_failed",run_id=self.run_id,provider=self.configuration.provider,
+                       error_type=type(exc).__name__,status_code=code if isinstance(code,int) and 100<=code<=599 else None,
+                       elapsed_ms=int((time.monotonic()-started)*1000))
+                send("error",exc)
             finally:
                 if stream and hasattr(stream,"close"):
                     try:stream.close()

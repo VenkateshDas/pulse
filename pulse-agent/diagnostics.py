@@ -8,7 +8,7 @@ import time
 
 FIELDS = frozenset({"run_id", "session_id", "call_id", "operation", "stage", "status", "error_type",
                     "elapsed_ms", "input_bytes", "output_bytes", "context_estimate", "context_limit",
-                    "message_count", "sequence", "queue_depth", "count", "provider", "attempt", "context_before"})
+                    "message_count", "sequence", "queue_depth", "count", "provider", "attempt", "context_before", "status_code"})
 logger = logging.getLogger("pulse.harness")
 logger.propagate = False
 
