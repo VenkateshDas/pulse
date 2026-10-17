@@ -104,3 +104,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Ask Pulse timeline correction:** Native List replaces lazy message layout after live hang capture. Answer text wraps vertically and renders inline Markdown off-main after streaming, retaining paragraph breaks; provider/actions unchanged.
 
 - **Ask Pulse tool calls:** Consecutive calls are grouped behind a native disclosure, collapsed by default. Each result has its own disclosure; answers and action approvals remain visible.
+
+- **Grouped app quit (2026-10-17):** App activity groups inspect the regular application PID instead of the busiest helper, so Brave/Chromium renderer load cannot redirect Send Quit to a refused helper. Aggregate totals and exact PID/start-token quit guards remain unchanged. Regression: `MonitorGroupingTests`.
