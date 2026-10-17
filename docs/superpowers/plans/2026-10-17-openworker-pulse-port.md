@@ -18,7 +18,7 @@ Date: 2026-10-17. Branch: `feat/openworker-pulse-runtime`. Upstream: MIT OpenWor
 - `make test`: **380 tests in 88 suites pass**. Includes six isolated credential lifecycle cases and native reducer/control regressions. Tests use injected credential closures; no user Keychain modification.
 - `make assistant`: **3 frontend tests pass**, TypeScript and Vite build pass. Generated assets committed; tests cover grouped transcript boundaries/stable identity and incremental patches.
 - Browser fixture, 1280×720: 60 earlier conversation items, collapsed investigation, final Markdown table and composer visible; corrected follow-to-latest after layout growth. Question fixture rejects a 15 KB Unicode answer, accepts a bounded answer and disables resolved controls. Screenshot: `/tmp/pulse-openworker-long-conversation.png`; earlier question screenshot `/tmp/pulse-openworker-question.png`. Fixtures use a fake native bridge, no paid API or real Mac actions. Temporary fixture entry points removed from source after verification.
-- `git diff --check`: pass. Release bundle/CI results are appended below after completion.
+- `git diff --check`: pass. Release evidence follows; required CI is tracked on PR #89.
 
 ## Source manifest
 
@@ -43,3 +43,11 @@ Full OpenWorker package is a pinned runtime dependency, not a stripped fork. Its
 - Deferred UI: session rename/archive/delete/search, todo editing, standalone evidence drawer and safe model-only retry. Current recent-session/history/memory controls, tool details, result reader and dialogue search remain functional. Connectors/teams/schedules/remote/voice are outside selected scope.
 
 Production robustness improved and deterministic contracts pass; release readiness still requires these live/native gates.
+
+## Review delivery
+
+- PR: https://github.com/VenkateshDas/pulse/pull/89 into main. Required macOS CI must pass and user must explicitly approve visual/functional behavior before merge.
+- `make cli-smoke`: passes (closed native grammar/fixture command paths).
+- `PULSE_VERSION=0.3.0-beta.5-openworker.dev make bundle`: passes. Artifact: `pulse/dist/Pulse.app`, signed with stable `Pulse Local Signing`. `codesign --verify --deep --strict` passes; packaged runtime files byte-match source, obsolete execution modules absent. Existing unrelated Swift 6 concurrency/deprecation warnings remain in release output.
+- Local output logs: `/tmp/pulse-openworker-contracts.log`, `/tmp/pulse-openworker-swift-tests.log`, `/tmp/pulse-openworker-ui.log`, `/tmp/pulse-openworker-cli.log`, `/tmp/pulse-openworker-bundle.log`. These development artifacts are ephemeral and are not shipped.
+- App has not been launched with a real user key/model for this new runtime. No auto-merge or release publication.
