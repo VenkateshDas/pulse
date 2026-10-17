@@ -1,5 +1,34 @@
 import Foundation
 
+public struct AgentUsageSnapshot: Codable, Sendable, Equatable {
+    public let context: AgentContextUsage?
+    public let totals: AgentUsageTotals
+    public let historical: Bool
+}
+public struct AgentContextUsage: Codable, Sendable, Equatable {
+    public struct Category: Codable, Sendable, Equatable { public let label: String; public let tokens: Int }
+    public let estimatedTokens: Int
+    public let limit: Int
+    public let outputReserve: Int
+    public let purpose: String
+    public let model: String
+    public let measuredAt: Int
+    public let categories: [Category]
+    public let reportedTokens: Int?
+}
+public struct AgentUsageTotals: Codable, Sendable, Equatable {
+    public let input: Int
+    public let output: Int
+    public let cacheRead: Int
+    public let cacheWrite: Int
+    public let totalTokens: Int
+    public let requests: Int
+    public let missingUsage: Int
+    public let missingCost: Int
+    public let costUSD: String?
+    public let compactionTokens: Int
+}
+
 /// Pulse-owned event contract. Python runtime detail never reaches SwiftUI.
 public struct AgentEnvelope: Codable, Identifiable, Sendable {
     public let version: Int
@@ -51,6 +80,9 @@ public struct AgentSessionItem: Identifiable, Codable, Sendable {
 public struct AgentHistoryMessage: Codable, Sendable {
     public let role: String
     public let content: String
+    public var id: String? = nil
+    public var name: String? = nil
+    public var status: String? = nil
 }
 
 /// Local authenticated SSE client. No UI types belong here.
@@ -74,20 +106,29 @@ public actor AgentClient {
         } catch { return .init(isOnline: false, hasApiKey: false) }
     }
 
-    public func run(message: String, sessionId: String?) -> AsyncThrowingStream<AgentEnvelope, Error> {
-        stream(path: "/runs", body: ["message": message, "session_id": sessionId ?? ""])
+    public func run(message: String, sessionId: String?, runId: String = UUID().uuidString, readOnly: Bool = false) -> AsyncThrowingStream<AgentEnvelope, Error> {
+        return stream(path: "/runs", body: ["message": message, "session_id": sessionId ?? UUID().uuidString, "request_id": runId, "mode": readOnly ? "investigate" : "interactive"], runId: runId)
     }
 
-    public func continueRun(runId: String, approved: Bool) -> AsyncThrowingStream<AgentEnvelope, Error> {
-        stream(path: "/runs/\(runId)/continue", body: ["approved": approved])
+    public func continueRun(runId: String, approved: Bool, approvalId: String, afterSequence: Int = 0) -> AsyncThrowingStream<AgentEnvelope, Error> {
+        stream(path: "/runs/\(runId)/continue", body: ["approved": approved, "approval_id": approvalId], runId: runId, afterSequence: afterSequence)
+    }
+
+    public func answerQuestion(runId: String, approvalId: String, answer: String, afterSequence: Int) -> AsyncThrowingStream<AgentEnvelope, Error> {
+        stream(path: "/runs/\(runId)/continue", body: ["answer": answer, "approval_id": approvalId], runId: runId, afterSequence: afterSequence)
     }
 
     public func cancel(runId: String) async throws {
-        _ = try await URLSession.shared.data(for: request(path: "/runs/\(runId)/cancel", method: "POST"))
+        let (_, response) = try await URLSession.shared.data(for: request(path: "/runs/\(runId)/cancel", method: "POST"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
     }
 
-    public func updateConfiguration(baseURL: String, apiKey: String, model: String) async throws {
-        let body: [String: Any] = ["base_url": baseURL, "api_key": apiKey, "model": model]
+    public func updateConfiguration(baseURL: String, apiKey: String, model: String, configuration: [String: String]? = nil) async throws {
+        let selection = configuration ?? AgentConfiguration.runtimeEnvironment
+        let body: [String: Any] = ["base_url": baseURL, "api_key": apiKey, "model": model,
+                                 "provider": selection["PULSE_PROVIDER"] ?? "openai-chat", "memory_enabled": selection["PULSE_MEMORY_ENABLED"] == "true",
+                                 "context_tokens": Int(selection["PULSE_CONTEXT_TOKENS"] ?? "32768") ?? 32768,
+                                 "output_tokens": Int(selection["PULSE_OUTPUT_TOKENS"] ?? "4096") ?? 4096]
         var request = request(path: "/config", method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -103,32 +144,84 @@ public actor AgentClient {
         }
     }
 
+    public func fetchUsage(sessionId: String) async throws -> AgentUsageSnapshot {
+        let (data, response) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/usage"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder.agent.decode(AgentUsageSnapshot.self, from: data)
+    }
+
     public func fetchHistory(sessionId: String) async throws -> [AgentHistoryMessage] {
         let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history"))
         struct Response: Decodable { let messages: [AgentHistoryMessage] }
         return try JSONDecoder.agent.decode(Response.self, from: data).messages
     }
 
-    private func stream(path: String, body: [String: Any]) -> AsyncThrowingStream<AgentEnvelope, Error> {
-        let token = bearerToken, url = URL(string: path, relativeTo: baseURL)!
+    public struct HistoryPage: Decodable, Sendable {
+        public let messages: [AgentHistoryMessage]
+        public let hasMore: Bool
+        public let interrupted: Bool?
+        enum CodingKeys: String, CodingKey { case messages, interrupted; case hasMore = "has_more" }
+    }
+    public func fetchHistoryPage(sessionId: String, page: Int) async throws -> HistoryPage {
+        let (data, response) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/history?page=\(page)"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder.agent.decode(HistoryPage.self, from: data)
+    }
+
+    public func memoryRequest(path: String = "/memory", method: String = "GET") async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request(path: path, method: method))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return data
+    }
+
+    private func stream(path: String, body: [String: Any], runId: String, afterSequence: Int = 0) -> AsyncThrowingStream<AgentEnvelope, Error> {
+        let token = bearerToken, baseURL = baseURL
         let encodedBody = try? JSONSerialization.data(withJSONObject: body)
         return AsyncThrowingStream { continuation in
             let streamTask = Task {
-                var request = URLRequest(url: url)
-                request.httpMethod = "POST"; request.timeoutInterval = 120
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-                request.httpBody = encodedBody
-                do {
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
-                    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-                    for try await line in bytes.lines where line.hasPrefix("data:") {
-                        let text = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                        guard let data = text.data(using: .utf8) else { continue }
-                        continuation.yield(try JSONDecoder.agent.decode(AgentEnvelope.self, from: data))
+                var sequence = afterSequence
+                var lastError: Error = URLError(.networkConnectionLost)
+                for attempt in 0..<4 {
+                    guard !Task.isCancelled else { break }
+                    let route = attempt == 0 ? path : "/runs/\(runId)/stream?after_sequence=\(sequence)"
+                    var request = URLRequest(url: URL(string: route, relativeTo: baseURL)!)
+                    request.httpMethod = attempt == 0 ? "POST" : "GET"
+                    request.timeoutInterval = 120
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+                    if attempt == 0 { request.httpBody = encodedBody }
+                    do {
+                        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+                        if (response as? HTTPURLResponse)?.statusCode == 404 && attempt > 0 {
+                            // The original POST may still be constructing its run.
+                            try? await Task.sleep(for: .milliseconds(750)); continue
+                        }
+                        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                            // Include HTTP/replay failures in bounded recovery and
+                            // eventual cancellation; never abandon an unseen run.
+                            throw URLError(.badServerResponse)
+                        }
+                        for try await line in bytes.lines where line.hasPrefix("data:") {
+                            let text = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                            guard let data = text.data(using: .utf8) else { continue }
+                            let event = try JSONDecoder.agent.decode(AgentEnvelope.self, from: data)
+                            guard event.sequence > sequence else { continue }
+                            sequence = event.sequence; continuation.yield(event)
+                            if ["run.completed", "run.failed", "run.cancelled", "run.paused"].contains(event.kind) {
+                                continuation.finish(); return
+                            }
+                        }
+                    } catch { lastError = error }
+                    if attempt < 3 { try? await Task.sleep(for: .milliseconds(250 * (attempt + 1))) }
                     }
-                    continuation.finish()
-                } catch { continuation.finish(throwing: error) }
+                if !Task.isCancelled {
+                    // Never leave a request that failed before its first event running unseen.
+                    var stop = URLRequest(url: URL(string: "/runs/\(runId)/cancel", relativeTo: baseURL)!)
+                    stop.httpMethod = "POST"; stop.timeoutInterval = 5
+                    if let token { stop.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+                    _ = try? await URLSession.shared.data(for: stop)
+                }
+                continuation.finish(throwing: lastError)
             }
             continuation.onTermination = { @Sendable _ in streamTask.cancel() }
         }

@@ -27,7 +27,7 @@ public enum DuplicatesCmd {
     public static func run(parser: CLIParser, output: CLIOutput) async {
         guard let path = parser.positional.first else {
             output.printError("Missing directory path to scan. Usage: pulse duplicates <path> [--json]")
-            exit(2)
+            output.finish(2); return
         }
 
         let resolvedURL: URL
@@ -41,7 +41,7 @@ public enum DuplicatesCmd {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             output.printError("Directory does not exist: \(resolvedURL.path)")
-            exit(1)
+            output.finish(1); return
         }
 
         if !output.isJSON {
@@ -76,7 +76,7 @@ public enum DuplicatesCmd {
             }
         } catch {
             output.printError("Failed to scan duplicates: \(error.localizedDescription)")
-            exit(1)
+            output.finish(1); return
         }
     }
 }

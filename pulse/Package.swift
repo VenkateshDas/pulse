@@ -36,11 +36,14 @@ let package = Package(
             .linkedFramework("Security"),
         ]),
         // SwiftUI app: menu bar extra + dashboard window.
-        .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [
-            .process("Resources")
+        .executableTarget(name: "Pulse", dependencies: ["PulseKit", "PulseCommands"], resources: [
+            .process("Resources/AppIcon.icns"),
+            .process("Resources/Logo.png"),
+            .copy("Resources/Assistant")
         ]),
         // Native CLI command center for agents and terminal users.
-        .executableTarget(name: "PulseCLI", dependencies: ["PulseKit"]),
+        .target(name: "PulseCommands", dependencies: ["PulseKit"]),
+        .executableTarget(name: "PulseCLI", dependencies: ["PulseKit", "PulseCommands"]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
         // Unit tests for pure app-layer logic (display-mode gating, sidebar
         // visibility, label formatting) — no UI, so testable directly

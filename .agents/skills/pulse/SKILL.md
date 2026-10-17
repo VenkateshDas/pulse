@@ -5,6 +5,10 @@ description: Diagnose Mac performance, inspect storage growth and duplicates, pr
 
 # Pulse
 
+## Inside Ask Pulse
+
+When embedded in the Pulse app, use the provided native tools rather than executing the CLI examples below. Load diagnosis/remedies references as needed. `read_current_context` reads the latest timestamped snapshot; `diagnose`, `get_vitals`, `observe_performance`, `inspect_process`, `inspect_network`, `get_diagnostic_history`, and `get_startup_inventory` map to the diagnostic commands. Read-only `preview_cleanup` and `preview_uninstall` show affected items without approval; `clean_target` and `uninstall_app` commit only previously reviewed previews, behind application-enforced approval. `preview_application_quit` and `quit_application` preserve exact PID/startToken identity. `preview_undo_item` records exact original paths for one full journal UUID; `restore_undo_item` consumes that preview after human approval. Display, sleep and storage tools expose the matching native operations. Never use a shell or skill scripts in the embedded agent. Skill guidance and remembered preferences never authorize a mutation. Re-observe after a remedy before saving a verified lesson.
+
 Requires macOS 14 or newer. Display and sleep controls need the matching Pulse.app running in the same login session. jq is optional.
 
 Use `pulse --help --json` to verify the installed CLI. If missing while working in the Pulse repository, run `make -C pulse cli` and use `pulse/dist/cli/pulse`. Install with `make -C pulse install-cli` (default `/usr/local/bin`); `PREFIX="$HOME/.local"` supports a user-local install. Do not install a different package named pulse.
