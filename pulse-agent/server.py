@@ -135,7 +135,7 @@ async def translate(stream,r):
             new_segment=True
             if data.get('usage'):
                 usage=data['usage']
-                record('provider.usage',run_id=r.id,provider=r.config.provider,count=int(usage.get('input',0))+int(usage.get('output',0)))
+                record('provider.usage',run_id=r.id,provider=r.config.provider,count=sum(int(usage.get(key,0)) for key in ('input','output','cache_read','cache_write')))
         elif kind==EventType.TOOL_STARTED:
             event_line(r,'tool.started',{'tool_call_id':data.get('tool_call_id'),'title':title_for(data['name'])})
         elif kind==EventType.TOOL_FINISHED:
@@ -163,10 +163,21 @@ async def translate(stream,r):
 
 async def serve(r):
     event_line(r,'run.started',{'provider':r.config.provider,'model':r.config.model})
+    usage_changed=asyncio.Event();loop=asyncio.get_running_loop()
+    r.agent.meter.on_change=lambda:loop.call_soon_threadsafe(usage_changed.set)
+    async def publish_usage():
+        while True:
+            await usage_changed.wait();usage_changed.clear()
+            try:
+                snapshot=await asyncio.to_thread(r.agent.store.usage,r.session_id)
+                event_line(r,'usage.updated',{'usage':snapshot})
+            except Exception as exc:record('usage.failed',run_id=r.id,error_type=type(exc).__name__)
+    usage_task=asyncio.create_task(publish_usage())
     try:
         async with asyncio.timeout(RUN_TTL):
             await translate(r.agent.run(r.message),r)
         await r.agent.checkpoint('cancelled' if r.cancelled else 'completed')
+        event_line(r,'usage.updated',{'usage':await asyncio.to_thread(r.agent.store.usage,r.session_id)})
         event_line(r,'run.cancelled' if r.cancelled else 'run.completed')
     except asyncio.CancelledError:
         r.cancelled=True;r.agent.request_interrupt()
@@ -178,6 +189,9 @@ async def serve(r):
         except Exception as failure:record('storage.failed',run_id=r.id,error_type=type(failure).__name__)
         event_line(r,'run.failed',{'text':'Request stopped. Check provider configuration or available context; earlier conversation remains saved. Inspect completed actions before retrying.'})
     finally:
+        r.agent.meter.on_change=lambda:None
+        usage_task.cancel()
+        await asyncio.gather(usage_task,return_exceptions=True)
         r.agent.request_interrupt()
         if r.agent.pending:
             try:await asyncio.to_thread(r.agent.store.resolve,r.agent.pending['id'],r.id,False)
@@ -324,6 +338,12 @@ async def replay(run_id:str,after_sequence:int=Query(0,ge=0)):
 @app.get('/sessions',dependencies=[Depends(require_token)])
 async def sessions(page:int=Query(1,ge=1,le=10000)):
     return {'sessions':await asyncio.to_thread(storage().sessions,page)}
+
+@app.get('/sessions/{session_id}/usage',dependencies=[Depends(require_token)])
+async def session_usage(session_id:str):
+    try:uuid.UUID(session_id)
+    except ValueError:raise HTTPException(422,'Invalid session ID')
+    return await asyncio.to_thread(storage().usage,session_id)
 
 @app.get('/sessions/{session_id}/history',dependencies=[Depends(require_token)])
 async def session_history(session_id:str,page:int=Query(1,ge=1,le=10000)):

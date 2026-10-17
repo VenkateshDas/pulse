@@ -23,15 +23,12 @@ from coworker.skills import SkillLoader, skill_catalog_text
 from context import build_system_instructions
 from pulse_toolkit import PulseToolkit
 from diagnostics import record
+from usage_accounting import estimate, UsageMeter, MeteredProvider
 
 # A stopped but blocked SDK thread still occupies capacity until it really exits.
 PRODUCERS = threading.BoundedSemaphore(4)
 COMPACTION_TIMEOUT = 65
 INTERACTION_TIMEOUT = 300
-
-def estimate(messages, tools=()):
-    raw = json.dumps([messages, tools], ensure_ascii=False, default=str).encode()
-    return int(sum(1 if byte >= 128 else 1/3 for byte in raw)) + 256
 
 class _CompactionProvider:
     """Keep upstream summary policy; constrain its blocking provider transport."""
@@ -67,6 +64,7 @@ class _CompactionProvider:
 class PulseTurnEngine(TurnEngine):
     def __init__(self, *, configuration, store, session_id, run_id, provider=None, context="", memory=None, read_only=False):
         self.configuration = configuration
+        self.meter = UsageMeter(store, configuration, session_id, run_id)
         self.store = store
         self.session_id = session_id
         self.run_id = run_id
@@ -104,7 +102,7 @@ class PulseTurnEngine(TurnEngine):
         instructions += "\nEarlier dialogue is searchable with search_conversation; full offloaded evidence is available with read_tool_result. Never infer omitted evidence.\n"
         if read_only:
             instructions += "\nRead-only investigation mode: changes and persistent memory writes are unavailable. Investigate and explain without attempting them.\n"
-        super().__init__(provider=provider or configuration.make_provider(), registry=self.registry,
+        super().__init__(provider=MeteredProvider(provider or configuration.make_provider(request_meter=self.meter), self.meter), registry=self.registry,
             permissions=PermissionEngine(workspace_root=Path(store.path).parent), model=configuration.model,
             instructions=instructions, messages=history, max_iterations=12,
             model_settings={"max_tokens": configuration.output_tokens}, tool_result_max_bytes=6000,

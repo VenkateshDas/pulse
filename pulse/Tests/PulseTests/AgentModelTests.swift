@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 import Observation
 import os
 @testable import Pulse
@@ -143,6 +144,58 @@ private actor CancellationFixture {
     }
     var count: Int { requests.count }
     func finish(_ id: String) { requests.removeValue(forKey: id)?.resume() }
+}
+
+@Suite("Conversation usage")
+@MainActor
+struct ConversationUsageTests {
+    private let snapshotJSON = #"{"context":{"estimatedTokens":1200,"limit":32000,"outputReserve":4096,"purpose":"turn","model":"fixture","measuredAt":1700000000,"categories":[{"label":"Tools","tokens":900},{"label":"History","tokens":300}],"reportedTokens":1250},"totals":{"input":4000,"output":200,"cacheRead":3000,"cacheWrite":0,"totalTokens":4200,"requests":2,"missingUsage":0,"missingCost":0,"costUSD":"0.0123","compactionTokens":100},"historical":false}"#
+
+    @Test func usageEventUpdatesRendererWithoutAddingTranscriptRows() {
+        let model = AgentModel()
+        model.sessionId = "session"; model.activeRunId = "run"
+        let changed = OSAllocatedUnfairLock(initialState: false)
+        withObservationTracking { _ = AgentWebView.snapshot(for: model, largerText: false).usage } onChange: { changed.withLock { $0 = true } }
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "usage.updated", payload: ["usage": snapshotJSON]))
+        #expect(changed.withLock { $0 })
+        #expect(model.usage?.context?.estimatedTokens == 1200)
+        #expect(model.usage?.totals.costUSD == "0.0123")
+        #expect(AgentWebView.snapshot(for: model, largerText: false).usage == model.usage)
+        #expect(model.items.isEmpty)
+    }
+
+    @Test func replayedUsageReplacesSnapshotInsteadOfAccumulatingTotals() {
+        let model = AgentModel()
+        let event = AgentEnvelope(eventId: "usage-once", sequence: 1, runId: "run", sessionId: "session", kind: "usage.updated", payload: ["usage": snapshotJSON])
+        model.apply(event); model.apply(event)
+        model.apply(.init(sequence: 2, runId: "run", sessionId: "session", kind: "usage.updated", payload: ["usage": snapshotJSON]))
+        #expect(model.usage?.totals.totalTokens == 4200)
+        #expect(model.usage?.totals.requests == 2)
+    }
+
+    @Test func foreignUsageDoesNotChangeIdentityOrConsumeItsSequence() {
+        let model = AgentModel()
+        model.sessionId = "session"; model.activeRunId = "run"
+        for (run, session) in [("foreign", "session"), ("run", "foreign")] {
+            model.apply(.init(eventId: "shared-event", sequence: 5, runId: run, sessionId: session, kind: "usage.updated", payload: ["usage": snapshotJSON]))
+            #expect(model.usage == nil)
+            #expect(model.sessionId == "session")
+            #expect(model.activeRunId == "run")
+        }
+        model.apply(.init(eventId: "shared-event", sequence: 1, runId: "run", sessionId: "session", kind: "usage.updated", payload: ["usage": snapshotJSON]))
+        #expect(model.usage?.totals.totalTokens == 4200)
+    }
+
+    @Test func malformedUsagePreservesLastKnownSnapshotAndNewConversationClearsIt() {
+        let model = AgentModel()
+        model.apply(.init(sequence: 1, runId: "run", sessionId: "session", kind: "usage.updated", payload: ["usage": snapshotJSON]))
+        let previous = model.usage
+        model.apply(.init(sequence: 2, runId: "run", sessionId: "session", kind: "usage.updated", payload: ["usage": "{invalid"]))
+        #expect(model.usage == previous)
+        model.newConversation()
+        #expect(model.usage == nil)
+        #expect(model.sessionId == nil)
+    }
 }
 
 @Suite("Cancellation responses")

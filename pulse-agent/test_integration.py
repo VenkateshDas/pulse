@@ -165,3 +165,25 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(401,event.kwargs['status_code'])
             self.assertEqual('Rejected',event.kwargs['error_type'])
             self.assertNotIn('secret',str(log.call_args_list))
+
+    async def test_server_publishes_and_reloads_persisted_session_usage(self):
+        from coworker.providers.base import TokenUsage
+        class MeteredFixture(FixtureProvider):
+            def stream(self,**kwargs):
+                yield StreamChunk(turn=AssistantTurn(text='Done',finish_reason='stop',usage=TokenUsage(input=100,output=20,cache_read=50)))
+        with tempfile.TemporaryDirectory() as d:
+            engine=self.engine(d,provider=MeteredFixture())
+            r=server.Run(engine.run_id,engine.session_id,engine,engine.configuration,message='Check')
+            server.runs[r.id]=r;server.session_writers[r.session_id]=r.id
+            try:
+                with patch.object(server,'store',engine.store):
+                    r.task=asyncio.create_task(server.serve(r))
+                    lines=[line async for line in server.observe(r)];await r.task
+                    snapshots=[json.loads(json.loads(line.split('data: ',1)[1])['payload']['usage']) for line in lines if 'usage.updated' in line]
+                    self.assertTrue(snapshots)
+                    self.assertEqual(170,snapshots[-1]['totals']['totalTokens'])
+                    restored=await server.session_usage(engine.session_id)
+                    self.assertEqual(snapshots[-1],restored)
+                    self.assertFalse(restored['historical'])
+            finally:
+                server.runs.pop(r.id,None);server.session_writers.pop(r.session_id,None)

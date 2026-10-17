@@ -24,6 +24,8 @@ final class AgentModel {
     var items: [AgentTimelineItem] = []
     var sessions: [AgentSessionItem] = []
     var sessionId: String?
+    var usage: AgentUsageSnapshot?
+    @ObservationIgnored private var usageRevision = 0
     var state: AgentRunState = .idle
     var status = "Ready"
     var activeRunId: String?
@@ -69,7 +71,7 @@ final class AgentModel {
     func newConversation() {
         guard !isBusy else { return }
         resetStream()
-        sessionId = nil; activeRunId = nil; approvalId = nil; items = []; hasEarlier = false; historyPage = 1; state = .idle; status = "Ready"
+        sessionId = nil; usage = nil; usageRevision += 1; activeRunId = nil; approvalId = nil; items = []; hasEarlier = false; historyPage = 1; state = .idle; status = "Ready"
     }
     private var seenEventIDs = Set<String>()
     private var lastSequence = 0
@@ -115,6 +117,7 @@ final class AgentModel {
         let daemon = await AgentClient.shared.checkStatus()
         hasApiKey = daemon.hasApiKey; state = .idle; status = daemon.summary ?? "Ready"
         sessions = (try? await AgentClient.shared.fetchSessions()) ?? []
+        await refreshUsage()
     }
 
     func send(_ text: String) {
@@ -192,6 +195,12 @@ final class AgentModel {
                 } catch {
                     if state == .cancelled && cancellationGeneration == streamGeneration { status = "Could not confirm a stop. Already started actions may still finish." }
                 }
+                guard cancellationGeneration == streamGeneration else { return }
+                await refreshUsage()
+                // Stop acknowledges the interrupt before an in-flight provider finishes accounting.
+                try? await Task.sleep(for: .seconds(1))
+                guard cancellationGeneration == streamGeneration else { return }
+                await refreshUsage()
             }
         }
     }
@@ -199,13 +208,18 @@ final class AgentModel {
     func loadSession(_ id: String) async {
         guard !isBusy else { return }
         resetStream()
-        sessionId = id; items = []; state = .starting; status = "Loading conversation…"
+        sessionId = id; usage = nil; usageRevision += 1; activeRunId = nil
+        let generation = streamGeneration
+        items = []; state = .starting; status = "Loading conversation…"
         do {
             let page = try await AgentClient.shared.fetchHistoryPage(sessionId: id, page: 1)
+            guard sessionId == id, generation == streamGeneration else { return }
             historyPage = 1; hasEarlier = page.hasMore
             items = page.messages.map(Self.historyItem)
             state = .idle; status = page.interrupted == true ? "Previous run interrupted. Review completed actions before continuing." : "Ready"
+            await refreshUsage()
         } catch {
+            guard sessionId == id, generation == streamGeneration else { return }
             state = .failed; status = "Could not load conversation"
         }
     }
@@ -229,11 +243,20 @@ final class AgentModel {
     }
 
     func apply(_ event: AgentEnvelope) {
+        if event.kind == "usage.updated" {
+            guard sessionId == nil || sessionId == event.sessionId,
+                  activeRunId == nil || activeRunId == event.runId else { return }
+        }
         guard !ignoresCancelledEvents, event.version == 1, seenEventIDs.insert(event.eventId).inserted, event.sequence > lastSequence else { return }
         if items.count > 500 { items.removeFirst(items.count - 500) }
         lastSequence = event.sequence; activeRunId = event.runId; sessionId = event.sessionId
         let text = event.payload["text"] ?? ""
         switch event.kind {
+        case "usage.updated":
+            if let encoded = event.payload["usage"]?.data(using: .utf8),
+               let snapshot = try? JSONDecoder().decode(AgentUsageSnapshot.self, from: encoded) {
+                usageRevision += 1; usage = snapshot
+            }
         case "answer.reset":
             clearPendingAnswer(runId: event.runId)
             items.removeAll { $0.id == "answer-\(event.runId)" }
@@ -273,8 +296,8 @@ final class AgentModel {
             if let index = items.firstIndex(where: { $0.approvalID == event.payload["approval_id"] }) {
                 items[index].outcome = text; items[index].isRunning = false
             }
-        case "run.completed": approvalId = nil; Task { sessions = (try? await AgentClient.shared.fetchSessions()) ?? sessions }; removeProgress(runId: event.runId); state = .completed; status = "Complete"
-        case "run.cancelled": state = .cancelled; status = "Cancelled"
+        case "run.completed": approvalId = nil; Task { sessions = (try? await AgentClient.shared.fetchSessions()) ?? sessions }; removeProgress(runId: event.runId); state = .completed; status = "Complete"; scheduleUsageRefresh()
+        case "run.cancelled": state = .cancelled; status = "Cancelled"; scheduleUsageRefresh()
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
         default: break
         }
@@ -373,11 +396,28 @@ final class AgentModel {
         pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll()
     }
 
+    private func refreshUsage() async {
+        guard let id = sessionId else { return }
+        let generation = streamGeneration, revision = usageRevision
+        guard let snapshot = try? await AgentClient.shared.fetchUsage(sessionId: id),
+              sessionId == id, generation == streamGeneration, revision == usageRevision else { return }
+        usage = snapshot
+    }
+
+    private func scheduleUsageRefresh() {
+        let id = sessionId, generation = streamGeneration
+        Task { [weak self] in
+            guard let self, self.sessionId == id, self.streamGeneration == generation else { return }
+            await self.refreshUsage()
+        }
+    }
+
     private func fail(_ detail: String) {
         flushAnswers(); resetStream()
         for index in items.indices where items[index].isRunning { items[index].isRunning = false; items[index].outcome = "unknown" }
         state = .failed; status = "Request stopped"
         items.append(.init(id: UUID().uuidString, kind: .error, title: "Agent run failed", detail: detail))
+        scheduleUsageRefresh()
         if !surfaceVisible { scheduleShutdown() }
     }
 }

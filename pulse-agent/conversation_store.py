@@ -24,6 +24,10 @@ class ConversationStore:
                 CREATE TABLE IF NOT EXISTS decisions(id TEXT PRIMARY KEY, run TEXT, session TEXT, call TEXT,
                     operation TEXT, arguments TEXT, preview TEXT, status TEXT NOT NULL, created INTEGER);
                 CREATE TABLE IF NOT EXISTS results(id TEXT PRIMARY KEY, session TEXT, payload TEXT, created INTEGER);
+                CREATE TABLE IF NOT EXISTS usage_requests(id TEXT PRIMARY KEY, session TEXT NOT NULL, run TEXT, provider TEXT, model TEXT,
+                    purpose TEXT, context TEXT NOT NULL, reported TEXT, created INTEGER);
+                CREATE INDEX IF NOT EXISTS usage_session ON usage_requests(session,created);
+                CREATE TABLE IF NOT EXISTS usage_sessions(session TEXT PRIMARY KEY, historical INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS migration(id TEXT PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY, content TEXT UNIQUE NOT NULL, payload TEXT NOT NULL);
             """)
@@ -186,3 +190,42 @@ class ConversationStore:
                 payload=row['content']
                 db.execute("INSERT OR IGNORE INTO memories VALUES(?,?,?)",(row['learning_id'],payload['content'],json.dumps(payload)))
             db.execute("INSERT INTO migration VALUES('agno-v1')")
+
+    def usage_initialize(self, session):
+        with self.connection() as db:
+            db.execute("INSERT OR IGNORE INTO usage_sessions SELECT ?,EXISTS(SELECT 1 FROM messages WHERE session=?)",(session,session))
+
+    def usage_begin(self, identifier, session, run, provider, model, purpose, context):
+        with self.connection() as db:
+            db.execute("INSERT OR IGNORE INTO usage_sessions SELECT ?,EXISTS(SELECT 1 FROM messages WHERE session=? AND json_extract(payload,'$.role')='assistant')",(session,session))
+            db.execute("INSERT OR IGNORE INTO usage_requests VALUES(?,?,?,?,?,?,?,NULL,?)",
+                       (identifier,session,run,provider,model,purpose,json.dumps(context),int(time.time())))
+
+    def usage_report(self, identifier, reported):
+        with self.connection() as db:
+            # Raw transport reports win; normalization cannot overwrite cache splits/cost.
+            db.execute("UPDATE usage_requests SET reported=? WHERE id=? AND reported IS NULL",(json.dumps(reported),identifier))
+
+    def usage(self, session):
+        from decimal import Decimal
+        totals=dict(input=0,output=0,cacheRead=0,cacheWrite=0,totalTokens=0,requests=0,missingUsage=0,missingCost=0,costUSD=None,compactionTokens=0)
+        amount=Decimal(0);costs=0;context=None
+        with self.connection() as db:
+            historical=db.execute("SELECT historical FROM usage_sessions WHERE session=?",(session,)).fetchone()
+            if historical is None:
+                historical=[db.execute("SELECT EXISTS(SELECT 1 FROM messages WHERE session=?)",(session,)).fetchone()[0]]
+            # Stream rows; long sessions do not load the whole ledger into memory.
+            for row in db.execute("SELECT context,reported,purpose FROM usage_requests WHERE session=? ORDER BY created,rowid",(session,)):
+                totals['requests']+=1;context=json.loads(row['context'])
+                if row['reported'] is None:
+                    totals['missingUsage']+=1;totals['missingCost']+=1;continue
+                usage=json.loads(row['reported'])
+                for key in ('input','output','cacheRead','cacheWrite'):totals[key]+=usage[key]
+                used=sum(usage[key] for key in ('input','output','cacheRead','cacheWrite'))
+                if row['purpose']=='compaction':totals['compactionTokens']+=used
+                if usage['costUSD'] is None:totals['missingCost']+=1
+                else:amount+=Decimal(usage['costUSD']);costs+=1
+                context['reportedTokens']=usage['input']+usage['cacheRead']+usage['cacheWrite']
+        totals['totalTokens']=sum(totals[key] for key in ('input','output','cacheRead','cacheWrite'))
+        if costs:totals['costUSD']=format(amount,'f')
+        return dict(context=context,totals=totals,historical=bool(historical[0]))

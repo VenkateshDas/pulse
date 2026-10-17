@@ -33,3 +33,7 @@ Application Support/Pulse/agent contains `harness.jsonl` (2 MB × four files) an
 ## Development
 
 From `pulse/`: `make agent-test`, `make assistant`, `make build`, `make test`, `make bundle`. Deterministic providers exercise the real pinned engine without paid model calls or operations on user files. See `docs/superpowers/plans/2026-10-17-openworker-pulse-port.md` for verified evidence and release gates.
+
+## Context and session billing
+
+The composer exposes latest-request context estimates and cumulative session usage separately. `usage_accounting.py` captures normalized token/cache counts plus raw OpenRouter charges through run-owned SDK methods; it does not fork the upstream provider. SQLite request IDs prevent replay/double counting. Compaction calls and transport retries are included; absent reports stay unknown. Costs sum Decimal strings and are accepted as USD only from OpenRouter's documented usage field. Other transports expose token counts and unavailable monetary cost. No historical bill is invented. Session selection/reopen reloads saved aggregates over authenticated `/sessions/{id}/usage`; active events update at request/report boundaries, not per token. No pricing lookup, extra inference or background polling.

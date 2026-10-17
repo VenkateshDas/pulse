@@ -1287,6 +1287,9 @@ pulse/
 
 <!-- §12 BUILD LOG -->
 <h2 id="buildlog"><span class="n">12 ·</span> Build Log &amp; Decisions</h2>
+<h3>Ask Pulse context and billing visibility — October 17, 2026</h3>
+<p>Composer context meter opens an estimated input breakdown beside the approval-mode control. Keep latest request occupancy separate from cumulative session tokens. Output reserve is separate; provider-reported input is labeled separately from estimates. Durable request accounting includes compaction, cache reads/writes and reported output without double counting reasoning or replayed events.</p>
+<p>OpenRouter-reported charges survive SDK parsing and are stored as decimal USD amounts; other unsupported costs remain unavailable. Missing final reports, cancelled attempts and pre-tracking history must remain visibly incomplete, never zero. No extra model call or background polling is used for metering. Native session reload restores saved usage; estimates are diagnostic rather than exact model tokenizer categories.</p>
 <h3>Ask Pulse OpenWorker port — October 17, 2026</h3>
 <p>Pinned OpenWorker TurnEngine replaces Agno execution; Agno remains only for backed-up, idempotent legacy import. Swift host, closed native tool RPC, explicit per-call approvals and UndoJournal remain authoritative. Canonical SQLite history, structured compaction checkpoints, paged offloaded evidence and conversation search support long sessions. Summary failure must disclose trimming; a summary never grants action authority.</p>
 <p>Save commits endpoint-bound credentials to Keychain immediately and caches successful writes. Routine Security operations prohibit authentication UI, coalesce off-main reads and reject stale endpoint configurations. Locked Keychain or changed signing identity produces an error rather than repeated password prompts. Keep stable local signing for permission testing.</p>

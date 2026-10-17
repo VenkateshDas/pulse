@@ -1,5 +1,34 @@
 import Foundation
 
+public struct AgentUsageSnapshot: Codable, Sendable, Equatable {
+    public let context: AgentContextUsage?
+    public let totals: AgentUsageTotals
+    public let historical: Bool
+}
+public struct AgentContextUsage: Codable, Sendable, Equatable {
+    public struct Category: Codable, Sendable, Equatable { public let label: String; public let tokens: Int }
+    public let estimatedTokens: Int
+    public let limit: Int
+    public let outputReserve: Int
+    public let purpose: String
+    public let model: String
+    public let measuredAt: Int
+    public let categories: [Category]
+    public let reportedTokens: Int?
+}
+public struct AgentUsageTotals: Codable, Sendable, Equatable {
+    public let input: Int
+    public let output: Int
+    public let cacheRead: Int
+    public let cacheWrite: Int
+    public let totalTokens: Int
+    public let requests: Int
+    public let missingUsage: Int
+    public let missingCost: Int
+    public let costUSD: String?
+    public let compactionTokens: Int
+}
+
 /// Pulse-owned event contract. Python runtime detail never reaches SwiftUI.
 public struct AgentEnvelope: Codable, Identifiable, Sendable {
     public let version: Int
@@ -113,6 +142,12 @@ public actor AgentClient {
         return try JSONDecoder.agent.decode(Response.self, from: data).sessions.map {
             .init(sessionId: $0.session_id, name: $0.name, createdAt: $0.created_at, updatedAt: $0.updated_at)
         }
+    }
+
+    public func fetchUsage(sessionId: String) async throws -> AgentUsageSnapshot {
+        let (data, response) = try await URLSession.shared.data(for: request(path: "/sessions/\(sessionId)/usage"))
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        return try JSONDecoder.agent.decode(AgentUsageSnapshot.self, from: data)
     }
 
     public func fetchHistory(sessionId: String) async throws -> [AgentHistoryMessage] {

@@ -46,6 +46,7 @@ struct AgentWebView: NSViewRepresentable {
         let memories: [AgentMemoryItem]; let memoryEnabled: Bool; let memoryStatus: String; let largerText: Bool; let hasEarlier: Bool
         let draft: String
         let readOnly: Bool
+        let usage: AgentUsageSnapshot?
     }
 
     static func snapshot(for model: AgentModel, largerText: Bool) -> Snapshot {
@@ -58,7 +59,8 @@ struct AgentWebView: NSViewRepresentable {
             status: model.status, busy: model.isBusy, ready: model.hasApiKey, state: String(describing: model.state),
             model: AgentConfiguration.model, provider: AgentConfiguration.provider,
             memories: model.memories, memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
-            largerText: largerText, hasEarlier: model.hasEarlier, draft: model.draft, readOnly: model.investigationOnly)
+            largerText: largerText, hasEarlier: model.hasEarlier, draft: model.draft, readOnly: model.investigationOnly,
+            usage: model.usage)
     }
 
     @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {

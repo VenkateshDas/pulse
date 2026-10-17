@@ -35,7 +35,7 @@ class ProviderConfiguration(BaseModel):
     def ready(self):
         return bool(self.api_key) or (self.provider in {"openai-chat", "ollama"} and urlsplit(self.base_url).hostname in {"localhost", "127.0.0.1", "::1"})
 
-    def make_provider(self):
+    def make_provider(self, request_meter=None):
         """Use pinned OpenWorker transports with explicit run-local SDK clients."""
         if self.provider in {"openai-chat", "openai-responses", "ollama"}:
             from openai import OpenAI
@@ -45,6 +45,9 @@ class ProviderConfiguration(BaseModel):
             if self.provider == "ollama" and not endpoint.endswith("/v1"):
                 endpoint += "/v1"
             client = OpenAI(api_key=self.api_key or "local", base_url=endpoint, timeout=60, max_retries=0)
+            if request_meter:
+                client.chat.completions.create = request_meter.raw_create(client.chat.completions.create)
+                client.responses.create = request_meter.raw_create(client.responses.create)
             kind = OpenAIResponsesProvider if self.provider == "openai-responses" else OpenAIProvider
             return kind(client=client, default_model=self.model)
         if self.provider == "anthropic":
