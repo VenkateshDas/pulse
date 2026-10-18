@@ -114,18 +114,21 @@ final class AgentModel {
         let model = selection["PULSE_MODEL_ID"] ?? ""
         state = .starting; status = "Loading provider settings…"
         let key = await AgentConfiguration.loadAPIKey(endpoint: endpoint)
-        state = .idle
         guard selection == AgentConfiguration.runtimeEnvironment else {
-            hasApiKey = false; status = "Provider settings changed. Reconnect to use them."; return
+            hasApiKey = false; state = .idle; status = "Provider settings changed. Reconnect to use them."; return
         }
         hasApiKey = AgentConfiguration.isReady(baseURL: endpoint, apiKey: key, provider: provider)
-        guard hasApiKey else { status = "Set up an AI provider to ask Pulse"; return }
+        guard hasApiKey else { state = .idle; status = "Set up an AI provider to ask Pulse"; return }
         guard AgentConfiguration.providerURL(endpoint) != nil else {
             state = .failed; status = "Review the provider URL in Settings before asking Pulse"
             return
         }
-        if appliedSelection == selection, appliedKey == key, (await AgentClient.shared.checkStatus()).isOnline {
-            state = .idle; status = "Ready"; return
+        if appliedSelection == selection, appliedKey == key {
+            let daemon = await AgentClient.shared.checkStatus()
+            guard selection == AgentConfiguration.runtimeEnvironment else {
+                hasApiKey = false; state = .idle; status = "Provider settings changed. Reconnect to use them."; return
+            }
+            if daemon.isOnline { state = .idle; status = "Ready"; return }
         }
         state = .starting; status = "Starting local agent…"
         defer { if !isBusy && !surfaceVisible { scheduleShutdown() } }
@@ -145,6 +148,9 @@ final class AgentModel {
         catch { hasApiKey = false; state = .failed; status = "Provider settings could not be applied. Reconnect before sending a question."; return }
         appliedSelection = selection; appliedKey = key
         let daemon = await AgentClient.shared.checkStatus()
+        guard selection == AgentConfiguration.runtimeEnvironment else {
+            hasApiKey = false; state = .idle; status = "Provider settings changed. Reconnect to use them."; return
+        }
         hasApiKey = daemon.hasApiKey; state = .idle; status = daemon.summary ?? "Ready"
         sessions = (try? await AgentClient.shared.fetchSessions()) ?? []
         await refreshUsage()

@@ -19,7 +19,7 @@ test('grouping preserves stable identities and never mutates source',()=>{
 });
 const bridgeSource=await readFile(new URL('./bridge.ts',import.meta.url),'utf8');
 const bridgeJS=ts.transpileModule(bridgeSource,{compilerOptions:{target:ts.ScriptTarget.ES2023,module:ts.ModuleKind.ESNext}}).outputText;
-const {applyPatch,initial}=await import('data:text/javascript;base64,'+Buffer.from(bridgeJS).toString('base64'));
+const {applyPatch,initial,shouldSyncDraft}=await import('data:text/javascript;base64,'+Buffer.from(bridgeJS).toString('base64'));
 test('stream patch retains old row references, updates one answer, removes expired rows',()=>{
   const old=item('old','answer'),live=item('live','answer');
   const state={...initial,items:[old,live]};
@@ -27,4 +27,12 @@ test('stream patch retains old row references, updates one answer, removes expir
   assert.equal(result.items[0],old);assert.equal(result.items[1].detail,'new token');
   const removed=applyPatch(result,{items:[],order:['live']});
   assert.equal(removed.items.length,1);assert.equal(removed.items[0].id,'live');
+});
+
+test('delayed typing echoes cannot replace newer local draft; intentional native edits sync',()=>{
+  const echo={...initial,sessionId:'chat',draft:'a',draftRevision:0};
+  assert.equal(shouldSyncDraft(true,'chat',0,echo),false);
+  assert.equal(shouldSyncDraft(true,'chat',0,{...echo,draft:'attached text',draftRevision:1}),true);
+  assert.equal(shouldSyncDraft(true,'other',0,echo),true);
+  assert.equal(shouldSyncDraft(false,undefined,0,initial),true);
 });

@@ -26,6 +26,7 @@ final class AutomationModel {
     private(set) var runs: [AutomationRunRecord] = []
     private(set) var status = ""
     var activeIDs: Set<String> { Set(tasks.keys) }
+    var inboxRuns: [AutomationRunRecord] { Array(runs.filter { ["needs_review", "failed", "interrupted"].contains($0.status) }.prefix(100)) }
 
     private var tasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var runner: (@MainActor (PulseAutomation, String, String) async -> AutomationOutcome)?
@@ -141,6 +142,14 @@ final class AutomationModel {
         scheduleDeadline(now: now)
     }
 
+    func acknowledgeRun(_ id: String) throws {
+        guard let index = runs.firstIndex(where: { $0.id == id && ["needs_review", "failed", "interrupted"].contains($0.status) }) else { return }
+        var history = runs; history[index].status = "reviewed"
+        try persist(automations, history)
+        runs = history; status = "Marked reviewed. The saved conversation is still available."
+        reconcile()
+    }
+
     private func claim(_ automation: PulseAutomation, now: Date, scheduled: Bool) {
         guard let runner, tasks[automation.id] == nil,
               let index = automations.firstIndex(where: { $0.id == automation.id }) else { return }
@@ -151,7 +160,10 @@ final class AutomationModel {
         updated[index].runCount += 1; updated[index].lastRun = now; updated[index].lastStatus = "running"
         if scheduled || (updated[index].nextRun.map { $0 <= now } ?? false) { updated[index].nextRun = automation.schedule.next(after: now) }
         var history = runs; history.insert(record, at: 0)
-        if history.count > 200, let expired = history.lastIndex(where: { $0.status != "running" }) {
+        if history.count > 200 {
+            guard let expired = history.lastIndex(where: { ["completed", "cancelled", "reviewed"].contains($0.status) }) else {
+                status = "Review or mark an Inbox item reviewed before starting more automations."; return
+            }
             history.remove(at: expired)
         }
         do { try persist(updated, history) }

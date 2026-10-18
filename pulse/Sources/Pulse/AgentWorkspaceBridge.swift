@@ -26,6 +26,9 @@ extension AgentWebView.Coordinator {
             do { try AutomationModel.shared.toggle(id) } catch { model.workspaceStatus = error.localizedDescription }
         case "automationRun": if let id = body["id"] as? String { AutomationModel.shared.runNow(id) }
         case "automationCancel": if let id = body["id"] as? String { AutomationModel.shared.cancel(id) }
+        case "automationAcknowledge":
+            guard let id = body["id"] as? String else { return }
+            do { try AutomationModel.shared.acknowledgeRun(id) } catch { model.workspaceStatus = error.localizedDescription }
         case "automationReview":
             guard !model.isBusy, let id = body["id"] as? String, let run = AutomationModel.shared.runs.first(where: { $0.id == id && $0.status == "needs_review" }) else { return }
             Task {

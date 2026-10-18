@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Activity, ArrowUp, ArrowDown, Plus, SlidersHorizontal, Brain, X, Copy, Check, ChevronRight, CircleStop, RotateCcw, ShieldCheck, Cpu, HardDrive, Layers, PanelRight, Paperclip, Mic, Download, ListChecks } from 'lucide-react';
-import { command, initial, applyPatch, type Snapshot, type Item } from './bridge';
+import { command, initial, applyPatch, shouldSyncDraft, type Snapshot, type Item } from './bridge';
 import { groupTimeline } from './timeline';
 import './style.css';
 import {FeaturePage} from './Features';
@@ -106,7 +106,7 @@ function App() {
   const send=()=>{if(!draft.trim()||state.busy||!state.ready||new TextEncoder().encode(draft).length>12000)return;command('send',{text:draft});setDraft('');following.current=true;setAtBottom(true)};
 
   const [drawer,setDrawer]=useState(false);
-  const nativeDraft=useRef('');
+  const nativeDraft=useRef(0);
   useEffect(()=>{
     for(const [key,value] of Object.entries(state.theme||{})) {
       if(/^#[0-9a-fA-F]{6}$/.test(value))document.documentElement.style.setProperty('--'+key,value);
@@ -114,7 +114,7 @@ function App() {
   },[state.theme]);
   useEffect(()=>{
     window.pulseReceive=next=>{
-      if(!received.current||session.current!==next.sessionId||nativeDraft.current!==next.draft){setDraft(next.draft||'');nativeDraft.current=next.draft||'';following.current=true;setAtBottom(true)}
+      if(shouldSyncDraft(received.current,session.current,nativeDraft.current,next)){setDraft(next.draft||'');nativeDraft.current=next.draftRevision;following.current=true;setAtBottom(true)}
       received.current=true;session.current=next.sessionId;setState(next);
     };
     let latest=initial;window.pulsePatch=patch=>{latest=applyPatch(latest,patch);window.pulseReceive?.(latest)};

@@ -45,6 +45,7 @@ struct AgentWebView: NSViewRepresentable {
         let status: String; let busy: Bool; let ready: Bool; let state: String; let model: String; let provider: String
         let memories: [AgentMemoryItem]; let memoryEnabled: Bool; let memoryStatus: String; let largerText: Bool; let hasEarlier: Bool
         let draft: String
+        let draftRevision: Int
         let readOnly: Bool
         let usage: AgentUsageSnapshot?
         let page: String; let instructions: String; let workspaceStatus: String
@@ -65,10 +66,10 @@ struct AgentWebView: NSViewRepresentable {
             status: model.status, busy: model.isBusy || model.workspaceBusy, ready: model.hasApiKey, state: String(describing: model.state),
             model: AgentConfiguration.model, provider: AgentConfiguration.provider,
             memories: model.page == "memory" ? model.memories : [], memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
-            largerText: largerText, hasEarlier: model.hasEarlier, draft: model.draft, readOnly: model.investigationOnly,
+            largerText: largerText, hasEarlier: model.hasEarlier, draft: model.draft, draftRevision: model.draftRevision, readOnly: model.investigationOnly,
             usage: model.usage, page: model.page, instructions: model.instructions, workspaceStatus: model.workspaceStatus,
             searchQuery: model.searchQuery, searchArchived: model.searchArchived, searchResults: model.page == "search" ? model.searchResults : [],
-            automations: model.page == "automations" ? AutomationModel.shared.automations : [], automationRuns: ["automations", "inbox"].contains(model.page) ? Array(AutomationModel.shared.runs.prefix(100)) : [],
+            automations: model.page == "automations" ? AutomationModel.shared.automations : [], automationRuns: ["automations", "inbox"].contains(model.page) ? (model.page == "inbox" ? AutomationModel.shared.inboxRuns : Array(AutomationModel.shared.runs.prefix(100))) : [],
             automationStatus: AutomationModel.shared.status, tasks: model.investigationTasks, specialist: model.specialist,
             theme: Halo.webTokens, voiceRecording: VoiceInput.shared.isRecording, voiceStatus: VoiceInput.shared.status, memoryUndoID: model.memoryUndoID)
     }
