@@ -143,3 +143,11 @@ Do not ship the original live Home capture as a product asset; it includes local
 ### Native keyboard hardening
 
 The initial review build passed deterministic checks but native evidence-close/Tab testing produced two WebKit layer-update SIGSEGV reports. An attempted focus guard traversed WebKit's accessibility tree after Tab; this was removed rather than retained behind timing workarounds. SwiftUI FocusedValues now handles native Home focus, while native NSView responder ancestry prevents a stale focused value from treating WebKit's own Tab movement as a request to close chat. The exact framework-internal crash mechanism is not proven by its stack trace. The original native sequence must be replayed against a static bundle after this change; unit tests alone do not establish the fix. Always stop Pulse before replacing its executable during packaging.
+
+
+### Final native replay and review handoff
+
+- After removing accessibility traversal and guarding WebKit responder focus, the original evidence → Escape → Tab sequence plus minimize/reopen passed **five consecutive native cycles** in a static stable-signed bundle. No later Pulse crash report appeared during those cycles. The two earlier reports remain local evidence; this does not establish general WebKit crash immunity.
+- Verified Provider settings → **Back to Home chat** returns to the compact surface with the entire unsent draft intact. No provider credentials were edited and the test question was not submitted.
+- Required CI passed for the initial feature commit. PR **#91** (`https://github.com/VenkateshDas/pulse/pull/91`) contains the feature and focus correction, explicitly depending on #90; checks for the final documentation/source head are tracked on that PR. No merge is authorized.
+- Full VoiceOver/theme/text matrix, real provider actions and formal repeated baseline performance/usability checks remain user/release gates. The signed review app is `pulse/dist/Pulse.app`.
