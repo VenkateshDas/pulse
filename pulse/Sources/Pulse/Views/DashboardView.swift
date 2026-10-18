@@ -79,7 +79,11 @@ struct DashboardView: View {
     private var condition: some View {
         let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
         return VStack(alignment: .leading, spacing: 14) {
-            Label(state.title, systemImage: state.symbol)
+            Label {
+                Text(state.title).fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: state.symbol)
+            }
                 .font(Halo.font(size: 22, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
                 .accessibilityAddTraits(.isHeader)
