@@ -7,8 +7,8 @@ public enum SleepCmd {
             let action = parser.positional.first ?? "status"
             // Read assertions even when no GUI owns a keep-awake assertion.
             let reply: AppControl.Reply?
-            if action == "status" { reply = try? await AppControl.send(.init(action: "sleep.status")) }
-            else { reply = try await AppControl.send(.init(action: "sleep.\(action)", value: parser.doubleOption("until"))) }
+            if action == "status" { reply = try? await NativeCommandControl.send(.init(action: "sleep.status")) }
+            else { reply = try await NativeCommandControl.send(.init(action: "sleep.\(action)", value: parser.doubleOption("until"))) }
             if let error = reply?.error { throw CLIUsageError(error) }
             struct Assertion: Encodable { let pid: Int32; let processName: String; let assertionName: String }
             struct Status: Encodable { let isKeepAwakeActive: Bool?; let expiresAt: Date?; let activeAssertions: [Assertion]; let unavailable: [String] }
@@ -21,6 +21,6 @@ public enum SleepCmd {
                 if let expiry = status.expiresAt { output.printRow(label: "Expires", value: expiry.description) }
                 for item in status.activeAssertions { output.printRow(label: "\(item.processName) [\(item.pid)]", value: item.assertionName) }
             }
-        } catch { output.printError(error.localizedDescription); exit(1) }
+        } catch { output.printError(error.localizedDescription); output.finish(1); return }
     }
 }

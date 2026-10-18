@@ -6,6 +6,7 @@ import UserNotifications
 @main
 struct PulseApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var agentModel = AgentModel()
     @State private var model = DashboardModel()
     @State private var storageModel = StorageModel()
     @State private var cleanModel = CleanModel()
@@ -26,6 +27,7 @@ struct PulseApp: App {
         Window("Pulse", id: "dashboard") {
             RootView()
                 .environment(model)
+                .environment(agentModel)
                 .environment(storageModel)
                 .environment(cleanModel)
                 .environment(uninstallModel)
@@ -55,6 +57,16 @@ struct PulseApp: App {
         }
         .defaultSize(width: 1120, height: 760)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(replacing: .appTermination) {
+                Button("Close Pulse Window") {
+                    NSApp.windows.first { $0.identifier?.rawValue == "dashboard" }?.performClose(nil)
+                }
+                .keyboardShortcut("q", modifiers: .command)
+                Button("Quit Pulse") { AppActivation.shared.quit() }
+                    .keyboardShortcut("q", modifiers: [.command, .option])
+            }
+        }
 
         MenuBarExtra {
             MenuBarContent()
@@ -69,7 +81,7 @@ struct PulseApp: App {
                 // the current preset immediately.
                 .id("\(ThemeManager.shared.selected.rawValue)-\(ThemeManager.shared.largerText)")
         } label: {
-            menuBarLabel
+            menuBarLabel.task { await agentModel.bootstrap(dashboard: model) }
         }
         .menuBarExtraStyle(.window)
     }

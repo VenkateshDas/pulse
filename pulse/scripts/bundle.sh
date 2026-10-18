@@ -27,8 +27,7 @@ ARCH_FLAGS=""
 for a in ${PULSE_ARCHS:-}; do ARCH_FLAGS="$ARCH_FLAGS --arch $a"; done
 # shellcheck disable=SC2086
 swift build -c release $ARCH_FLAGS
-# The Agent sidecar invokes Pulse's CLI from the app bundle. Build it alongside
-# the GUI rather than relying on a developer-installed `pulse` command.
+# Bundle the CLI for external integrations; the embedded agent uses native RPC.
 # shellcheck disable=SC2086
 swift build -c release --product pulse-cli $ARCH_FLAGS
 
@@ -69,7 +68,7 @@ fi
 
 # Agent files are deliberately whitelisted. Never bundle a local .env or venv.
 mkdir -p "$APP/Contents/Resources/pulse-agent" "$APP/Contents/Resources/skills/pulse"
-for f in agent.py context.py pulse_toolkit.py server.py start.sh; do
+for f in context.py pulse_toolkit.py server.py providers.py storage.py memory.py openworker_runtime.py conversation_store.py diagnostics.py usage_accounting.py title_agent.py assistant_utilities.py OPENWORKER-LICENSE pyproject.toml uv.lock start.sh; do
     cp "../pulse-agent/$f" "$APP/Contents/Resources/pulse-agent/$f"
 done
 chmod +x "$APP/Contents/Resources/pulse-agent/start.sh"
@@ -104,6 +103,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <!-- Uninstaller: ask Finder to move protected (App Store / App-Management)
          bundles to the Trash via Apple Events. -->
     <key>NSAppleEventsUsageDescription</key><string>Pulse asks Finder to move an app you’re uninstalling to the Trash.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>Pulse transcribes your voice on this Mac when you choose Dictate.</string>
+    <key>NSMicrophoneUsageDescription</key><string>Pulse uses your microphone only when you choose Dictate.</string>
     <key>NSBluetoothAlwaysUsageDescription</key><string>Pulse reads battery levels from connected Bluetooth peripherals.</string>
     <!-- Network page: CoreWLAN only returns Wi-Fi SSID/BSSID when the app
          holds Location authorization. Requested on first Network page visit. -->

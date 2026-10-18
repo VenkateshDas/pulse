@@ -70,7 +70,7 @@ public enum UninstallCmd {
                 print("Only high-confidence leftovers selected. Trash retains disk usage until emptied.")
                 for id in report.undoIDs { print("Undo: pulse undo restore \(id)") }
             }
-            if !report.failures.isEmpty { exit(1) }
-        } catch { output.printError(error.localizedDescription); exit(1) }
+            if !report.failures.isEmpty { output.finish(1); return }
+        } catch { output.printError(error.localizedDescription); output.finish(1); return }
     }
 }

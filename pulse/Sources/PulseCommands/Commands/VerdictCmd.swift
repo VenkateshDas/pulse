@@ -41,7 +41,7 @@ public enum VerdictCmd {
     public static func run(parser: CLIParser, output: CLIOutput) async {
         guard let path = parser.positional.first else {
             output.printError("Missing directory path. Usage: pulse verdict <path> [--json]")
-            exit(2)
+            output.finish(2); return
         }
 
         let resolvedURL: URL
@@ -55,7 +55,7 @@ public enum VerdictCmd {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: resolvedURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
             output.printError("Directory does not exist: \(resolvedURL.path)")
-            exit(1)
+            output.finish(1); return
         }
 
         let engine = FolderVerdictEngine()

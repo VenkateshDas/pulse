@@ -56,18 +56,18 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
     /// Preset identifiers remain stable so saved appearance choices survive.
     var palette: Palette {
         let base = Palette(
-            void: .hex(0xF5F7F8, 0x171D21),
-            surface1: .hex(0xFFFFFF, 0x222B30),
-            surface2: .hex(0xE8EDF0, 0x303C43),
-            border: .hex(0x84949C, 0x71828B),
-            borderSubtle: .hex(0xCCD5DA, 0x52616A),
-            textPrimary: .hex(0x172126, 0xF2F6F7),
-            textSecondary: .hex(0x4F6068, 0xB5C2C9),
-            textDim: .hex(0x4F6068, 0xB5C2C9),
+            void: .hex(0xFFFFFF, 0x191B1F),
+            surface1: .hex(0xFAFAFA, 0x16171B),
+            surface2: .hex(0xF0F1F4, 0x212329),
+            border: .hex(0xB4BAC3, 0x69717D),
+            borderSubtle: .hex(0xE8EAED, 0x303339),
+            textPrimary: .hex(0x17191C, 0xE5E7EB),
+            textSecondary: .hex(0x4D535C, 0xB2B7C0),
+            textDim: .hex(0x4D535C, 0xB2B7C0),
             nominal: .hex(0x176B56, 0x70D6B3),
             warning: .hex(0x875100, 0xF4C16A),
             critical: .hex(0xB62F39, 0xFF9DA4),
-            interactive: .hex(0x176B56, 0x70D6B3)
+            interactive: .hex(0x2563EB, 0x4C8DFF)
         )
         switch self {
         case .precision:

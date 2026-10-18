@@ -11,10 +11,12 @@ struct RootView: View {
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
     @Environment(TimelineModel.self) private var timeline
-    @State private var selection: SidebarItem = .dashboard
+    @Environment(AgentModel.self) private var agentModel
+    @State private var selection: SidebarItem = .agent
     /// Mirrors NSWindow occlusion so a hidden/locked-screen window stops
     /// driving SwiftUI updates (measured ~12% CPU when occluded otherwise).
     @State private var windowVisible = true
+    @State private var screenLocked = false
     @State private var showPalette = false
     @State private var columns: NavigationSplitViewVisibility = .all
     @State private var showOnboarding = PermissionsGate.shouldPromptOnLaunch()
@@ -32,13 +34,13 @@ struct RootView: View {
         let _ = ThemeManager.shared.selected
         let _ = ThemeManager.shared.largerText
         NavigationSplitView(columnVisibility: $columns) {
-            SidebarView(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 190, ideal: 218, max: 260)
+            SidebarView(selection: $selection, agent: agentModel)
+                .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 300)
         } detail: {
             GeometryReader { geometry in
             Group {
                 switch selection {
-                case .agent: AgentView()
+                case .agent: AgentView(model: agentModel, visible: windowVisible && !screenLocked)
                 case .storage: DiskView()
                 case .timeline: TimelineView()
                 case .optimize: OptimizeView()
@@ -119,6 +121,8 @@ struct RootView: View {
             if let pid = note.object as? Int32 { monitorModel.select(pid) }
             selection = .monitor
         }
+        .onReceive(DistributedNotificationCenter.default().publisher(for: .init("com.apple.screenIsLocked"))) { _ in screenLocked = true }
+        .onReceive(DistributedNotificationCenter.default().publisher(for: .init("com.apple.screenIsUnlocked"))) { _ in screenLocked = false }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: NSWindow.didChangeOcclusionStateNotification)
