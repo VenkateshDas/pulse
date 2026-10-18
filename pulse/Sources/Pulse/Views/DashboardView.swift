@@ -17,6 +17,7 @@ struct DashboardView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
+                everydaySummary
                 if geometry.size.width >= 872 {
                     HStack(alignment: .top, spacing: 24) {
                         VStack(alignment: .leading, spacing: 24) {
@@ -35,7 +36,6 @@ struct DashboardView: View {
                 }
                 if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
                 tasks
-                everydaySummary
                 recentRemovals
 
             }

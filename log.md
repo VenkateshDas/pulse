@@ -209,3 +209,5 @@ Live restart regression verified: the real DeepSeek provider recalled the origin
 ## [2026-10-18] Place activity beside technical details | Replace the bottom activity disclosure with adjacent native segmented tabs above the main Home panel; condition/attention remains at the side and task actions follow. Bound the process list height within the activity panel.
 
 ## [2026-10-18] Show Home details simultaneously | User clarified separate columns, both visible. Replace the tabs with technical cards on the left and activity charts/processes on the right; condition/attention follows the cards, and task actions follow both panels. Narrow windows stack the panels.
+
+## [2026-10-18] Lead Home with the Mac state summary | Move the existing Storage, Battery and Internet summary above the technical/activity columns for a quick first glance. Preserve the same live readings and navigation actions.
