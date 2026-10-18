@@ -203,3 +203,5 @@ Live restart regression verified: the real DeepSeek provider recalled the origin
 ## [2026-10-18] Preserve active conversation access | Keep Current conversation and Stop visible in the native sidebar when users navigate to another feature during a run or approval. Returning preserves active run/session/decision identity. 402 Swift tests pass.
 
 ## [2026-10-18] Prioritize Your Mac navigation | Move Your Mac above chat controls and conversations, remove the Mac tools disclosure and its expansion state, and label the following Ask Pulse group. Advanced tools retains its disclosure. User-requested refinement to PR #90.
+
+## [2026-10-18] Fix dictation and prioritize Home telemetry | Correct Swift 6 actor isolation at Speech permission and audio callbacks after reproducing a microphone-triggered crash. Make ⌘Q close the window while explicit Quit Pulse remains available. Promote technical cards to the top of Home with condition/attention beside them and task actions below.

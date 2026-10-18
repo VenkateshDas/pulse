@@ -16,6 +16,18 @@ import Observation
     @ObservationIgnored private var starting = false
     @ObservationIgnored private var generation = UUID()
 
+    /// Speech calls its completion on a background queue. Keep this boundary
+    /// nonisolated so Swift 6 never infers a MainActor callback for it.
+    nonisolated static func speechPermission(
+        using authorize: @Sendable (@escaping @Sendable (SFSpeechRecognizerAuthorizationStatus) -> Void) -> Void = {
+            SFSpeechRecognizer.requestAuthorization($0)
+        }
+    ) async -> Bool {
+        await withCheckedContinuation { continuation in
+            authorize { status in continuation.resume(returning: status == .authorized) }
+        }
+    }
+
     func start(finish: @escaping (String) -> Void) {
         guard !isRecording, !starting else { return }
         guard Bundle.main.object(forInfoDictionaryKey: "NSSpeechRecognitionUsageDescription") != nil,
@@ -23,7 +35,7 @@ import Observation
         generation = UUID(); let expected = generation
         starting = true; status = "Checking dictation permission…"
         Task {
-            let speech = await withCheckedContinuation { continuation in SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) } }
+            let speech = await Self.speechPermission()
             let microphone = speech ? await AVCaptureDevice.requestAccess(for: .audio) : false
             guard generation == expected else { return }
             starting = false
@@ -33,11 +45,11 @@ import Observation
             request.requiresOnDeviceRecognition = true; request.shouldReportPartialResults = true
             let input = engine.inputNode, format = engine.inputNode.outputFormat(forBus: 0)
             guard format.sampleRate > 0, format.channelCount > 0 else { status = "No microphone input is available."; return }
-            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }
+            input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in request.append(buffer) }
             do { engine.prepare(); try engine.start() }
             catch { input.removeTap(onBus: 0); status = "Microphone could not start."; return }
             self.engine = engine; self.request = request; self.finish = finish; transcript = ""; isRecording = true; status = "Listening on this Mac…"
-            recognition = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            recognition = recognizer.recognitionTask(with: request) { @Sendable [weak self] result, error in
                 let text = result?.bestTranscription.formattedString, final = result?.isFinal == true, failed = error != nil
                 Task { @MainActor in
                     guard let self, self.isRecording, self.generation == expected else { return }

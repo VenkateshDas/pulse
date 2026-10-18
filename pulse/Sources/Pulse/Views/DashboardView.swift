@@ -7,35 +7,33 @@ struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(NetworkModel.self) private var networkModel
     @Environment(StorageModel.self) private var storage
-    /// Gates the charts/heatmap/process-table wall behind a tap in Simple
-    /// mode, so a non-technical user's first view is verdict + vitals, not
-    /// an instrument panel. Pro mode starts expanded — nothing changes for
-    /// existing users. Set once at construction, not re-derived on every
-    /// render, so a manual toggle during the session sticks.
-    @State private var showDetails: Bool
+    @State private var showDetails = false
 
     /// Posted when the user taps the diagnosis culprit chip; RootView
     /// switches the sidebar to the Monitor tab.
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
-    init() {
-        _showDetails = State(initialValue: DisplayModeManager.shared.current == .pro)
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
-                condition
-                if model.snapshot != nil && !model.attentionItems.isEmpty { AttentionSection() }
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 24) {
+                        technicalSummary.frame(minWidth: 500, maxWidth: .infinity)
+                        attentionSummary.frame(width: 300)
+                    }
+                    VStack(alignment: .leading, spacing: 24) {
+                        technicalSummary
+                        attentionSummary
+                    }
+                }
                 if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
-                everydaySummary
                 tasks
+                everydaySummary
                 recentRemovals
-                DisclosureGroup("Technical details", isExpanded: $showDetails) {
+                DisclosureGroup("Activity history and processes", isExpanded: $showDetails) {
                     VStack(spacing: 20) {
                         if model.snapshot != nil {
-                            vitals
                             chartsPanel.frame(minHeight: 400)
                             CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
                             TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
@@ -55,6 +53,28 @@ struct DashboardView: View {
         .background(Halo.void)
     }
 
+
+    private var technicalSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Technical details")
+                .font(Halo.font(size: 17, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if model.snapshot != nil {
+                vitals
+            } else {
+                Text("Readings will appear after the first check.")
+                    .foregroundStyle(Halo.textSecondary)
+            }
+        }
+    }
+
+    private var attentionSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            condition
+            if model.snapshot != nil { AttentionSection() }
+        }
+    }
 
     private var condition: some View {
         let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)

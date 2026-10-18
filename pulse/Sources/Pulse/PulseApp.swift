@@ -57,6 +57,16 @@ struct PulseApp: App {
         }
         .defaultSize(width: 1120, height: 760)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(replacing: .appTermination) {
+                Button("Close Pulse Window") {
+                    NSApp.windows.first { $0.identifier?.rawValue == "dashboard" }?.performClose(nil)
+                }
+                .keyboardShortcut("q", modifiers: .command)
+                Button("Quit Pulse") { AppActivation.shared.quit() }
+                    .keyboardShortcut("q", modifiers: [.command, .option])
+            }
+        }
 
         MenuBarExtra {
             MenuBarContent()
