@@ -68,7 +68,6 @@ struct SidebarView: View {
     @Binding var selection: SidebarItem
     @Bindable var agent: AgentModel
     @State private var showAdvanced = false
-    @State private var showMac = true
     @State private var showRecents = false
 
     var body: some View {
@@ -82,6 +81,12 @@ struct SidebarView: View {
             }.padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 20)
             ScrollView {
                 VStack(alignment: .leading, spacing: 3) {
+                    navLabel("YOUR MAC")
+                    ForEach(SidebarItem.everyday) { item in toolRow(item) }
+                    DisclosureGroup("Advanced tools", isExpanded: $showAdvanced) {
+                        ForEach(SidebarItem.advanced) { item in toolRow(item) }
+                    }.font(Halo.font(size: 13)).padding(.horizontal, 10).padding(.vertical, 5)
+                    navLabel("ASK PULSE")
                     nav("New conversation", symbol: "plus", page: "conversation") { agent.newConversation() }
                     nav("Search", symbol: "magnifyingglass", page: "search")
                     nav("Automations", symbol: "clock", page: "automations")
@@ -126,13 +131,6 @@ struct SidebarView: View {
                         }
                         if agent.sessions.count > 7 { Button(showRecents ? "Show fewer" : "Show more") { showRecents.toggle() }.buttonStyle(.plain).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary).padding(10) }
                     }
-                    navLabel("YOUR MAC")
-                    DisclosureGroup("Mac tools", isExpanded: $showMac) {
-                        ForEach(SidebarItem.everyday) { item in toolRow(item) }
-                        DisclosureGroup("Advanced tools", isExpanded: $showAdvanced) {
-                            ForEach(SidebarItem.advanced) { item in toolRow(item) }
-                        }.font(Halo.font(size: 13)).padding(.horizontal, 10).padding(.vertical, 5)
-                    }.font(Halo.font(size: 13, weight: .medium)).padding(.horizontal, 9)
                 }.padding(.horizontal, 10).padding(.bottom, 16)
             }
             VStack(spacing: 8) {
@@ -177,7 +175,6 @@ struct SidebarView: View {
     }
 
     private func revealSelection() {
-        if selection != .agent && selection != .settings { showMac = true }
         if SidebarItem.advancedGatedItems.contains(selection) { showAdvanced = true }
     }
 
