@@ -7,7 +7,6 @@ struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(NetworkModel.self) private var networkModel
     @Environment(StorageModel.self) private var storage
-    @State private var showActivity = false
 
     /// Posted when the user taps the diagnosis culprit chip; RootView
     /// switches the sidebar to the Monitor tab.
@@ -19,11 +18,16 @@ struct DashboardView: View {
                 PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 24) {
-                        technicalSummary.frame(minWidth: 500, maxWidth: .infinity)
-                        attentionSummary.frame(width: 300)
+                        VStack(alignment: .leading, spacing: 24) {
+                            technicalSummary
+                            attentionSummary
+                        }
+                        .frame(minWidth: 400, maxWidth: .infinity)
+                        activitySummary.frame(minWidth: 400, maxWidth: .infinity)
                     }
                     VStack(alignment: .leading, spacing: 24) {
                         technicalSummary
+                        activitySummary
                         attentionSummary
                     }
                 }
@@ -34,7 +38,7 @@ struct DashboardView: View {
 
             }
             .padding(Halo.Space.xxl)
-            .frame(maxWidth: 1040, alignment: .leading)
+            .frame(maxWidth: 1200, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .background(Halo.void)
@@ -43,23 +47,30 @@ struct DashboardView: View {
 
     private var technicalSummary: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Picker("Home details", selection: $showActivity) {
-                Text("Technical details").tag(false)
-                Text("Activity history and processes").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .accessibilityLabel("Home details")
+            Text("Technical details")
+                .font(Halo.font(size: 17, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
             if model.snapshot != nil {
-                if showActivity {
-                    VStack(spacing: 20) {
-                        chartsPanel.frame(minHeight: 400)
-                        CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
-                        TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                            .frame(height: 300)
-                    }
-                } else {
-                    vitals
-                }
+                vitals
+            } else {
+                Text("Readings will appear after the first check.")
+                    .foregroundStyle(Halo.textSecondary)
+            }
+        }
+    }
+
+    private var activitySummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Activity history and processes")
+                .font(Halo.font(size: 17, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if model.snapshot != nil {
+                chartsPanel.frame(minHeight: 400)
+                CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                    .frame(height: 300)
             } else {
                 Text("Readings will appear after the first check.")
                     .foregroundStyle(Halo.textSecondary)

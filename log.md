@@ -207,3 +207,5 @@ Live restart regression verified: the real DeepSeek provider recalled the origin
 ## [2026-10-18] Fix dictation and prioritize Home telemetry | Correct Swift 6 actor isolation at Speech permission and audio callbacks after reproducing a microphone-triggered crash. Make ⌘Q close the window while explicit Quit Pulse remains available. Promote technical cards to the top of Home with condition/attention beside them and task actions below.
 
 ## [2026-10-18] Place activity beside technical details | Replace the bottom activity disclosure with adjacent native segmented tabs above the main Home panel; condition/attention remains at the side and task actions follow. Bound the process list height within the activity panel.
+
+## [2026-10-18] Show Home details simultaneously | User clarified separate columns, both visible. Replace the tabs with technical cards on the left and activity charts/processes on the right; condition/attention follows the cards, and task actions follow both panels. Narrow windows stack the panels.
