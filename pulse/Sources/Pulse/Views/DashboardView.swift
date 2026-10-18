@@ -7,7 +7,7 @@ struct DashboardView: View {
     @Environment(DashboardModel.self) private var model
     @Environment(NetworkModel.self) private var networkModel
     @Environment(StorageModel.self) private var storage
-    @State private var showDetails = false
+    @State private var showActivity = false
 
     /// Posted when the user taps the diagnosis culprit chip; RootView
     /// switches the sidebar to the Monitor tab.
@@ -31,20 +31,7 @@ struct DashboardView: View {
                 tasks
                 everydaySummary
                 recentRemovals
-                DisclosureGroup("Activity history and processes", isExpanded: $showDetails) {
-                    VStack(spacing: 20) {
-                        if model.snapshot != nil {
-                            chartsPanel.frame(minHeight: 400)
-                            CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
-                            TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                        } else {
-                            Text("Readings will appear after the first check.")
-                        }
-                    }
-                    .padding(.top, 16)
-                }
-                .font(Halo.font(size: 14, weight: .medium))
-                .foregroundStyle(Halo.textPrimary)
+
             }
             .padding(Halo.Space.xxl)
             .frame(maxWidth: 1040, alignment: .leading)
@@ -56,12 +43,23 @@ struct DashboardView: View {
 
     private var technicalSummary: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Technical details")
-                .font(Halo.font(size: 17, weight: .semibold))
-                .foregroundStyle(Halo.textPrimary)
-                .accessibilityAddTraits(.isHeader)
+            Picker("Home details", selection: $showActivity) {
+                Text("Technical details").tag(false)
+                Text("Activity history and processes").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Home details")
             if model.snapshot != nil {
-                vitals
+                if showActivity {
+                    VStack(spacing: 20) {
+                        chartsPanel.frame(minHeight: 400)
+                        CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                        TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                            .frame(height: 300)
+                    }
+                } else {
+                    vitals
+                }
             } else {
                 Text("Readings will appear after the first check.")
                     .foregroundStyle(Halo.textSecondary)
