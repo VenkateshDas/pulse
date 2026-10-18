@@ -23,6 +23,7 @@ from coworker.skills import SkillLoader, skill_catalog_text
 from context import build_system_instructions
 from pulse_toolkit import PulseToolkit
 from diagnostics import record
+from assistant_utilities import AssistantUtilities, SPECIALISTS
 from usage_accounting import estimate, UsageMeter, MeteredProvider
 
 # A stopped but blocked SDK thread still occupies capacity until it really exits.
@@ -62,7 +63,7 @@ class _CompactionProvider:
             PRODUCERS.release()
 
 class PulseTurnEngine(TurnEngine):
-    def __init__(self, *, configuration, store, session_id, run_id, provider=None, context="", memory=None, read_only=False):
+    def __init__(self, *, configuration, store, session_id, run_id, provider=None, context="", memory=None, read_only=False, specialist="general"):
         self.configuration = configuration
         self.meter = UsageMeter(store, configuration, session_id, run_id)
         self.store = store
@@ -75,6 +76,7 @@ class PulseTurnEngine(TurnEngine):
         self.started = time.monotonic()
         self.memory = memory
         self.read_only = read_only
+        self.specialist = specialist
         self.checkpoint_lock = asyncio.Lock()
         self.registry = ToolRegistry()
         for func in self.toolkit.tools:
@@ -83,6 +85,9 @@ class PulseTurnEngine(TurnEngine):
         self.registry.register(self.read_tool_result)
         self.registry.register(self.ask_user)
         self.registry.register(self.propose_plan)
+        self.utilities=AssistantUtilities(store,configuration,session_id,run_id)
+        self.registry.register(self.utilities.update_investigation_tasks)
+        self.registry.register(self.utilities.request_second_opinion)
         if memory and configuration.memory_enabled:
             self.registry.register(memory.save_pulse_memory)
         root = Path(os.environ.get("PULSE_SKILL_DIR") or Path(__file__).resolve().parent.parent / ".agents/skills/pulse")
@@ -97,6 +102,8 @@ class PulseTurnEngine(TurnEngine):
         prior_compaction = upstream_compaction.CompactionState.from_dict(checkpoint.get("compaction")) if isinstance(checkpoint,dict) else None
         self.saved_count = len(history)+1  # TurnEngine inserts the system message.
         instructions = build_system_instructions() + "\n" + skill_catalog_text(self.skills, {"pulse"})
+        instructions += "\nUse update_investigation_tasks for multi-step investigations. A second opinion costs an extra model call; use only when the user requests independent review. Automations must name their timezone and are read-only when unattended; never promise automatic cleanup.\n"
+        instructions += "\n" + SPECIALISTS.get(specialist,SPECIALISTS["general"])
         if memory:
             instructions += "\n" + memory.instructions() + "\n" + memory.build_context(memory.recall())
         instructions += "\nEarlier dialogue is searchable with search_conversation; full offloaded evidence is available with read_tool_result. Never infer omitted evidence.\n"

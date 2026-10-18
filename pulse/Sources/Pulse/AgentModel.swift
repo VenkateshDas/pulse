@@ -23,6 +23,19 @@ struct AgentTimelineItem: Identifiable, Codable, Equatable {
 final class AgentModel {
     var items: [AgentTimelineItem] = []
     var sessions: [AgentSessionItem] = []
+    var page = "conversation"
+    var instructions = ""
+    var workspaceStatus = ""
+    var workspaceBusy = false
+    var searchQuery = ""
+    var searchArchived = false
+    var searchResults: [AgentSessionItem] = []
+    var specialist = "general"
+    var investigationTasks: [InvestigationTask] = []
+    @ObservationIgnored var runtimeLeases = 0
+    @ObservationIgnored private var startupTask: Task<Void, Never>?
+    @ObservationIgnored private var appliedSelection: [String: String]?
+    @ObservationIgnored private var appliedKey: String?
     var sessionId: String?
     var usage: AgentUsageSnapshot?
     @ObservationIgnored private var usageRevision = 0
@@ -35,15 +48,18 @@ final class AgentModel {
     @ObservationIgnored private var historyPage = 1
     @ObservationIgnored private var drafts: [String: String] = [:]
     @ObservationIgnored private var draftOrder: [String] = []
+    var draftRevision = 0
     var draft: String { drafts[sessionId ?? "new"] ?? "" }
-    func setDraft(_ text: String) {
+    func setDraft(_ text: String, publish: Bool = false) {
         guard text.utf8.count <= 12_000 else { return }
         let key = sessionId ?? "new"
         draftOrder.removeAll { $0 == key }; draftOrder.append(key)
         while draftOrder.count > 50 { drafts.removeValue(forKey: draftOrder.removeFirst()) }
         drafts[key] = text
+        if publish { draftRevision += 1 }
     }
     var memories: [AgentMemoryItem] = []
+    var memoryUndoID: String?
     var memoryStatus = ""
     var memoryEnabled = AgentConfiguration.memoryEnabled
     @ObservationIgnored private let nativeToken = UUID().uuidString + UUID().uuidString
@@ -70,7 +86,9 @@ final class AgentModel {
 
     func newConversation() {
         guard !isBusy else { return }
+        VoiceInput.shared.stop()
         resetStream()
+        page = "conversation"; investigationTasks = []; workspaceStatus = ""; VoiceInput.shared.status = ""
         sessionId = nil; usage = nil; usageRevision += 1; activeRunId = nil; approvalId = nil; items = []; hasEarlier = false; historyPage = 1; state = .idle; status = "Ready"
     }
     private var seenEventIDs = Set<String>()
@@ -81,7 +99,15 @@ final class AgentModel {
     private var pendingAnswerChunks: [String: Int] = [:]
 
     func start() async {
+        if let startupTask { await startupTask.value; return }
         guard !isBusy else { return }
+        let task = Task { await performStart() }
+        startupTask = task
+        await task.value
+        startupTask = nil
+    }
+
+    private func performStart() async {
         let selection = AgentConfiguration.runtimeEnvironment
         let endpoint = selection["OPENAI_BASE_URL"] ?? ""
         let provider = selection["PULSE_PROVIDER"] ?? ""
@@ -97,6 +123,9 @@ final class AgentModel {
         guard AgentConfiguration.providerURL(endpoint) != nil else {
             state = .failed; status = "Review the provider URL in Settings before asking Pulse"
             return
+        }
+        if appliedSelection == selection, appliedKey == key, (await AgentClient.shared.checkStatus()).isOnline {
+            state = .idle; status = "Ready"; return
         }
         state = .starting; status = "Starting local agent…"
         defer { if !isBusy && !surfaceVisible { scheduleShutdown() } }
@@ -114,6 +143,7 @@ final class AgentModel {
         }
         do { try await AgentClient.shared.updateConfiguration(baseURL: endpoint, apiKey: key, model: model, configuration: selection) }
         catch { hasApiKey = false; state = .failed; status = "Provider settings could not be applied. Reconnect before sending a question."; return }
+        appliedSelection = selection; appliedKey = key
         let daemon = await AgentClient.shared.checkStatus()
         hasApiKey = daemon.hasApiKey; state = .idle; status = daemon.summary ?? "Ready"
         sessions = (try? await AgentClient.shared.fetchSessions()) ?? []
@@ -123,6 +153,7 @@ final class AgentModel {
     func send(_ text: String) {
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty, state == .idle || state == .completed || state == .failed || state == .cancelled else { return }
+        VoiceInput.shared.stop(); VoiceInput.shared.status = ""; workspaceStatus = ""
         setDraft("")
         items.append(.init(id: UUID().uuidString, kind: .user, title: message, detail: ""))
         state = .running; status = "Working…"; lastSequence = 0; seenEventIDs.removeAll()
@@ -134,7 +165,7 @@ final class AgentModel {
         streamTask = Task {
             guard !Task.isCancelled, generation == streamGeneration else { return }
             do {
-                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId, runId: runId, readOnly: investigationOnly) {
+                for try await event in await AgentClient.shared.run(message: message, sessionId: sessionId, runId: runId, readOnly: investigationOnly, specialist: specialist) {
                     guard generation == streamGeneration, !Task.isCancelled else { return }
                     apply(event)
                 }
@@ -207,7 +238,10 @@ final class AgentModel {
 
     func loadSession(_ id: String) async {
         guard !isBusy else { return }
+        VoiceInput.shared.stop()
+        VoiceInput.shared.stop()
         resetStream()
+        page = "conversation"; investigationTasks = []; workspaceStatus = ""; VoiceInput.shared.status = ""
         sessionId = id; usage = nil; usageRevision += 1; activeRunId = nil
         let generation = streamGeneration
         items = []; state = .starting; status = "Loading conversation…"
@@ -217,7 +251,7 @@ final class AgentModel {
             historyPage = 1; hasEarlier = page.hasMore
             items = page.messages.map(Self.historyItem)
             state = .idle; status = page.interrupted == true ? "Previous run interrupted. Review completed actions before continuing." : "Ready"
-            await refreshUsage()
+            await refreshUsage(); await refreshTasks()
         } catch {
             guard sessionId == id, generation == streamGeneration else { return }
             state = .failed; status = "Could not load conversation"
@@ -275,6 +309,13 @@ final class AgentModel {
             replace(id: "answer-\(event.runId)", kind: .answer, title: "Pulse Agent", detail: text)
         case "tool.started": items.append(.init(id: "tool-\(event.runId)-\(event.payload["tool_call_id"] ?? event.eventId)", kind: .tool, title: event.payload["title"] ?? "Running tool", detail: event.payload["detail"] ?? "", isRunning: true))
         case "tool.completed", "tool.failed":
+            if event.payload["title"] == "Save pulse memory", let data = event.payload["detail"]?.data(using: .utf8),
+               let receipt = try? JSONSerialization.jsonObject(with: data) as? [String: Any], receipt["status"] as? String == "Remembered",
+               let id = receipt["id"] as? String { memoryUndoID = id; workspaceStatus = "A useful preference or lesson was remembered. Review or undo in Memory." }
+            if event.payload["title"] == "Update investigation tasks", let data = event.payload["detail"]?.data(using: .utf8) {
+                struct Progress: Decodable { let tasks: [InvestigationTask] }
+                if let progress = try? JSONDecoder().decode(Progress.self, from: data) { investigationTasks = progress.tasks }
+            }
             let id = "tool-\(event.runId)-\(event.payload["tool_call_id"] ?? event.eventId)"
             if let index = items.firstIndex(where: { $0.id == id }) { items[index].detail = event.payload["detail"] ?? text; items[index].isRunning = false; items[index].outcome = event.payload["status"] ?? (event.kind == "tool.failed" ? "error" : "ok") }
             else { items.append(.init(id: id, kind: .tool, title: event.payload["title"] ?? "Tool result", detail: event.payload["detail"] ?? text, approvalID: event.payload["approval_id"], outcome: event.payload["status"] ?? (event.kind == "tool.failed" ? "error" : "ok"))) }
@@ -296,7 +337,7 @@ final class AgentModel {
             if let index = items.firstIndex(where: { $0.approvalID == event.payload["approval_id"] }) {
                 items[index].outcome = text; items[index].isRunning = false
             }
-        case "run.completed": approvalId = nil; Task { sessions = (try? await AgentClient.shared.fetchSessions()) ?? sessions }; removeProgress(runId: event.runId); state = .completed; status = "Complete"; scheduleUsageRefresh()
+        case "run.completed": approvalId = nil; finishWorkspaceRefresh(session: event.sessionId); removeProgress(runId: event.runId); state = .completed; status = "Complete"; scheduleUsageRefresh()
         case "run.cancelled": state = .cancelled; status = "Cancelled"; scheduleUsageRefresh()
         case "run.failed": fail(text.isEmpty ? "Agent run failed" : text)
         default: break
@@ -335,15 +376,16 @@ final class AgentModel {
 
     func visibilityChanged(_ visible: Bool) {
         surfaceVisible = visible
+        if !visible { VoiceInput.shared.stop() }
         if visible { shutdownTask?.cancel(); shutdownTask = nil }
         else if !isBusy { scheduleShutdown() }
     }
 
-    private func scheduleShutdown() {
+    func scheduleShutdown() {
         shutdownTask?.cancel()
         shutdownTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
-            guard let self, !Task.isCancelled, !self.surfaceVisible, !self.isBusy else { return }
+            guard let self, !Task.isCancelled, !self.surfaceVisible, !self.isBusy, self.runtimeLeases == 0 else { return }
             await AgentDaemonManager.shared.shutdown()
             await AgentNativeBridge.shared.stop()
         }
@@ -352,9 +394,9 @@ final class AgentModel {
     func refreshMemory() async {
         do {
             let data = try await AgentClient.shared.memoryRequest()
-            struct Response: Decodable { let memories: [AgentMemoryItem]; let enabled: Bool }
+            struct Response: Decodable { let memories: [AgentMemoryItem]; let enabled: Bool; let instructions: String? }
             let response = try JSONDecoder().decode(Response.self, from: data)
-            memories = response.memories; memoryEnabled = response.enabled; memoryStatus = ""
+            memories = response.memories; memoryEnabled = response.enabled; instructions = response.instructions ?? ""; memoryStatus = ""
         } catch { memoryStatus = "Memory could not load. Reconnect and try again." }
     }
     func deleteMemory(_ id: String) async {
@@ -396,7 +438,7 @@ final class AgentModel {
         pendingAnswerText.removeAll(); pendingAnswerChunks.removeAll()
     }
 
-    private func refreshUsage() async {
+    func refreshUsage() async {
         guard let id = sessionId else { return }
         let generation = streamGeneration, revision = usageRevision
         guard let snapshot = try? await AgentClient.shared.fetchUsage(sessionId: id),
@@ -429,4 +471,5 @@ struct AgentMemoryItem: Codable, Identifiable {
     let kind: String
     let source_session: String
     let created_at: Int
+    var revision: Int? = nil
 }

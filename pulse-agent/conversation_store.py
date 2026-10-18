@@ -28,6 +28,10 @@ class ConversationStore:
                     purpose TEXT, context TEXT NOT NULL, reported TEXT, created INTEGER);
                 CREATE INDEX IF NOT EXISTS usage_session ON usage_requests(session,created);
                 CREATE TABLE IF NOT EXISTS usage_sessions(session TEXT PRIMARY KEY, historical INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS conversation_meta(session TEXT PRIMARY KEY, title_origin TEXT NOT NULL DEFAULT 'provisional',
+                    revision INTEGER NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+                CREATE TABLE IF NOT EXISTS workspace_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS conversation_tasks(session TEXT PRIMARY KEY, payload TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS migration(id TEXT PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY, content TEXT UNIQUE NOT NULL, payload TEXT NOT NULL);
             """)
@@ -60,10 +64,76 @@ class ConversationStore:
             row = db.execute("SELECT payload FROM checkpoints WHERE session=?", (session,)).fetchone()
         return json.loads(row[0]) if row else []
 
-    def sessions(self, page=1):
+    def sessions(self, page=1, query='', archived=False):
+        query=query.strip()
+        if len(query)>200: raise ValueError('Search is limited to 200 characters')
         with self.connection() as db:
-            rows = db.execute("SELECT * FROM conversations ORDER BY updated DESC,id LIMIT 50 OFFSET ?", ((page-1)*50,)).fetchall()
-        return [{"session_id": row["id"], "name": row["title"], "updated_at": row["updated"]} for row in rows]
+            rows=db.execute("""SELECT c.*,coalesce(m.pinned,0) pinned,coalesce(m.archived,0) archived,
+                coalesce(m.title_origin,'provisional') title_origin,coalesce(m.revision,0) revision
+                FROM conversations c LEFT JOIN conversation_meta m ON m.session=c.id
+                WHERE coalesce(m.archived,0)=? AND (?='' OR instr(lower(c.title),lower(?))>0 OR EXISTS(
+                    SELECT 1 FROM messages x WHERE x.session=c.id AND json_extract(x.payload,'$.role') IN ('user','assistant')
+                    AND instr(lower(json_extract(x.payload,'$.content')),lower(?))>0))
+                ORDER BY pinned DESC,c.updated DESC,c.id LIMIT 50 OFFSET ?""", (int(archived),query,query,query,(page-1)*50)).fetchall()
+        return [{'session_id':r['id'],'name':r['title'],'updated_at':r['updated'],
+                 'pinned':bool(r['pinned']),'archived':bool(r['archived']),'title_origin':r['title_origin'],'revision':r['revision']} for r in rows]
+
+    def session_metadata(self, session):
+        with self.connection() as db:
+            row=db.execute("SELECT c.title,coalesce(m.revision,0) revision,coalesce(m.title_origin,'provisional') origin FROM conversations c LEFT JOIN conversation_meta m ON m.session=c.id WHERE c.id=?",(session,)).fetchone()
+        return dict(row) if row else None
+
+    def update_session(self, session, *, title=None, pinned=None, archived=None):
+        if title is not None:
+            title=' '.join(title.split())
+            if not title or len(title)>80:raise ValueError('Use a title of 1–80 characters')
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if not db.execute('SELECT 1 FROM conversations WHERE id=?',(session,)).fetchone():raise ValueError('Conversation unavailable')
+            db.execute('INSERT OR IGNORE INTO conversation_meta(session) VALUES(?)',(session,))
+            if title is not None:
+                db.execute('UPDATE conversations SET title=? WHERE id=?',(title,session))
+                db.execute("UPDATE conversation_meta SET title_origin='manual' WHERE session=?",(session,))
+            if pinned is not None:db.execute('UPDATE conversation_meta SET pinned=? WHERE session=?',(int(pinned),session))
+            if archived is not None:db.execute('UPDATE conversation_meta SET archived=? WHERE session=?',(int(archived),session))
+            db.execute('UPDATE conversation_meta SET revision=revision+1 WHERE session=?',(session,))
+
+    def set_generated_title(self, session, title, revision):
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            db.execute('INSERT OR IGNORE INTO conversation_meta(session) VALUES(?)',(session,))
+            changed=db.execute("UPDATE conversation_meta SET title_origin='generated',revision=revision+1 WHERE session=? AND revision=? AND title_origin='provisional' AND archived=0",(session,revision)).rowcount
+            if changed:db.execute('UPDATE conversations SET title=? WHERE id=?',(title,session))
+        return bool(changed)
+
+    def title_evidence(self, session):
+        with self.connection() as db:
+            rows=db.execute("SELECT payload FROM messages WHERE session=? AND json_extract(payload,'$.role') IN ('user','assistant') ORDER BY id LIMIT 4",(session,)).fetchall()
+        return [{'role':m['role'],'content':str(m.get('content') or '')[:1000]} for row in rows if (m:=json.loads(row[0])).get('content') and not m.get('tool_calls')]
+
+    def setting(self, key, default=''):
+        with self.connection() as db:row=db.execute('SELECT value FROM workspace_settings WHERE key=?',(key,)).fetchone()
+        return row[0] if row else default
+
+    def set_setting(self, key, value):
+        if key!='user_instructions' or len(value)>4000 or len(value.encode())>6000:raise ValueError('Instructions exceed 4,000 characters / 6,000 bytes')
+        with self.connection() as db:db.execute('INSERT OR REPLACE INTO workspace_settings VALUES(?,?)',(key,value))
+
+    def tasks(self, session):
+        with self.connection() as db:row=db.execute('SELECT payload FROM conversation_tasks WHERE session=?',(session,)).fetchone()
+        return json.loads(row[0]) if row else []
+
+    def set_tasks(self, session, tasks, run=None):
+        if len(tasks)>20 or any(not isinstance(t,dict) or not isinstance(t.get('title'),str) or not 1<=len(t['title'].strip())<=200 or t.get('status') not in {'pending','running','completed'} for t in tasks):
+            raise ValueError('Use up to 20 tasks with a title and pending/running/completed status')
+        payload=[{'title':t['title'].strip(),'status':t['status']} for t in tasks]
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if run is not None:
+                current=db.execute('SELECT id,status FROM executions WHERE session=? ORDER BY updated DESC,rowid DESC LIMIT 1',(session,)).fetchone()
+                if not current or current['id']!=run or current['status']!='running':raise ValueError('Investigation no longer owns task progress')
+            db.execute('INSERT OR REPLACE INTO conversation_tasks VALUES(?,?)',(session,json.dumps(payload)))
+        return payload
 
     def history(self, session, page=1):
         with self.connection() as db:
@@ -135,7 +205,7 @@ class ConversationStore:
     def memory_rows(self):
         with self.connection() as db:
             rows=db.execute("SELECT id,payload FROM memories ORDER BY rowid DESC LIMIT 100").fetchall()
-        return [{"id":row["id"],**json.loads(row["payload"])} for row in rows]
+        return [{"id":row["id"],"revision":0,**json.loads(row["payload"])} for row in rows]
 
     def remember(self, identifier, payload):
         with self.connection() as db:
@@ -146,6 +216,26 @@ class ConversationStore:
                 return {"error":"Memory full. Review and remove old memories first"}
             db.execute("INSERT INTO memories VALUES(?,?,?)",(identifier,payload['content'],json.dumps(payload)))
         return {"status":"Remembered","id":identifier}
+
+    def update_memory(self, identifier, payload, revision):
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT payload FROM memories WHERE id=?',(identifier,)).fetchone()
+            if not row:raise ValueError('Memory unavailable')
+            previous=json.loads(row[0])
+            if previous.get('revision',0)!=revision:raise ValueError('Memory changed; reload before editing')
+            updated={**previous,**{k:payload[k] for k in ('content','evidence','kind')},'revision':revision+1,'updated_at':int(time.time())}
+            try:db.execute('UPDATE memories SET content=?,payload=? WHERE id=?',(updated['content'],json.dumps(updated),identifier))
+            except sqlite3.IntegrityError:raise ValueError('That memory already exists')
+        return {'status':'Updated','id':identifier,'revision':revision+1}
+
+    def undo_memory_save(self, identifier, revision):
+        with self.connection() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row=db.execute('SELECT payload FROM memories WHERE id=?',(identifier,)).fetchone()
+            if not row or json.loads(row[0]).get('revision',0)!=revision:return False
+            db.execute('DELETE FROM memories WHERE id=?',(identifier,))
+        return True
 
     def delete_memory(self, identifier):
         with self.connection() as db:
@@ -216,7 +306,9 @@ class ConversationStore:
                 historical=[db.execute("SELECT EXISTS(SELECT 1 FROM messages WHERE session=?)",(session,)).fetchone()[0]]
             # Stream rows; long sessions do not load the whole ledger into memory.
             for row in db.execute("SELECT context,reported,purpose FROM usage_requests WHERE session=? ORDER BY created,rowid",(session,)):
-                totals['requests']+=1;context=json.loads(row['context'])
+                totals['requests']+=1
+                request_context=json.loads(row['context'])
+                if row['purpose'] not in {'title','second_opinion'}:context=request_context
                 if row['reported'] is None:
                     totals['missingUsage']+=1;totals['missingCost']+=1;continue
                 usage=json.loads(row['reported'])
@@ -225,7 +317,7 @@ class ConversationStore:
                 if row['purpose']=='compaction':totals['compactionTokens']+=used
                 if usage['costUSD'] is None:totals['missingCost']+=1
                 else:amount+=Decimal(usage['costUSD']);costs+=1
-                context['reportedTokens']=usage['input']+usage['cacheRead']+usage['cacheWrite']
+                if row['purpose'] not in {'title','second_opinion'}:context['reportedTokens']=usage['input']+usage['cacheRead']+usage['cacheWrite']
         totals['totalTokens']=sum(totals[key] for key in ('input','output','cacheRead','cacheWrite'))
         if costs:totals['costUSD']=format(amount,'f')
         return dict(context=context,totals=totals,historical=bool(historical[0]))

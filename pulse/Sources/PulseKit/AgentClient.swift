@@ -72,8 +72,10 @@ public struct AgentSessionItem: Identifiable, Codable, Sendable {
     public let name: String
     public let createdAt: Int?
     public let updatedAt: Int?
-    public init(sessionId: String, name: String, createdAt: Int? = nil, updatedAt: Int? = nil) {
-        self.sessionId = sessionId; self.name = name; self.createdAt = createdAt; self.updatedAt = updatedAt
+    public let pinned: Bool?
+    public let archived: Bool?
+    public init(sessionId: String, name: String, createdAt: Int? = nil, updatedAt: Int? = nil, pinned: Bool? = nil, archived: Bool? = nil) {
+        self.sessionId = sessionId; self.name = name; self.createdAt = createdAt; self.updatedAt = updatedAt; self.pinned = pinned; self.archived = archived
     }
 }
 
@@ -106,8 +108,8 @@ public actor AgentClient {
         } catch { return .init(isOnline: false, hasApiKey: false) }
     }
 
-    public func run(message: String, sessionId: String?, runId: String = UUID().uuidString, readOnly: Bool = false) -> AsyncThrowingStream<AgentEnvelope, Error> {
-        return stream(path: "/runs", body: ["message": message, "session_id": sessionId ?? UUID().uuidString, "request_id": runId, "mode": readOnly ? "investigate" : "interactive"], runId: runId)
+    public func run(message: String, sessionId: String?, runId: String = UUID().uuidString, readOnly: Bool = false, specialist: String = "general") -> AsyncThrowingStream<AgentEnvelope, Error> {
+        return stream(path: "/runs", body: ["message": message, "session_id": sessionId ?? UUID().uuidString, "request_id": runId, "mode": readOnly ? "investigate" : "interactive", "specialist": specialist], runId: runId)
     }
 
     public func continueRun(runId: String, approved: Bool, approvalId: String, afterSequence: Int = 0) -> AsyncThrowingStream<AgentEnvelope, Error> {
@@ -136,12 +138,34 @@ public actor AgentClient {
         guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
     }
 
-    public func fetchSessions() async throws -> [AgentSessionItem] {
-        let (data, _) = try await URLSession.shared.data(for: request(path: "/sessions"))
-        struct Response: Decodable { let sessions: [Session]; struct Session: Decodable { let session_id: String; let name: String; let created_at: Int?; let updated_at: Int? } }
+    public func fetchSessions(query: String = "", archived: Bool = false) async throws -> [AgentSessionItem] {
+        var parts = URLComponents(); parts.queryItems = [URLQueryItem(name: "query", value: query), URLQueryItem(name: "archived", value: archived ? "true" : "false")]
+        let data = try await workspaceRequest(path: "/sessions?" + (parts.percentEncodedQuery ?? ""))
+        struct Response: Decodable { let sessions: [Session]; struct Session: Decodable { let session_id: String; let name: String; let created_at: Int?; let updated_at: Int?; let pinned: Bool?; let archived: Bool? } }
         return try JSONDecoder.agent.decode(Response.self, from: data).sessions.map {
-            .init(sessionId: $0.session_id, name: $0.name, createdAt: $0.created_at, updatedAt: $0.updated_at)
+            .init(sessionId: $0.session_id, name: $0.name, createdAt: $0.created_at, updatedAt: $0.updated_at, pinned: $0.pinned, archived: $0.archived)
         }
+    }
+
+    public func awaitTitle(sessionId: String) async {
+        var request = request(path: "/sessions/\(sessionId)/title"); request.timeoutInterval = 68
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
+    public func workspaceRequest(path: String, method: String = "GET", body: [String: String]? = nil, flags: [String: Bool] = [:]) async throws -> Data {
+        var request = request(path: path, method: method)
+        if body != nil || !flags.isEmpty {
+            var value: [String: Any] = body ?? [:]
+            for (key, flag) in flags { value[key] = flag }
+            // Revision is numeric in the authenticated schema.
+            if let revision = body?["revision"], let number = Int(revision) { value["revision"] = number }
+            request.httpBody = try JSONSerialization.data(withJSONObject: value)
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        guard data.count <= 512_000 else { throw URLError(.dataLengthExceedsMaximum) }
+        return data
     }
 
     public func fetchUsage(sessionId: String) async throws -> AgentUsageSnapshot {

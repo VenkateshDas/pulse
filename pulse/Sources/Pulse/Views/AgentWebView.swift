@@ -47,20 +47,30 @@ struct AgentWebView: NSViewRepresentable {
         let draft: String
         let readOnly: Bool
         let usage: AgentUsageSnapshot?
+        let page: String; let instructions: String; let workspaceStatus: String
+        let searchQuery: String; let searchArchived: Bool; let searchResults: [AgentSessionItem]
+        let automations: [PulseAutomation]; let automationRuns: [AutomationRunRecord]; let automationStatus: String
+        let tasks: [InvestigationTask]; let specialist: String; let theme: [String: String]
+        let voiceRecording: Bool; let voiceStatus: String; let memoryUndoID: String?
     }
 
     static func snapshot(for model: AgentModel, largerText: Bool) -> Snapshot {
+        let _ = model.draftRevision
         let items = model.items.map { item -> AgentTimelineItem in
             var item = item
             if item.kind == .approval { item.isRunning = model.state == .awaitingApproval && item.approvalID == model.approvalId }
             return item
         }
         return Snapshot(items: items, sessions: model.sessions, sessionId: model.sessionId,
-            status: model.status, busy: model.isBusy, ready: model.hasApiKey, state: String(describing: model.state),
+            status: model.status, busy: model.isBusy || model.workspaceBusy, ready: model.hasApiKey, state: String(describing: model.state),
             model: AgentConfiguration.model, provider: AgentConfiguration.provider,
-            memories: model.memories, memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
+            memories: model.page == "memory" ? model.memories : [], memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
             largerText: largerText, hasEarlier: model.hasEarlier, draft: model.draft, readOnly: model.investigationOnly,
-            usage: model.usage)
+            usage: model.usage, page: model.page, instructions: model.instructions, workspaceStatus: model.workspaceStatus,
+            searchQuery: model.searchQuery, searchArchived: model.searchArchived, searchResults: model.page == "search" ? model.searchResults : [],
+            automations: model.page == "automations" ? AutomationModel.shared.automations : [], automationRuns: ["automations", "inbox"].contains(model.page) ? Array(AutomationModel.shared.runs.prefix(100)) : [],
+            automationStatus: AutomationModel.shared.status, tasks: model.investigationTasks, specialist: model.specialist,
+            theme: Halo.webTokens, voiceRecording: VoiceInput.shared.isRecording, voiceStatus: VoiceInput.shared.status, memoryUndoID: model.memoryUndoID)
     }
 
     @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
@@ -78,13 +88,14 @@ struct AgentWebView: NSViewRepresentable {
         func publish() {
             guard ready, active else { return }
             var metadata = snapshot; metadata.items = []
-            guard let data = try? JSONEncoder().encode(metadata) else { return }
+            let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+            guard let data = try? encoder.encode(metadata) else { return }
             let changed = snapshot.items.filter { renderedItems[$0.id] != $0 }
             let order = snapshot.items.map(\.id)
             guard data != previous || !changed.isEmpty || order != renderedOrder else { return }
             struct Patch: Encodable { let state: Snapshot?; let items: [AgentTimelineItem]; let order: [String]? }
             let patch = Patch(state: data != previous ? metadata : nil, items: changed, order: order != renderedOrder ? order : nil)
-            guard let encoded = try? JSONEncoder().encode(patch), let value = try? JSONSerialization.jsonObject(with: encoded) else { return }
+            guard let encoded = try? encoder.encode(patch), let value = try? JSONSerialization.jsonObject(with: encoded) else { return }
             previous = data; renderedItems = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) }); renderedOrder = order
             // Stream only changed rows; loaded history is not re-encoded for each token.
             view?.callAsyncJavaScript("window.pulsePatch(patch)", arguments: ["patch": value], in: nil, in: .page, completionHandler: { _ in })
@@ -121,7 +132,7 @@ struct AgentWebView: NSViewRepresentable {
             case "new": model.newConversation()
             case "session":
                 guard let id = body["id"] as? String, UUID(uuidString: id) != nil else { return }
-                Task { await model.loadSession(id) }
+                Task { await model.openSession(id) }
             case "older": Task { await model.loadEarlier() }
             case "approve":
                 guard let id = body["id"] as? String, id == model.approvalId, let approved = body["approved"] as? Bool else { return }
@@ -135,7 +146,7 @@ struct AgentWebView: NSViewRepresentable {
             case "memoryToggle":
                 guard let enabled = body["enabled"] as? Bool else { return }
                 Task { await model.setMemoryEnabled(enabled) }
-            default: break
+            default: handleWorkspace(action: action, body: body)
             }
         }
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {

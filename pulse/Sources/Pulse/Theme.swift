@@ -163,3 +163,19 @@ extension Color {
         )
     }
 }
+
+extension Halo {
+    /// Same resolved palette for native and packaged web views, including user presets.
+    @MainActor static var webTokens: [String: String] {
+        var result: [String: String] = [:]
+        (NSApp?.effectiveAppearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
+            for (key, value) in ["paper": void, "surface": surface1, "subtle": surface2, "ink": textPrimary,
+                                 "muted": textSecondary, "line": borderSubtle, "blue": interactive, "danger": critical] {
+                if let color = NSColor(value).usingColorSpace(.deviceRGB) {
+                    result[key] = String(format: "#%02X%02X%02X", Int(color.redComponent * 255), Int(color.greenComponent * 255), Int(color.blueComponent * 255))
+                }
+            }
+        }
+        return result
+    }
+}

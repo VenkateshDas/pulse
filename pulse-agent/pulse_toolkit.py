@@ -62,6 +62,9 @@ class PulseToolkit:
             self.get_sleep_status,
             self.set_keep_awake,
             self.get_cached_speedtest,
+            self.list_automations,
+            self.create_automation,
+            self.set_automation_enabled,
         ]
 
         self.tools = tools
@@ -72,6 +75,8 @@ class PulseToolkit:
                 "restore_undo_item",
                 "set_display_brightness",
                 "set_keep_awake",
+                "create_automation",
+                "set_automation_enabled",
             ])
 
     async def _run_cmd(self, args: List[str], timeout: int = 30) -> Any:
@@ -317,6 +322,8 @@ class PulseToolkit:
         return result
 
     def approval_evidence(self, name: str, arguments: dict) -> dict:
+        if name in {"create_automation", "set_automation_enabled"}:
+            return {"arguments": arguments, "notice": "Automations run while Pulse is open, catch up a missed schedule once, and never wake a sleeping Mac. Future runs send requests to your selected provider and may incur charges. Scheduled investigations are read-only; changes need a fresh interactive review and approval."}
         key = None
         if name == "clean_target": key = ("clean", "--target", arguments.get("target_id", ""))
         if name == "uninstall_app": key = ("uninstall", arguments.get("app_path_or_name", ""))
@@ -407,6 +414,49 @@ class PulseToolkit:
         Retrieve latest network speed test results (download, upload, ping) recorded by Pulse.
         """
         return await self._run_cmd(["speedtest", "--cached"])
+
+    async def list_automations(self) -> Any:
+        """List Pulse's saved automations and schedules without changing them."""
+        return await self._run_cmd(["automation", "list"])
+
+    async def create_automation(self, title: str, instructions: str, timezone_id: str,
+                                repeat_rule: str = "daily", hour: int = 9, minute: int = 0,
+                                weekday: int = 2, once_at: str = "") -> Any:
+        """After human approval, schedule a read-only Mac investigation. Supply the user's
+        explicit IANA timezone (never infer it); repeat once/daily/weekdays/weekly.
+        Hour 0–23, minute 0–59, weekday 1=Sunday through 7=Saturday.
+        For once, supply once_at as a future ISO8601 date with timezone offset.
+        Pulse must remain open; future provider requests may incur charges."""
+        if not all(isinstance(value, str) for value in (title, instructions, timezone_id, repeat_rule, once_at)):
+            return {"error": "Supply text for automation name, instructions, timezone and schedule"}
+        title, instructions, timezone_id = title.strip(), instructions.strip(), timezone_id.strip()
+        if not 1 <= len(title) <= 80 or not instructions or len(instructions.encode('utf-8')) > 2500:
+            return {"error": "Use a name of 1–80 characters and instructions of 1–2,500 UTF-8 bytes"}
+        if not timezone_id or len(timezone_id) > 100:
+            return {"error": "Supply the user's explicit timezone ID, at most 100 characters"}
+        if repeat_rule not in {"once", "daily", "weekdays", "weekly"}:
+            return {"error": "Repeat must be once, daily, weekdays or weekly"}
+        if any(type(value) is not int for value in (hour, minute, weekday)) or not (0 <= hour <= 23 and 0 <= minute <= 59 and 1 <= weekday <= 7):
+            return {"error": "Use integer hour 0–23, minute 0–59 and weekday 1–7"}
+        once_at = once_at.strip()
+        if len(once_at) > 100 or (repeat_rule == "once" and not once_at):
+            return {"error": "A one-time schedule requires a future ISO8601 date, at most 100 characters"}
+        payload = {"title": title, "instructions": instructions, "repeatRule": repeat_rule,
+                   "hour": hour, "minute": minute, "weekday": weekday,
+                   "timezoneID": timezone_id, "onceAt": once_at}
+        encoded = json.dumps(payload, separators=(',', ':'), ensure_ascii=False)
+        if len(encoded.encode('utf-8')) > 4096:
+            return {"error": "Automation exceeds the 4,096-byte request limit"}
+        return await self._run_cmd(["automation", "create", encoded])
+
+    async def set_automation_enabled(self, automation_id: str, enabled: bool) -> Any:
+        """After human approval, pause or resume one exact automation UUID from list_automations.
+        Resuming permits future read-only provider requests, which may incur charges."""
+        if not isinstance(automation_id, str) or type(enabled) is not bool:
+            return {"error": "Supply an automation UUID and boolean enabled value"}
+        try: identifier = str(uuid.UUID(automation_id))
+        except ValueError: return {"error": "Supply an automation UUID"}
+        return await self._run_cmd(["automation", "set_enabled", json.dumps({"id": identifier, "enabled": enabled}, separators=(',', ':'))])
 
 
 async def native_request(run_id: str, session_id: str, arguments: list[str], timeout: int = 30, cancel: bool = False) -> dict:

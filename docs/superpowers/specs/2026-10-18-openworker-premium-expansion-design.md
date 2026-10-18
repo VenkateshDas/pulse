@@ -1,6 +1,6 @@
 # Pulse: OpenWorker feature expansion and premium application shell
 
-Date: October 18, 2026. Status: design approved October 18, 2026 (user: “go ahead”); implementation in progress. User requested all non-connector OpenWorker capabilities adapted for Mac optimization and utility, including detached agent-generated conversation titles. This document makes the proposed boundaries reviewable; it does not claim feature parity or approval.
+Date: October 18, 2026. Status: design approved October 18, 2026 (user: “go ahead”); implementation complete for the adapted Mac workspace; validation and user review in progress. User requested all non-connector OpenWorker capabilities adapted for Mac optimization and utility, including detached agent-generated conversation titles. This document makes the proposed boundaries reviewable; it does not claim feature parity or approval.
 
 ## Evidence and baseline
 
@@ -84,3 +84,12 @@ Apply the same header/spacing/form/row treatment to Home, storage, Apps, energy,
 ## Review decision
 
 Recommended: approve this native-host adaptation and sequence, including the bounded detached title agent, native scheduling wakeups and the explicit broader-feature follow-up scope. Implementation must not silently replace this with a cosmetic-only change or claim all upstream features shipped. Research is complete enough to start the first focused implementation design after approval; no implementation or live-provider tests have run for this expansion.
+
+
+## Implemented boundary (October 18)
+
+Implementation follows the native-host approach on `feat/openworker-premium`, retaining runtime dependency #89. One native sidebar fronts real workspace feature pages. Chat metadata/search, independent bounded title jobs, native app-resident schedules, read-only unattended runs and review drafts, editable memory/instructions with revision-guarded Undo, persisted task progress, evidence/export drawer, bounded tool-free second opinions and Mac specialist focus modes are implemented. Selected UTF-8 text attachments and Markdown export use native panels. Dictation uses only supported on-device recognition, explicit permission requests, thirty-second bounds and session/generation cancellation.
+
+Deliberate adaptations: supported schedules use native repeat presets rather than a cron editor. Archived search is an exclusive filter. Attachments are selected text files (8 KB), not arbitrary binary documents or a filesystem browser. Specialists are bounded diagnostic focus profiles with existing Pulse skill/tools, not independent cloud/team agents. Delegation is a single tool-free second opinion per run. Automation review prepares an unsent draft, never replays expired approval or commits a scheduled mutation. Notifications require existing macOS authorization. Full upstream team/cloud/remote-machine/sandbox/workspace infrastructure, connectors and automatic action approval are not imported. These are explicit product boundaries, not hidden claims of full OpenWorker parity.
+
+Local deterministic checks currently pass: 75 backend tests, 399 Swift tests, React fixtures/typecheck/production asset build. Source review corrected standalone server route registration, stale task writes, cold startup coalescing, cancellation forwarding, paused-task edits, one-time catch-up consumption, Unicode request bounds and dictation generation/session races. Final bundle/visual/resource evidence and CI are recorded in the companion plan; this paragraph does not certify live providers, full VoiceOver, dictation hardware/languages or background RSS compliance.

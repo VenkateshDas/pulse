@@ -114,6 +114,9 @@ actor AgentNativeBridge {
                 let result: NativeCommandExecutor.Result
                 if request.arguments == ["context"] {
                     result = .init(json: await contextProvider?() ?? "{\"unavailable\":\"No current snapshot\"}", exitCode: 0)
+                } else if request.arguments.first == "automation" {
+                    let response = await AutomationModel.shared.agentCommand(request.arguments)
+                    result = .init(json: response.json, exitCode: response.exitCode)
                 } else { result = await NativeCommandExecutor.execute(request.arguments) }
                 let elapsed = ContinuousClock.now - started
                 await self?.finished(connection, id: id, request: request, result: result, elapsed: elapsed)

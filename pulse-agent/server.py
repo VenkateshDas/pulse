@@ -17,6 +17,7 @@ from providers import ProviderConfiguration
 from conversation_store import ConversationStore
 from openworker_runtime import PulseTurnEngine
 from memory import PulseMemoryStore
+from title_agent import TitleAgentJobs
 from pulse_toolkit import native_request
 from storage import RUNTIME_DIR, database
 from diagnostics import configure as configure_logs, record
@@ -28,6 +29,7 @@ store=None
 runs={}
 session_writers={}
 cancelled_requests=OrderedDict()
+titles=TitleAgentJobs()
 
 def storage():
     global store
@@ -46,6 +48,7 @@ async def lifespan(app):
     for r in list(runs.values()):
         if r.task and not r.task.done():r.task.cancel()
     await asyncio.gather(*(r.task for r in runs.values() if r.task),return_exceptions=True)
+    await titles.stop()
     record('runtime.stopped')
 
 app=FastAPI(title='Pulse OpenWorker Agent',version='3',lifespan=lifespan)
@@ -64,6 +67,7 @@ class RunRequest(BaseModel):
     session_id:Optional[str]=Field(default=None,max_length=128)
     request_id:Optional[str]=Field(default=None,max_length=128)
     mode:Literal['investigate','interactive']='interactive'
+    specialist:Literal['general','performance','storage','energy']='general'
 class ContinueRequest(BaseModel):
     approved:bool=False
     approval_id:str=Field(min_length=1,max_length=128)
@@ -178,6 +182,7 @@ async def serve(r):
             await translate(r.agent.run(r.message),r)
         await r.agent.checkpoint('cancelled' if r.cancelled else 'completed')
         event_line(r,'usage.updated',{'usage':await asyncio.to_thread(r.agent.store.usage,r.session_id)})
+        if not r.cancelled and r.config.ready:titles.start(r.agent.store,r.config,r.session_id)
         event_line(r,'run.cancelled' if r.cancelled else 'run.completed')
     except asyncio.CancelledError:
         r.cancelled=True;r.agent.request_interrupt()
@@ -231,7 +236,7 @@ def prune():
 async def status():
     prune()
     return {'status':'ok','has_api_key':configuration.ready,'summary':'Ready','model':configuration.model,'provider':configuration.provider,
-            'memory_enabled':configuration.memory_enabled,'active_runs':len(session_writers),'engine':'openworker'}
+            'memory_enabled':configuration.memory_enabled,'active_runs':len(session_writers),'engine':'openworker','background_jobs':len(titles.jobs)}
 
 @app.post('/config',dependencies=[Depends(require_token)])
 async def configure(request:ProviderConfiguration):
@@ -254,7 +259,7 @@ async def run(request:RunRequest):
     if rid in cancelled_requests:raise HTTPException(409,'Request was stopped before startup completed')
     existing=runs.get(rid)
     if existing:
-        if existing.session_id!=sid or existing.message!=request.message or existing.agent.read_only!=(request.mode=='investigate'):raise HTTPException(409,'Request ID already used')
+        if existing.session_id!=sid or existing.message!=request.message or existing.agent.read_only!=(request.mode=='investigate') or getattr(existing.agent,'specialist','general')!=request.specialist:raise HTTPException(409,'Request ID already used')
         return StreamingResponse(observe(existing),media_type='text/event-stream')
     if sid in session_writers:raise HTTPException(409,'Conversation has an active run')
     if len(session_writers)>=4 or len(runs)>=MAX_RUNS:raise HTTPException(429,'Agent capacity reached')
@@ -267,7 +272,7 @@ async def run(request:RunRequest):
             context='Timestamped native snapshot (may be stale): '+snapshot['json'][:6000]
         except Exception:context='Native snapshot unavailable; request relevant evidence when needed.'
         memory=PulseMemoryStore(sid,config.memory_enabled,store=db)
-        agent=await asyncio.to_thread(PulseTurnEngine,configuration=config,store=db,session_id=sid,run_id=rid,context=context,memory=memory,read_only=request.mode=='investigate')
+        agent=await asyncio.to_thread(PulseTurnEngine,configuration=config,store=db,session_id=sid,run_id=rid,context=context,memory=memory,read_only=request.mode=='investigate',specialist=request.specialist)
         if rid in cancelled_requests:
             session_writers.pop(sid,None)
             raise HTTPException(409,'Request was stopped during setup')
@@ -336,8 +341,8 @@ async def replay(run_id:str,after_sequence:int=Query(0,ge=0)):
     return {'events':[event for event in r.events if event['sequence']>after_sequence]}
 
 @app.get('/sessions',dependencies=[Depends(require_token)])
-async def sessions(page:int=Query(1,ge=1,le=10000)):
-    return {'sessions':await asyncio.to_thread(storage().sessions,page)}
+async def sessions(page:int=Query(1,ge=1,le=10000),query:str=Query('',max_length=200),archived:bool=False):
+    return {'sessions':await asyncio.to_thread(storage().sessions,page,query,archived)}
 
 @app.get('/sessions/{session_id}/usage',dependencies=[Depends(require_token)])
 async def session_usage(session_id:str):
@@ -351,7 +356,7 @@ async def session_history(session_id:str,page:int=Query(1,ge=1,le=10000)):
 
 @app.get('/memory',dependencies=[Depends(require_token)])
 async def memories():
-    return {'memories':await PulseMemoryStore('',True,store=storage()).arecall(),'enabled':configuration.memory_enabled}
+    return {'memories':await PulseMemoryStore('',True,store=storage()).arecall(),'enabled':configuration.memory_enabled,'instructions':await asyncio.to_thread(storage().setting,'user_instructions','')}
 
 @app.delete('/memory/{memory_id}',dependencies=[Depends(require_token)])
 async def delete_memory(memory_id:str):
@@ -367,6 +372,69 @@ async def toggle_memory(enabled:bool):
     if session_writers:raise HTTPException(409,'Stop active runs before changing memory')
     configuration=configuration.model_copy(update={'memory_enabled':enabled})
     return {'enabled':enabled}
+
+
+class SessionUpdate(BaseModel):
+    title:Optional[str]=Field(default=None,min_length=1,max_length=80)
+    pinned:Optional[bool]=None
+    archived:Optional[bool]=None
+
+@app.patch('/sessions/{session_id}',dependencies=[Depends(require_token)])
+async def update_session(session_id:str,request:SessionUpdate):
+    if session_id in session_writers:raise HTTPException(409,'Wait for the conversation to finish')
+    try:await asyncio.to_thread(storage().update_session,session_id,**request.model_dump())
+    except ValueError as exc:raise HTTPException(422,str(exc))
+    return {'status':'updated'}
+
+@app.get('/sessions/{session_id}/title',dependencies=[Depends(require_token)])
+async def session_title(session_id:str):
+    await titles.wait(session_id)
+    return await asyncio.to_thread(storage().session_metadata,session_id)
+
+class MemoryUpdate(BaseModel):
+    content:str=Field(min_length=1,max_length=400)
+    evidence:str=Field(min_length=1,max_length=400)
+    kind:Literal['preference','lesson']='preference'
+    revision:int=Field(default=0,ge=0)
+
+@app.post('/memory',dependencies=[Depends(require_token)])
+async def add_memory(request:MemoryUpdate):
+    if session_writers:raise HTTPException(409,'Stop active runs before changing memory')
+    result=await PulseMemoryStore('',configuration.memory_enabled,storage()).save_pulse_memory(request.content,request.evidence,request.kind)
+    if 'error' in result:raise HTTPException(422,result['error'])
+    return result
+
+@app.put('/memory/{memory_id}',dependencies=[Depends(require_token)])
+async def edit_memory(memory_id:str,request:MemoryUpdate):
+    if session_writers:raise HTTPException(409,'Stop active runs before changing memory')
+    try:result=await PulseMemoryStore('',configuration.memory_enabled,storage()).edit_memory(memory_id,request.content,request.evidence,request.kind,request.revision)
+    except ValueError as exc:raise HTTPException(409,str(exc))
+    if 'error' in result:raise HTTPException(422,result['error'])
+    return result
+
+class InstructionUpdate(BaseModel):
+    text:str=Field(max_length=4000)
+
+@app.put('/instructions',dependencies=[Depends(require_token)])
+async def update_instructions(request:InstructionUpdate):
+    if session_writers:raise HTTPException(409,'Stop active runs before changing instructions')
+    try:await asyncio.to_thread(storage().set_setting,'user_instructions',request.text.strip())
+    except ValueError as exc:raise HTTPException(422,str(exc))
+    return {'status':'saved'}
+
+@app.get('/sessions/{session_id}/tasks',dependencies=[Depends(require_token)])
+async def session_tasks(session_id:str):
+    return {'tasks':await asyncio.to_thread(storage().tasks,session_id)}
+
+
+class MemoryUndo(BaseModel):
+    revision:int=Field(ge=0)
+
+@app.post('/memory/{memory_id}/undo',dependencies=[Depends(require_token)])
+async def undo_memory(memory_id:str,request:MemoryUndo):
+    if session_writers:raise HTTPException(409,'Wait for active runs before changing memory')
+    if not await asyncio.to_thread(storage().undo_memory_save,memory_id,request.revision):raise HTTPException(409,'Memory changed or was already removed')
+    return {'status':'undone'}
 
 if __name__=='__main__':
     import uvicorn
