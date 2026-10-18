@@ -88,6 +88,20 @@ struct SidebarView: View {
                     nav("Needs attention", symbol: "tray", page: "inbox")
                     nav("Memory", symbol: "brain", page: "memory")
                     nav("Specialists", symbol: "sparkles", page: "skills")
+                    if agent.isBusy {
+                        HStack(spacing: 6) {
+                            Button {
+                                selection = .agent; agent.openPage("conversation")
+                            } label: {
+                                Label(agent.state == .awaitingApproval ? "Review current request" : "Current conversation", systemImage: "bubble.left")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }.buttonStyle(.plain)
+                            Button("Stop", systemImage: "stop.fill") { agent.cancel() }
+                                .labelStyle(.iconOnly).buttonStyle(.plain).help("Stop current conversation")
+                                .disabled(agent.state == .starting)
+                        }.font(Halo.font(size: 12)).padding(12)
+                            .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8)).padding(.top, 8)
+                    }
                     if !agent.sessions.isEmpty {
                         navLabel("CONVERSATIONS")
                         let recent = showRecents ? agent.sessions : Array(agent.sessions.prefix(7))
