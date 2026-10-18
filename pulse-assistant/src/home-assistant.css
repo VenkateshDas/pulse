@@ -14,25 +14,25 @@
 .compact-chat .viewport { padding: 12px 16px; }
 .compact-chat .transcript { padding-bottom: 8px; }
 
-.compact-chat .welcome { padding: 12px 0 4px; }
+.compact-chat .welcome { padding: 4px 0; }
 .compact-chat .welcome > .hero-icon { display: none; }
 .compact-chat .welcome h2 {
   font-size: 20px;
   line-height: 1.35;
   letter-spacing: -.35px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
-.compact-chat .welcome-detail { font-size: 14px; line-height: 1.5; }
+.compact-chat .welcome-detail { font-size: 14px; line-height: 1.5; margin: 0; }
 .compact-chat .suggestions {
   grid-template-columns: 1fr;
-  gap: 8px;
-  margin: 16px 0 12px;
+  gap: 6px;
+  margin: 12px 0 6px;
 }
 .compact-chat .suggestions button {
   flex-direction: row;
   align-items: center;
-  min-height: 40px;
-  padding: 10px 12px;
+  min-height: 36px;
+  padding: 8px 12px;
   gap: 10px;
   border-radius: 8px;
 }

@@ -124,7 +124,7 @@ The existing optional Python runtime is already an approved interactive exceptio
 - Measure native app, WebKit children and optional runtime separately and together. Background target remains <1% CPU and <50 MB RSS. Existing documented 59.1 MiB hidden baseline means compliance is not yet established; this feature cannot claim to fix that through design alone.
 - Open focuses the composer or setup action, never steals focus on completion. Escape closes the innermost disclosure/modal first, then minimizes. Return sends and Shift-Return inserts a line break; honor IME composition.
 - Provide a named nonmodal assistant region and a discoverable keyboard action in the existing command palette. Verify crossing SwiftUI/WKWebView boundaries with native VoiceOver; web-only checks are insufficient.
-- Keep Home keyboard focus visible. If focus moves to a Home control behind the floating panel, minimize the panel before revealing that control, preserving the chat.
+- Keep Home keyboard focus visible. When a Home control receives focus, minimize the floating panel and preserve that focus and chat. WebKit internal focus movement must not trigger minimization.
 - Announce statuses once; keep streamed text outside a token-by-token live announcement. Retain full text for reading. Use symbols plus text for status and visible focus outlines.
 - Validate light/dark, selected themes, Larger text, Reduce Motion, Reduce Transparency, narrow windows, long responses, tables, approval details, and disconnected providers.
 

@@ -22,6 +22,7 @@ struct RootView: View {
     @State private var showOnboarding = PermissionsGate.shouldPromptOnLaunch()
     @State private var homeAssistant = HomeAssistantState()
     @FocusState private var launcherFocused: Bool
+    @FocusedValue(\.homeControlFocused) private var homeControlFocused
 
     private var assistantVisible: Bool {
         HomeAssistantState.isVisible(selection: selection, homeOpen: homeAssistant.isOpen,
@@ -77,6 +78,7 @@ struct RootView: View {
                 case .settings: SettingsView(selection: $selection)
                 case .diagnostics: DevModeView()
                 default: DashboardView(bottomClearance: 72)
+                    .focusedValue(\.homeControlFocused, true)
                     .disabled(homeAssistant.isOpen && HomeAssistantState.usesFullDetail(width: geometry.size.width, height: geometry.size.height))
                     .accessibilityHidden(homeAssistant.isOpen && HomeAssistantState.usesFullDetail(width: geometry.size.width, height: geometry.size.height))
                     .allowsHitTesting(!(homeAssistant.isOpen && HomeAssistantState.usesFullDetail(width: geometry.size.width, height: geometry.size.height)))
@@ -129,6 +131,12 @@ struct RootView: View {
             if assistantVisible { await agentModel.start() }
         }
         .onDisappear { agentModel.visibilityChanged(false) }
+        .onChange(of: homeControlFocused) { _, focused in
+            if focused == true && !AgentWebView.hasKeyboardFocus && selection == .dashboard && homeAssistant.isOpen {
+                homeAssistant.minimize()
+                VoiceInput.shared.stop()
+            }
+        }
         .onChange(of: selection) { _, destination in
             if destination != .dashboard { homeAssistant.minimize() }
             if destination == .agent && agentModel.page == "conversation" { homeAssistant.markRead(runID: agentModel.activeRunId) }
@@ -220,14 +228,7 @@ struct RootView: View {
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(onHome ? "Ask Pulse on Home" : "Ask Pulse workspace")
                 .accessibilityIdentifier("pulse-home-assistant")
-                .background {
-                    if onHome && !fullDetail {
-                        HomeAssistantFocusGuard(minimize: {
-                            homeAssistant.minimize()
-                            VoiceInput.shared.stop()
-                        })
-                    }
-                }
+                .focusedValue(\.homeControlFocused, false)
             }
             if onHome && !(homeAssistant.isOpen && fullDetail) {
                 HomeAssistantLauncher(model: agentModel, presentation: homeAssistant,

@@ -1,41 +1,11 @@
 import SwiftUI
-import AppKit
 
-/// After keyboard navigation, reveal a Home control covered by floating chat.
-/// Reads only this app's accessibility tree; no TCC grant or polling required.
-struct HomeAssistantFocusGuard: NSViewRepresentable {
-    let minimize: () -> Void
-    func makeNSView(context: Context) -> FocusView { FocusView(minimize: minimize) }
-    func updateNSView(_ view: FocusView, context: Context) { view.minimize = minimize }
-    static func dismantleNSView(_ view: FocusView, coordinator: ()) { view.stop() }
+private struct HomeControlFocusKey: FocusedValueKey { typealias Value = Bool }
 
-    final class FocusView: NSView {
-        var minimize: () -> Void
-        private var monitor: Any?
-        init(minimize: @escaping () -> Void) {
-            self.minimize = minimize
-            super.init(frame: .zero)
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                if event.keyCode == 48 {
-                    Task { @MainActor [weak self] in self?.revealFocusedControl() }
-                }
-                return event
-            }
-        }
-        required init?(coder: NSCoder) { nil }
-        func stop() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
-        private func revealFocusedControl() {
-            guard monitor != nil, let window, window.isKeyWindow,
-                  let focused = NSApplication.accessibilityFocusedUIElement() as? NSAccessibilityProtocol else { return }
-            var ancestor: Any? = focused
-            for _ in 0..<32 {
-                guard let element = ancestor as? NSAccessibilityProtocol else { break }
-                if element.accessibilityIdentifier() == "pulse-home-assistant" { return }
-                ancestor = element.accessibilityParent()
-            }
-            let panelFrame = window.convertToScreen(convert(bounds, to: nil))
-            if panelFrame.intersects(focused.accessibilityFrame()) { minimize() }
-        }
+extension FocusedValues {
+    var homeControlFocused: Bool? {
+        get { self[HomeControlFocusKey.self] }
+        set { self[HomeControlFocusKey.self] = newValue }
     }
 }
 

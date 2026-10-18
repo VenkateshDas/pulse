@@ -6,6 +6,17 @@ import PulseKit
 /// Only packaged assets are served; no localhost credentials reach JavaScript.
 @MainActor
 struct AgentWebView: NSViewRepresentable {
+    /// SwiftUI focused values can lag behind WebKit's internal responder moves.
+    /// Consult the native view ancestry, never WebKit's accessibility tree.
+    static var hasKeyboardFocus: Bool {
+        var view = NSApp.keyWindow?.firstResponder as? NSView
+        while let current = view {
+            if current is WKWebView { return true }
+            view = current.superview
+        }
+        return false
+    }
+
     let model: AgentModel
     let snapshot: Snapshot
     @Binding var failure: String?
