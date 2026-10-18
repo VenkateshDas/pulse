@@ -1,0 +1,243 @@
+/* Home shares the workspace renderer; keep every override inside this surface. */
+.workspace.compact-chat {
+  position: relative;
+  isolation: isolate;
+  height: 100dvh;
+  min-height: 0;
+  background: var(--paper);
+  font-size: 14px;
+}
+
+.compact-chat .header,
+.compact-chat .rail { display: none; }
+.compact-chat .main { min-height: 0; }
+.compact-chat .viewport { padding: 12px 16px; }
+.compact-chat .transcript { padding-bottom: 8px; }
+
+.compact-chat .welcome { padding: 12px 0 4px; }
+.compact-chat .welcome > .hero-icon { display: none; }
+.compact-chat .welcome h2 {
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: -.35px;
+  margin-bottom: 8px;
+}
+.compact-chat .welcome-detail { font-size: 14px; line-height: 1.5; }
+.compact-chat .suggestions {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+.compact-chat .suggestions button {
+  flex-direction: row;
+  align-items: center;
+  min-height: 40px;
+  padding: 10px 12px;
+  gap: 10px;
+  border-radius: 8px;
+}
+.compact-chat .suggestions button > svg:first-child { display: block; flex-shrink: 0; }
+.compact-chat .suggestions strong { font-size: 14px; line-height: 1.4; }
+.compact-chat .suggestions span { display: none; }
+.compact-chat .evidence-note { align-items: flex-start; font-size: 12px; line-height: 1.5; }
+.compact-chat .evidence-note svg { flex-shrink: 0; margin-top: 2px; }
+
+.compact-chat .message { margin: 14px 0 20px; }
+.compact-chat .message.user {
+  max-width: 92%;
+  padding: 10px 12px;
+  border-radius: 12px 12px 4px 12px;
+}
+.compact-chat .message.user > .markdown { padding: 0; background: transparent; max-width: 100%; }
+.compact-chat .message-label { font-size: 12px; letter-spacing: 0; text-transform: none; margin-bottom: 8px; }
+.compact-chat .markdown { font-size: 14px; line-height: 1.65; }
+.compact-chat .markdown p { margin-bottom: 12px; }
+.compact-chat .markdown h1 { font-size: 21px; }
+.compact-chat .markdown h2 { font-size: 19px; }
+.compact-chat .markdown h3 { font-size: 17px; }
+.compact-chat .markdown pre { padding: 12px; }
+.compact-chat .markdown pre,
+.compact-chat .markdown code,
+.compact-chat .markdown table { font-size: 12px; }
+.compact-chat .markdown th,
+.compact-chat .markdown td { padding: 8px; }
+.compact-chat .message-actions button,
+.compact-chat .tool-state,
+.compact-chat .tool pre,
+.compact-chat .approval pre,
+.compact-chat .approval small,
+.compact-chat .jump { font-size: 12px; }
+.compact-chat .work-group { margin: 12px 0; }
+.compact-chat .work-group > summary { align-items: flex-start; overflow-wrap: anywhere; }
+.compact-chat .tool summary { align-items: flex-start; }
+.compact-chat .tool summary > svg { flex-shrink: 0; margin-top: 2px; }
+.compact-chat .tool summary > span { min-width: 0; overflow-wrap: anywhere; }
+.compact-chat .tool-state { flex-shrink: 0; }
+.compact-chat .approval { padding: 12px; border-radius: 10px; overflow-wrap: anywhere; }
+.compact-chat .approval-title { align-items: flex-start; }
+.compact-chat .approval-title > svg { flex-shrink: 0; }
+.compact-chat .approval pre { max-height: 180px; }
+.compact-chat .approval-actions { flex-wrap: wrap; }
+.compact-chat .approval-actions button { white-space: normal; }
+.compact-chat .question-options { margin: 12px 0; }
+.compact-chat .question-options button { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+
+.compact-chat .composer-area {
+  position: relative;
+  z-index: 2;
+  padding: 0 12px 10px;
+  max-width: none;
+}
+.compact-chat .run-status { min-height: 24px; max-height: 48px; margin-bottom: 4px; font-size: 12px; }
+.compact-chat .run-status button { font-size: 12px; }
+.compact-chat .composer { padding: 10px; border-radius: 12px; overflow: visible; }
+.compact-chat .composer textarea {
+  min-height: 42px;
+  max-height: 100px;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.compact-chat .composer-controls { gap: 8px; align-items: center; }
+.compact-chat .composer-hint { flex: 1 1 auto; min-width: 0; max-width: none; font-size: 12px; }
+.compact-chat .composer-hint select { max-width: 100%; min-width: 0; font-size: 12px; padding: 6px 0; }
+.compact-chat .composer-controls > .send { width: 34px; height: 34px; flex-shrink: 0; }
+.compact-chat .usage-trigger {
+  order: 4;
+  flex: 1 0 100%;
+  max-width: none;
+  width: 100%;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  padding: 2px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.compact-chat .usage-session { font-size: 12px; }
+.compact-chat .composer-footnote {
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  margin: 8px 0 0;
+  opacity: 1;
+  overflow-wrap: anywhere;
+}
+.compact-chat .composer-more { position: relative; flex-shrink: 0; font-size: 12px; }
+.compact-chat .composer-more > summary {
+  padding: 8px;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 6px;
+  list-style: none;
+}
+.compact-chat .composer-more > summary::-webkit-details-marker { display: none; }
+.compact-chat .composer-more > summary:hover { background: var(--subtle); }
+.compact-chat .composer-more-actions {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 8px);
+  left: -8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  width: 200px;
+  max-width: calc(100vw - 48px);
+  max-height: min(240px, 55dvh);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px #0002;
+}
+.compact-chat .composer-more-actions button {
+  justify-content: flex-start;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px;
+  min-height: 32px;
+  border-radius: 6px;
+  white-space: normal;
+}
+.compact-chat .provider-disclosure {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.compact-chat .provider-disclosure > summary { cursor: pointer; padding: 3px 0; }
+.compact-chat .provider-disclosure p { margin: 6px 0 0; }
+
+.compact-chat .setup {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: block;
+  margin: 0;
+  max-width: none;
+  padding: 20px 18px;
+}
+.compact-chat .setup .hero-icon { width: 44px; height: 44px; border-radius: 12px; margin-bottom: 14px; }
+.compact-chat .setup h2 { font-size: 23px; letter-spacing: -.5px; }
+.compact-chat .setup p { font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+.compact-chat .setup small { display: block; font-size: 12px; margin-top: 16px; }
+.compact-chat .setup .quiet { display: flex; margin: 8px auto 0; }
+
+/* Overlay the transcript rather than narrowing it into an unreadable column. */
+.compact-chat .evidence-drawer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 0 16px 16px;
+  border: 0;
+  background: var(--surface);
+  overflow: auto;
+  overscroll-behavior: contain;
+  box-shadow: none;
+}
+.compact-chat .evidence-drawer > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+.compact-chat .evidence-drawer > header button { min-width: 32px; min-height: 32px; }
+.compact-chat .evidence-drawer section { margin-top: 16px; padding-top: 16px; }
+.compact-chat .evidence-drawer pre { max-height: 180px; }
+.compact-chat .usage-panel {
+  width: calc(100vw - 24px);
+  max-width: 480px;
+  max-height: calc(100dvh - 24px);
+  padding: 14px;
+  border-radius: 12px;
+  overscroll-behavior: contain;
+}
+.compact-chat .usage-panel header { gap: 8px; }
+.compact-chat .usage-panel header button { min-width: 32px; min-height: 32px; }
+.compact-chat .usage-panel h2 { font-size: 18px; }
+.compact-chat .usage-breakdown > div { gap: 8px; flex-wrap: wrap; }
+.compact-chat .usage-breakdown dd { margin-left: auto; }
+
+.compact-chat.larger .markdown,
+.compact-chat.larger .composer textarea,
+.compact-chat.larger .welcome-detail,
+.compact-chat.larger .suggestions strong,
+.compact-chat.larger .setup p { font-size: 16px; }
+.compact-chat.larger button { font-size: 14px; }
+.compact-chat.larger .composer-hint select,
+.compact-chat.larger .composer-footnote,
+.compact-chat.larger .provider-disclosure { font-size: 13px; }
+.compact-chat *, .compact-chat *::before, .compact-chat *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}

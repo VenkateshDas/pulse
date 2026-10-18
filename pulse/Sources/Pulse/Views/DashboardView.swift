@@ -4,6 +4,7 @@ import SwiftUI
 /// Main command-center content: greeting, guided-focus attention cards,
 /// vitals row, CPU chart and top processes.
 struct DashboardView: View {
+    var bottomClearance: CGFloat = 0
     @Environment(DashboardModel.self) private var model
     @Environment(NetworkModel.self) private var networkModel
     @Environment(StorageModel.self) private var storage
@@ -40,6 +41,7 @@ struct DashboardView: View {
 
             }
             .padding(Halo.Space.xxl)
+            .padding(.bottom, bottomClearance)
             .frame(maxWidth: 1200, alignment: .leading)
             .frame(maxWidth: .infinity)
         }

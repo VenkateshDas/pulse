@@ -9,8 +9,10 @@ struct AgentWebView: NSViewRepresentable {
     let model: AgentModel
     let snapshot: Snapshot
     @Binding var failure: String?
+    var minimize: () -> Void = {}
+    var openSettings: () -> Void = { PulseNavigation.open(.settings) }
 
-    func makeCoordinator() -> Coordinator { Coordinator(model: model, snapshot: snapshot, failure: $failure) }
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, snapshot: snapshot, failure: $failure, minimize: minimize, openSettings: openSettings) }
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
@@ -29,6 +31,8 @@ struct AgentWebView: NSViewRepresentable {
     func updateNSView(_ view: WKWebView, context: Context) {
         context.coordinator.model = model
         context.coordinator.snapshot = snapshot
+        context.coordinator.minimize = minimize
+        context.coordinator.openSettings = openSettings
         context.coordinator.publish()
     }
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
@@ -41,6 +45,8 @@ struct AgentWebView: NSViewRepresentable {
     }
 
     struct Snapshot: Encodable {
+        let compact: Bool
+        let providerLabel: String
         var items: [AgentTimelineItem]; let sessions: [AgentSessionItem]; let sessionId: String?
         let status: String; let busy: Bool; let ready: Bool; let state: String; let model: String; let provider: String
         let memories: [AgentMemoryItem]; let memoryEnabled: Bool; let memoryStatus: String; let largerText: Bool; let hasEarlier: Bool
@@ -55,14 +61,14 @@ struct AgentWebView: NSViewRepresentable {
         let voiceRecording: Bool; let voiceStatus: String; let memoryUndoID: String?
     }
 
-    static func snapshot(for model: AgentModel, largerText: Bool) -> Snapshot {
+    static func snapshot(for model: AgentModel, largerText: Bool, compact: Bool = false) -> Snapshot {
         let _ = model.draftRevision
         let items = model.items.map { item -> AgentTimelineItem in
             var item = item
             if item.kind == .approval { item.isRunning = model.state == .awaitingApproval && item.approvalID == model.approvalId }
             return item
         }
-        return Snapshot(items: items, sessions: model.sessions, sessionId: model.sessionId,
+        return Snapshot(compact: compact, providerLabel: AgentConfiguration.providerURL(AgentConfiguration.baseURL)?.host ?? "selected AI provider", items: items, sessions: model.sessions, sessionId: model.sessionId,
             status: model.status, busy: model.isBusy || model.workspaceBusy, ready: model.hasApiKey, state: String(describing: model.state),
             model: AgentConfiguration.model, provider: AgentConfiguration.provider,
             memories: model.page == "memory" ? model.memories : [], memoryEnabled: model.memoryEnabled, memoryStatus: model.memoryStatus,
@@ -78,13 +84,18 @@ struct AgentWebView: NSViewRepresentable {
         var model: AgentModel
         var snapshot: Snapshot
         let failure: Binding<String?>
+        var minimize: () -> Void
+        var openSettings: () -> Void
         weak var view: WKWebView?
         var ready = false
         var active = true
         private var previous: Data?
         private var renderedItems: [String: AgentTimelineItem] = [:]
         private var renderedOrder: [String] = []
-        init(model: AgentModel, snapshot: Snapshot, failure: Binding<String?>) { self.model = model; self.snapshot = snapshot; self.failure = failure }
+        init(model: AgentModel, snapshot: Snapshot, failure: Binding<String?>, minimize: @escaping () -> Void = {}, openSettings: @escaping () -> Void = { PulseNavigation.open(.settings) }) {
+            self.model = model; self.snapshot = snapshot; self.failure = failure
+            self.minimize = minimize; self.openSettings = openSettings
+        }
 
         func publish() {
             guard ready, active else { return }
@@ -138,7 +149,8 @@ struct AgentWebView: NSViewRepresentable {
             case "approve":
                 guard let id = body["id"] as? String, id == model.approvalId, let approved = body["approved"] as? Bool else { return }
                 model.resolveApproval(approved)
-            case "settings": PulseNavigation.open(.settings)
+            case "settings": openSettings()
+            case "minimize": if snapshot.compact { minimize() }
             case "reconnect": Task { await model.start() }
             case "memory": Task { await model.refreshMemory() }
             case "memoryDelete":

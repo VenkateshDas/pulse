@@ -77,9 +77,15 @@ final class AgentModel {
     @ObservationIgnored private var streamGeneration = UUID()
     @ObservationIgnored private var ignoresCancelledEvents = false
     @ObservationIgnored private let cancelRun: @Sendable (String) async throws -> Void
+    @ObservationIgnored private let shutdownRuntime: @Sendable () async -> Void
 
-    init(cancelRun: @escaping @Sendable (String) async throws -> Void = { try await AgentClient.shared.cancel(runId: $0) }) {
+    init(cancelRun: @escaping @Sendable (String) async throws -> Void = { try await AgentClient.shared.cancel(runId: $0) },
+         shutdownRuntime: @escaping @Sendable () async -> Void = {
+             await AgentDaemonManager.shared.shutdown()
+             await AgentNativeBridge.shared.stop()
+         }) {
         self.cancelRun = cancelRun
+        self.shutdownRuntime = shutdownRuntime
     }
 
     var isBusy: Bool { state == .running || state == .awaitingApproval || state == .starting }
@@ -392,8 +398,7 @@ final class AgentModel {
         shutdownTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard let self, !Task.isCancelled, !self.surfaceVisible, !self.isBusy, self.runtimeLeases == 0 else { return }
-            await AgentDaemonManager.shared.shutdown()
-            await AgentNativeBridge.shared.stop()
+            await self.shutdownRuntime()
         }
     }
 

@@ -1,11 +1,10 @@
 import SwiftUI
-import PulseKit
-import PulseCommands
 
 struct AgentView: View {
     @Bindable var model: AgentModel
-    var visible: Bool = true
-    @Environment(DashboardModel.self) private var dashboard
+    var compact = false
+    var minimize: () -> Void = {}
+    var openSettings: () -> Void = { PulseNavigation.open(.settings) }
     @State private var webFailure: String?
 
     var body: some View {
@@ -16,25 +15,12 @@ struct AgentView: View {
                 } description: { Text(webFailure) } actions: {
                     Button("Reload interface") { self.webFailure = nil }
                 }
-            } else if visible {
+            } else {
                 // Evaluate in body while visible: updateNSView alone does not
                 // establish SwiftUI's Observation dependencies.
-                AgentWebView(model: model, snapshot: AgentWebView.snapshot(for: model, largerText: ThemeManager.shared.largerText), failure: $webFailure)
-            } else { Color.clear }
+                AgentWebView(model: model, snapshot: AgentWebView.snapshot(for: model, largerText: ThemeManager.shared.largerText, compact: compact), failure: $webFailure, minimize: minimize, openSettings: openSettings)
+            }
         }
         .background(Halo.void)
-        .task {
-            model.visibilityChanged(visible)
-            await AgentNativeBridge.shared.configureContext {
-                guard let snapshot = dashboard.snapshot else { return "{\"unavailable\":\"No current visible snapshot\"}" }
-                return (try? CLIOutput.json(VitalsDTO(snapshot: snapshot))) ?? "{}"
-            }
-            if visible { await model.start() }
-        }
-        .onChange(of: visible) { _, value in
-            model.visibilityChanged(value)
-            if value { Task { await model.start() } }
-        }
-        .onDisappear { model.visibilityChanged(false) }
     }
 }

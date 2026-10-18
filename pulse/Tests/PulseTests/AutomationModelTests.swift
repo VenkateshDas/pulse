@@ -133,7 +133,11 @@ struct AutomationModelTests {
         let file = try temporaryFile()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
         let model = AutomationModel(fileURL: file, scheduleTimers: false)
-        let items = [automation(), automation(), automation()]
+        // Distinct tasks; wall-clock precision must not decide whether the
+        // duplicate-schedule guard accepts this concurrency fixture.
+        let items = (0..<3).map { index in
+            var item = automation(); item.title = "Health check \(index)"; return item
+        }
         for item in items { try model.save(item) }
         var gates: [String: CheckedContinuation<AutomationOutcome, Never>] = [:]
         model.configure { item, _, _ in await withCheckedContinuation { gates[item.id] = $0 } }
