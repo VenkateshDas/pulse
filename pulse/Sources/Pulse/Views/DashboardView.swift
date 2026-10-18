@@ -13,18 +13,20 @@ struct DashboardView: View {
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
     var body: some View {
+        GeometryReader { geometry in
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
-                ViewThatFits(in: .horizontal) {
+                if geometry.size.width >= 872 {
                     HStack(alignment: .top, spacing: 24) {
                         VStack(alignment: .leading, spacing: 24) {
                             technicalSummary
                             attentionSummary
                         }
-                        .frame(minWidth: 400, maxWidth: .infinity)
-                        activitySummary.frame(minWidth: 400, maxWidth: .infinity)
+                        .frame(width: (min(1200, geometry.size.width) - 72) / 2)
+                        activitySummary.frame(width: (min(1200, geometry.size.width) - 72) / 2)
                     }
+                } else {
                     VStack(alignment: .leading, spacing: 24) {
                         technicalSummary
                         activitySummary
@@ -42,6 +44,7 @@ struct DashboardView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Halo.void)
+        }
     }
 
 
