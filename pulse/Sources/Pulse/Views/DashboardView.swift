@@ -17,7 +17,6 @@ struct DashboardView: View {
         GeometryReader { geometry in
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
                 everydaySummary
                 if geometry.size.width >= 872 {
                     HStack(alignment: .top, spacing: 24) {

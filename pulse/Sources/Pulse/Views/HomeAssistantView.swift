@@ -23,10 +23,11 @@ struct HomeAssistantLauncher: View {
                 .padding(.horizontal, 18).frame(minHeight: 44)
                 .foregroundStyle(Halo.textPrimary)
                 .background(Halo.surface1, in: Capsule())
-                .overlay(Capsule().strokeBorder(Halo.interactive, lineWidth: 1))
+                .overlay(Capsule().strokeBorder(Halo.interactive, lineWidth: focused ? 2 : 1))
         }
         .buttonStyle(.plain)
         .focusable()
+        .focusEffectDisabled()
         .focused($focused)
         .accessibilityLabel("Ask Pulse")
         .accessibilityValue(presentation.label(for: model.state))

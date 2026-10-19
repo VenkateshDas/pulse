@@ -1,4 +1,4 @@
-/* Home shares the workspace renderer; keep every override inside this surface. */
+/* Home-specific layout plus the shared composer overflow menu. */
 .workspace.compact-chat {
   position: relative;
   isolation: isolate;
@@ -102,19 +102,7 @@
 .compact-chat .composer-hint { flex: 1 1 auto; min-width: 0; max-width: none; font-size: 12px; }
 .compact-chat .composer-hint select { max-width: 100%; min-width: 0; font-size: 12px; padding: 6px 0; }
 .compact-chat .composer-controls > .send { width: 34px; height: 34px; flex-shrink: 0; }
-.compact-chat .usage-trigger {
-  order: 4;
-  flex: 1 0 100%;
-  max-width: none;
-  width: 100%;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  padding: 2px 0;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-.compact-chat .usage-session { font-size: 12px; }
+.compact-chat .usage-trigger { flex-shrink: 0; padding: 6px; }
 .compact-chat .composer-footnote {
   font-size: 12px;
   line-height: 1.5;
@@ -123,17 +111,17 @@
   opacity: 1;
   overflow-wrap: anywhere;
 }
-.compact-chat .composer-more { position: relative; flex-shrink: 0; font-size: 12px; }
-.compact-chat .composer-more > summary {
+.composer-more { position: relative; flex-shrink: 0; font-size: 12px; }
+.composer-more > summary {
   padding: 8px;
   cursor: pointer;
   color: var(--muted);
   border-radius: 6px;
   list-style: none;
 }
-.compact-chat .composer-more > summary::-webkit-details-marker { display: none; }
-.compact-chat .composer-more > summary:hover { background: var(--subtle); }
-.compact-chat .composer-more-actions {
+.composer-more > summary::-webkit-details-marker { display: none; }
+.composer-more > summary:hover { background: var(--subtle); }
+.composer-more-actions {
   position: absolute;
   z-index: 5;
   bottom: calc(100% + 8px);
@@ -151,7 +139,7 @@
   border-radius: 10px;
   box-shadow: 0 6px 20px #0002;
 }
-.compact-chat .composer-more-actions button {
+.composer-more-actions button {
   justify-content: flex-start;
   text-align: left;
   font-size: 12px;

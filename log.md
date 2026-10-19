@@ -221,3 +221,5 @@ Live restart regression verified: the real DeepSeek provider recalled the origin
 
 
 ## [2026-10-18] Harden Home chat keyboard focus | Native evidence/Escape/Tab testing exposed WebKit layer-update crashes with an accessibility-tree focus guard. Removed AX traversal/event monitoring; use SwiftUI focused values with a native responder-ancestry guard so WebKit's own focus changes keep chat open. Five consecutive native replay/minimize/reopen cycles and Settings-return draft checks pass; 411 Swift tests and stable-signed bundle pass. PR #91 depends explicitly on #90; final-head CI and user review remain merge gates.
+
+## [2026-10-19] Simplify Home and Ask Pulse | Remove redundant Home intro/window title, match launcher keyboard focus to its capsule, fix overlapping CSS that double-boxed user messages, and simplify chat header/composer. Shared More menu retains attachments, dictation, evidence and settings; Usage retains complete context/billing details. Existing native actions, approvals and backend remain unchanged. Validation: make assistant (four tests/typecheck/assets), make build and make test (411 tests/96 suites) pass. Native review and CI recorded below.

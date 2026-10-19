@@ -91,6 +91,7 @@ struct RootView: View {
             }
             }
         }
+        .navigationTitle(Text(selection == .dashboard ? "" : "Pulse"))
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 860, minHeight: 600)
         .tint(Halo.interactive)

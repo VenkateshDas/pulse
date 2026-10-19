@@ -125,3 +125,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Landing feature coverage (2026-10-17):** [Approved content plan](docs/superpowers/specs/2026-10-17-landing-current-features-design.md). Landing copy covers released app features, optional AI/provider costs, history and restore limits; removes unshipped plans and unsupported guarantees.
 
 - **Ask Pulse branch sync (2026-10-17):** `feat/pulse-agent-harness` includes main through landing PR #88 and grouped-app quit fix #86. Local review bundle is stamped `0.3.0-beta.5-harness.dev`.
+
+- **Home/chat polish (2026-10-19):** Home opens directly with live summaries, without the redundant title/intro. Launcher uses a capsule keyboard-focus outline. Ask Pulse removes the model tagline and idle status row; shared More menu retains attachment, dictation, evidence and provider settings. Usage opens the existing full ledger. User messages have one surface rather than nested boxes; settled answers retain Markdown. PR #91 remains subject to user visual/functional approval.
