@@ -46,6 +46,7 @@ struct DashboardView: View {
         }
         .background(Halo.void)
         }
+        .navigationTitle(Text(""))
     }
 
 
