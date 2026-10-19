@@ -66,46 +66,105 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 struct SidebarView: View {
     @Environment(DashboardModel.self) private var model
     @Binding var selection: SidebarItem
+    @Bindable var agent: AgentModel
     @State private var showAdvanced = false
+    @State private var showRecents = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: "circle.inset.filled")
-                    .foregroundStyle(Halo.interactive)
-                    .accessibilityHidden(true)
-                Text("Pulse")
-                    .font(Halo.font(size: 22, weight: .semibold, design: .rounded))
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-
-            List(selection: Binding<SidebarItem?>(
-                get: { selection }, set: { if let item = $0 { selection = item } }
-            )) {
-                ForEach(SidebarItem.everyday) { item in row(item) }
-                Section("More") {
-                    row(.agent)
+                Image(systemName: "waveform.path").font(.system(size: 21, weight: .semibold)).foregroundStyle(Halo.interactive)
+                Text("Pulse").font(Halo.font(size: 23, weight: .semibold))
+                Spacer()
+                Text("AI").font(Halo.font(size: 11, weight: .medium)).foregroundStyle(Halo.textSecondary)
+                    .padding(.horizontal, 6).padding(.vertical, 3).overlay(RoundedRectangle(cornerRadius: 5).stroke(Halo.borderSubtle))
+            }.padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 20)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 3) {
+                    navLabel("YOUR MAC")
+                    ForEach(SidebarItem.everyday) { item in toolRow(item) }
                     DisclosureGroup("Advanced tools", isExpanded: $showAdvanced) {
-                        ForEach(SidebarItem.advanced) { item in row(item) }
+                        ForEach(SidebarItem.advanced) { item in toolRow(item) }
+                    }.font(Halo.font(size: 13)).padding(.horizontal, 10).padding(.vertical, 5)
+                    navLabel("ASK PULSE")
+                    nav("New conversation", symbol: "plus", page: "conversation") { agent.newConversation() }
+                    nav("Search", symbol: "magnifyingglass", page: "search")
+                    nav("Automations", symbol: "clock", page: "automations")
+                    nav("Needs attention", symbol: "tray", page: "inbox")
+                    nav("Memory", symbol: "brain", page: "memory")
+                    nav("Specialists", symbol: "sparkles", page: "skills")
+                    if agent.isBusy {
+                        HStack(spacing: 6) {
+                            Button {
+                                selection = .agent; agent.openPage("conversation")
+                            } label: {
+                                Label(agent.state == .awaitingApproval ? "Review current request" : "Current conversation", systemImage: "bubble.left")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }.buttonStyle(.plain)
+                            Button("Stop", systemImage: "stop.fill") { agent.cancel() }
+                                .labelStyle(.iconOnly).buttonStyle(.plain).help("Stop current conversation")
+                                .disabled(agent.state == .starting)
+                        }.font(Halo.font(size: 12)).padding(12)
+                            .background(Halo.surface2, in: RoundedRectangle(cornerRadius: 8)).padding(.top, 8)
                     }
-                    row(.settings)
-                }
+                    if !agent.sessions.isEmpty {
+                        navLabel("CONVERSATIONS")
+                        let recent = showRecents ? agent.sessions : Array(agent.sessions.prefix(7))
+                        ForEach(recent) { session in
+                            Button {
+                                selection = .agent
+                                Task { await agent.openSession(session.sessionId) }
+                            } label: {
+                                HStack(spacing: 9) {
+                                    if session.pinned == true { Image(systemName: "pin.fill").font(.system(size: 10)).foregroundStyle(Halo.textSecondary) }
+                                    Text(session.name).lineLimit(1).truncationMode(.tail)
+                                    Spacer(minLength: 0)
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 9)
+                                    .background(selection == .agent && agent.page == "conversation" && agent.sessionId == session.sessionId ? Halo.surface2 : .clear, in: RoundedRectangle(cornerRadius: 8))
+                            }.buttonStyle(.plain).font(Halo.font(size: 13)).disabled(agent.isBusy)
+                                .help(session.name)
+                                .contextMenu {
+                                    Button(session.pinned == true ? "Unpin" : "Pin") { Task { await agent.updateSession(session.sessionId, pinned: session.pinned != true) } }
+                                    Button("Rename…") { rename(session) }
+                                    Button("Archive") { Task { await agent.updateSession(session.sessionId, archived: true) } }
+                                }
+                        }
+                        if agent.sessions.count > 7 { Button(showRecents ? "Show fewer" : "Show more") { showRecents.toggle() }.buttonStyle(.plain).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary).padding(10) }
+                    }
+                }.padding(.horizontal, 10).padding(.bottom, 16)
             }
-            .listStyle(.sidebar)
-            .font(Halo.font(size: 14))
-            .accessibilityLabel("Navigation")
-
-            Label(statusText, systemImage: statusSymbol)
-                .font(Halo.font(size: 12))
-                .foregroundStyle(Halo.textSecondary)
-                .padding(16)
-                .accessibilityElement(children: .combine)
+            VStack(spacing: 8) {
+                Divider().overlay(Halo.borderSubtle)
+                Button { selection = .settings } label: { Label("Settings", systemImage: "gearshape").frame(maxWidth: .infinity, alignment: .leading).padding(10) }.buttonStyle(.plain)
+                Label(statusText, systemImage: statusSymbol).font(Halo.font(size: 12)).foregroundStyle(Halo.textSecondary).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.bottom, 12)
+            }.padding(.horizontal, 10)
         }
-        .foregroundStyle(Halo.textPrimary)
-        .background(Halo.void)
-        .onAppear { revealSelection() }
-        .onChange(of: selection) { _, _ in revealSelection() }
+        .font(Halo.font(size: 14)).foregroundStyle(Halo.textPrimary).background(Halo.surface1)
+        .onAppear { revealSelection() }.onChange(of: selection) { _, _ in revealSelection() }
+        .accessibilityLabel("Navigation")
+    }
+
+    private func navLabel(_ title: String) -> some View {
+        Text(title).font(Halo.font(size: 11, weight: .medium)).foregroundStyle(Halo.textSecondary).tracking(0.7).padding(.horizontal, 12).padding(.top, 24).padding(.bottom, 8)
+    }
+    private func nav(_ title: String, symbol: String, page: String, action: (() -> Void)? = nil) -> some View {
+        Button {
+            selection = .agent; action?(); agent.openPage(page)
+        } label: {
+            Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 12).padding(.vertical, 10)
+                .background(selection == .agent && agent.page == page && (page != "conversation" || agent.sessionId == nil) ? Halo.surface2 : .clear, in: RoundedRectangle(cornerRadius: 8))
+        }.buttonStyle(.plain).disabled(page == "conversation" && agent.isBusy)
+    }
+    private func toolRow(_ item: SidebarItem) -> some View {
+        Button { selection = item } label: {
+            Label(item.title, systemImage: item.symbol).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 10).padding(.vertical, 8)
+                .background(selection == item ? Halo.surface2 : .clear, in: RoundedRectangle(cornerRadius: 8))
+        }.buttonStyle(.plain).font(Halo.font(size: 13))
+    }
+    private func rename(_ session: AgentSessionItem) {
+        let alert = NSAlert(); alert.messageText = "Rename conversation"; alert.addButton(withTitle: "Save"); alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(string: session.name); field.frame = NSRect(x: 0, y: 0, width: 300, height: 25); alert.accessoryView = field
+        if alert.runModal() == .alertFirstButtonReturn { Task { await agent.updateSession(session.sessionId, title: field.stringValue) } }
     }
 
     private func row(_ item: SidebarItem) -> some View {

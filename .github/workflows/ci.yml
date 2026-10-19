@@ -48,6 +48,28 @@ jobs:
       - name: CLI fixture smoke tests
         run: make cli-smoke SWIFT=swift
 
+      - name: Set up Node for Ask Pulse
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: pulse-assistant/package-lock.json
+
+      - name: Verify packaged Ask Pulse assets
+        run: |
+          make assistant
+          git diff --exit-code -- Sources/Pulse/Resources/Assistant
+
+      - name: Set up Python for agent contracts
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Agent harness contracts
+        run: |
+          python -m pip install uv==0.6.5
+          make agent-test
+
       # Smoke-test the release path that CD depends on: a release build must
       # compile and bundle.sh must produce a launchable .app.
       - name: Release build + bundle smoke test

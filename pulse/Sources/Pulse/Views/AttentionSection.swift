@@ -44,27 +44,30 @@ private struct AttentionCard: View {
     @State private var confirmQuit: (pid: Int32, name: String)?
 
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
-                    .fill(severityColor.opacity(0.12))
-                    .frame(width: 28, height: 28)
-                Image(systemName: symbol)
-                    .font(Halo.font(size: 13))
-                    .foregroundStyle(severityColor)
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
+                        .fill(severityColor.opacity(0.12))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: symbol)
+                        .font(Halo.font(size: 13))
+                        .foregroundStyle(severityColor)
+                }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title)
-                    .font(Halo.font(size: 13, weight: .semibold))
-                    .foregroundStyle(Halo.textPrimary)
-                Text(item.detail)
-                    .font(Halo.font(size: 13))
-                    .foregroundStyle(Halo.textDim)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(Halo.font(size: 13, weight: .semibold))
+                        .foregroundStyle(Halo.textPrimary)
+                    Text(item.detail)
+                        .font(Halo.font(size: 13))
+                        .foregroundStyle(Halo.textDim)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                snoozeMenu
             }
-            Spacer(minLength: 12)
             actionButton
-            snoozeMenu
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -71,7 +71,7 @@ struct RefreshButton: View {
 
 // MARK: - Page header
 
-/// Standard page header: 24pt bold title, dim one-line subtitle, optional
+/// Shared page heading: calm typography and readable subtitle with optional
 /// trailing accessory (buttons, totals). Every full page uses this so titles
 /// never drift in size or weight again.
 struct PageHeader<Trailing: View>: View {
@@ -105,11 +105,12 @@ struct PageHeader<Trailing: View>: View {
     private var heading: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(Halo.font(size: 24, weight: .semibold))
+                .font(Halo.font(size: 28, weight: .semibold))
+                .tracking(-0.6)
                 .foregroundStyle(Halo.textPrimary)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle)
-                .font(Halo.font(size: 13))
+                .font(Halo.font(size: 14))
                 .foregroundStyle(Halo.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }

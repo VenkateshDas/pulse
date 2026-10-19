@@ -4,62 +4,100 @@ import SwiftUI
 /// Main command-center content: greeting, guided-focus attention cards,
 /// vitals row, CPU chart and top processes.
 struct DashboardView: View {
+    var bottomClearance: CGFloat = 0
     @Environment(DashboardModel.self) private var model
     @Environment(NetworkModel.self) private var networkModel
     @Environment(StorageModel.self) private var storage
-    /// Gates the charts/heatmap/process-table wall behind a tap in Simple
-    /// mode, so a non-technical user's first view is verdict + vitals, not
-    /// an instrument panel. Pro mode starts expanded — nothing changes for
-    /// existing users. Set once at construction, not re-derived on every
-    /// render, so a manual toggle during the session sticks.
-    @State private var showDetails: Bool
 
     /// Posted when the user taps the diagnosis culprit chip; RootView
     /// switches the sidebar to the Monitor tab.
     static let navigateToMonitor = Notification.Name("PulseNavigateToMonitor")
 
-    init() {
-        _showDetails = State(initialValue: DisplayModeManager.shared.current == .pro)
-    }
-
     var body: some View {
+        GeometryReader { geometry in
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
-                condition
-                if model.snapshot != nil && !model.attentionItems.isEmpty { AttentionSection() }
-                if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
                 everydaySummary
+                if geometry.size.width >= 872 {
+                    HStack(alignment: .top, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 24) {
+                            technicalSummary
+                            attentionSummary
+                        }
+                        .frame(width: (min(1200, geometry.size.width) - 72) / 2)
+                        activitySummary.frame(width: (min(1200, geometry.size.width) - 72) / 2)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 24) {
+                        technicalSummary
+                        activitySummary
+                        attentionSummary
+                    }
+                }
+                if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
                 tasks
                 recentRemovals
-                DisclosureGroup("Technical details", isExpanded: $showDetails) {
-                    VStack(spacing: 20) {
-                        if model.snapshot != nil {
-                            vitals
-                            chartsPanel.frame(minHeight: 400)
-                            CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
-                            TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
-                        } else {
-                            Text("Readings will appear after the first check.")
-                        }
-                    }
-                    .padding(.top, 16)
-                }
-                .font(Halo.font(size: 14, weight: .medium))
-                .foregroundStyle(Halo.textPrimary)
+
             }
             .padding(Halo.Space.xxl)
-            .frame(maxWidth: 1040, alignment: .leading)
+            .padding(.bottom, bottomClearance)
+            .frame(maxWidth: 1200, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .background(Halo.void)
+        }
+        .navigationTitle(Text(""))
     }
 
+
+    private var technicalSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Technical details")
+                .font(Halo.font(size: 17, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if model.snapshot != nil {
+                vitals
+            } else {
+                Text("Readings will appear after the first check.")
+                    .foregroundStyle(Halo.textSecondary)
+            }
+        }
+    }
+
+    private var activitySummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Activity history and processes")
+                .font(Halo.font(size: 17, weight: .semibold))
+                .foregroundStyle(Halo.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+            if model.snapshot != nil {
+                chartsPanel.frame(minHeight: 400)
+                CoreHeatmap(cpuPerCore: model.snapshot?.cpuPerCore ?? [])
+                TopProcessesPanel(processes: model.snapshot?.topProcesses ?? [])
+                    .frame(height: 300)
+            } else {
+                Text("Readings will appear after the first check.")
+                    .foregroundStyle(Halo.textSecondary)
+            }
+        }
+    }
+
+    private var attentionSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            condition
+            if model.snapshot != nil { AttentionSection() }
+        }
+    }
 
     private var condition: some View {
         let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
         return VStack(alignment: .leading, spacing: 14) {
-            Label(state.title, systemImage: state.symbol)
+            Label {
+                Text(state.title).fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: state.symbol)
+            }
                 .font(Halo.font(size: 22, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
                 .accessibilityAddTraits(.isHeader)

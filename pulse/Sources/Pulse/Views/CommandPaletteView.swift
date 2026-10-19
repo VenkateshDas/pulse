@@ -5,6 +5,7 @@ import SwiftUI
 struct CommandPaletteView: View {
     @Binding var isPresented: Bool
     @Binding var selection: SidebarItem
+    var openHomeAssistant: () -> Void = {}
     @Environment(CleanModel.self) private var clean
     @Environment(StorageModel.self) private var storage
     @Environment(HealthModel.self) private var health
@@ -31,6 +32,8 @@ struct CommandPaletteView: View {
                 symbol: item.symbol
             ) { selection = item }
         }
+        list.append(
+            Command(title: "Ask Pulse on Home", subtitle: "Start or continue a conversation without leaving Home", symbol: "bubble.left.and.text.bubble.right", run: openHomeAssistant))
         list.append(
             Command(
                 title: "Ask about your Mac", subtitle: "Get help using an optional AI provider",

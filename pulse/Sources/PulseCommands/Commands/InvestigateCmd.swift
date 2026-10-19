@@ -21,15 +21,15 @@ public enum InvestigateCmd {
             case "network":
                 let context = try await NetworkDiagnostic.read(url: parser.stringOption("url"))
                 output.emitJSON(context)
-                if context.probeError != nil { exit(1) }
+                if context.probeError != nil { output.finish(1); return }
             case "history": output.emitJSON(DiagnosticHistory.read(hours: parser.intOption("hours", default: 24) ?? 24))
             case "startup": output.emitJSON(StartupInventory.read())
             case "quit":
                 let result = try await AppQuit.run(pid: Int32(parser.positional[0])!, startToken: parser.stringOption("started-at")!, dryRun: parser.isDryRun)
                 output.emitJSON(result)
-                if !result.dryRun && !result.terminated { exit(1) }
+                if !result.dryRun && !result.terminated { output.finish(1); return }
             default: break
             }
-        } catch { output.printError(error.localizedDescription); exit(1) }
+        } catch { output.printError(error.localizedDescription); output.finish(1); return }
     }
 }

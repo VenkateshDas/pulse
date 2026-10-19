@@ -1,5 +1,6 @@
 import Foundation
 import PulseKit
+@_exported import PulseCommands
 
 @main
 struct PulseCLI {
