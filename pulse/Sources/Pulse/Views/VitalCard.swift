@@ -40,7 +40,6 @@ struct VitalCard: View {
     }
     var segments: [Segment]? = nil
 
-    @State private var isHovered = false
 
     private var clamped: Double { min(max(fraction, 0), 1) }
     private var color: Color { ringColor ?? Halo.statusColor(clamped) }
@@ -108,31 +107,12 @@ struct VitalCard: View {
         }
         .padding(Halo.Space.md)
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background {
-            ZStack {
-                RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
-                    .fill(.regularMaterial)
-                RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
-                    .fill(Halo.surface1.opacity(0.6))
-            }
-            .shadow(
-                color: isHovered
-                    ? color.opacity(0.15)
-                    : Halo.Shadow.cardColor,
-                radius: isHovered ? Halo.Shadow.elevatedRadius : Halo.Shadow.cardRadius,
-                y: isHovered ? Halo.Shadow.elevatedY : Halo.Shadow.cardY
-            )
-        }
+        // ponytail: opaque shared surfaces need no blur or hover animation.
+        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: Halo.Radius.medium))
         .overlay {
-            RoundedRectangle(cornerRadius: Halo.Radius.medium, style: .continuous)
-                .strokeBorder(
-                    isHovered ? color.opacity(0.25) : Halo.borderSubtle,
-                    lineWidth: isHovered ? 1 : 0.5
-                )
+            RoundedRectangle(cornerRadius: Halo.Radius.medium)
+                .strokeBorder(Halo.borderSubtle, lineWidth: 1)
         }
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .animation(Halo.Motion.snappy, value: isHovered)
-        .onHover { hovering in isHovered = hovering }
         .contentShape(RoundedRectangle(cornerRadius: Halo.Radius.medium))
         .help(cardTooltip ?? "")
     }

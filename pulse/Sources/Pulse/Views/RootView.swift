@@ -60,6 +60,8 @@ struct RootView: View {
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 860, minHeight: 600)
         .tint(Halo.interactive)
+        .toolbarBackground(Halo.sidebar, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { showPalette = true } label: { Label("Search tasks", systemImage: "magnifyingglass") }

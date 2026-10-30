@@ -4,6 +4,8 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Components
 
+- **Landing-aligned native UI (2026-10-30):** [Scope and screenshot provenance](docs/marketing/native-screenshots.md). Explicit System/Light/Dark modes retain legacy preset IDs; palette-specific color names prevent stale tint after switching. Shared sidebar, headers, Home and opaque vitals follow the landing identity. Native button navigation preserves selected traits, Up/Down focus and scroll-to-selection. `make build` and 357 tests pass; final runtime/screenshot evidence is recorded in the linked note.
+
 - **Home/sidebar layout (2026-10-30):** Home technical details and indicators precede task actions. Advanced destinations appear directly in the sidebar, with no More section or disclosure. Build, 355 tests, signed bundle and running-app inspection pass.
 
 - **AI-free Pulse (2026-10-30):** Ask Pulse UI, provider settings, Swift client/daemon and Python runtime removed on `feat/remove-ask-pulse`. The native CLI remains available; app bundles do not include an AI runtime or skill. AI work remains preserved on `feat/home-ask-pulse`. Debug build, 355 Swift tests and CLI smoke checks pass; signed release bundle and artifact checks pass. Running Home/sidebar and Settings confirm no Ask Pulse or provider controls. User review remains pending.

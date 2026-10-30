@@ -163,3 +163,5 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 
 
 ## [2026-10-30] Reorder Home and flatten navigation | Move technical details above task actions; show advanced destinations directly in the sidebar, removing More/disclosure and expansion state. User specified layout. Debug build, 355 tests and signed release bundle pass; restarted app verifies requested ordering and flat sidebar. User review remains pending.
+
+## [2026-10-30] Align native app with landing design | Add explicit System/Light/Dark appearance, palette cache invalidation, green wordmark/sidebar and clearer shared headers/Home. Remove vitals blur/hover effects and theme swatch grid. Preserve native keyboard movement/focus through sidebar buttons with bounds coverage; 357 tests pass. Real light/dark screenshot evidence and final review tracked in docs/marketing/native-screenshots.md. No new dependencies or sampling changes.

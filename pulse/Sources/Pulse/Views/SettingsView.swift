@@ -25,8 +25,7 @@ struct SettingsView: View {
     private static let snoozeOptions: [TimeInterval] = [3600, 4 * 3600, 24 * 3600]
 
     var body: some View {
-        // Registers an Observation dependency so the theme cards' selection
-        // state (checkmark) updates immediately on tap.
+        // Keep the native appearance picker and text-size control in sync.
         let _ = ThemeManager.shared.selected
         let _ = ThemeManager.shared.largerText
         ScrollView {
@@ -65,10 +64,18 @@ struct SettingsView: View {
                     .labelsHidden().toggleStyle(.switch)
             }
             rowDivider
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(AppTheme.allCases) { theme in
-                    themeCard(theme)
+            settingsRow(title: "Color mode", detail: "Follow your Mac, or choose a light or dark appearance.") {
+                // ponytail: NSApp appearance already updates every native window.
+                Picker("Color mode", selection: Binding(
+                    get: { ThemeManager.shared.selected },
+                    set: { ThemeManager.shared.select($0) }
+                )) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
                 }
+                .labelsHidden()
+                .frame(width: 160)
             }
         }
     }
@@ -99,55 +106,6 @@ struct SettingsView: View {
             get: { DisplayModeManager.shared.current },
             set: { DisplayModeManager.shared.set($0) }
         )
-    }
-
-    private func themeCard(_ theme: AppTheme) -> some View {
-        let isSelected = ThemeManager.shared.selected == theme
-        let palette = theme.palette
-        return Button {
-            ThemeManager.shared.select(theme)
-        } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    swatch(palette.void.dark)
-                    swatch(palette.surface2.dark)
-                    swatch(palette.interactive.dark)
-                    Spacer()
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Halo.interactive)
-                    }
-                }
-                Text(theme.displayName)
-                    .font(Halo.font(size: 12, weight: .medium))
-                    .foregroundStyle(Halo.textPrimary)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
-                    .fill(Halo.surface2.opacity(0.5))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Halo.Radius.small, style: .continuous)
-                    .strokeBorder(isSelected ? Halo.interactive : Halo.borderSubtle, lineWidth: isSelected ? 1.5 : 0.5)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func swatch(_ rgb: RGB) -> some View {
-        Circle()
-            .fill(Color(red: Double(rgb.r), green: Double(rgb.g), blue: Double(rgb.b)))
-            .frame(width: 14, height: 14)
-            .overlay(Circle().strokeBorder(Halo.borderSubtle, lineWidth: 0.5))
-    }
-
-    private func swatch(_ color: Color) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: 14, height: 14)
-            .overlay(Circle().strokeBorder(Halo.borderSubtle, lineWidth: 0.5))
     }
 
     // MARK: - General
