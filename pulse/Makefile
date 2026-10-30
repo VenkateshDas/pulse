@@ -83,7 +83,7 @@ fix-toolchain:
 		echo "Patched ManifestAPI installed at $(FIX_DIR)"; \
 	fi
 
-# Native agent CLI. DESTDIR/PREFIX support staged or user-local installs.
+# Native terminal CLI. DESTDIR/PREFIX support staged or user-local installs.
 PREFIX ?= /usr/local
 .PHONY: cli install-cli
 cli: fix-toolchain

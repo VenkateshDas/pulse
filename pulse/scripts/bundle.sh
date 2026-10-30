@@ -27,8 +27,7 @@ ARCH_FLAGS=""
 for a in ${PULSE_ARCHS:-}; do ARCH_FLAGS="$ARCH_FLAGS --arch $a"; done
 # shellcheck disable=SC2086
 swift build -c release $ARCH_FLAGS
-# The Agent sidecar invokes Pulse's CLI from the app bundle. Build it alongside
-# the GUI rather than relying on a developer-installed `pulse` command.
+# Bundle the native CLI for terminal workflows.
 # shellcheck disable=SC2086
 swift build -c release --product pulse-cli $ARCH_FLAGS
 
@@ -66,14 +65,6 @@ shopt -u nullglob
 if [ -f "Sources/Pulse/Resources/AppIcon.icns" ]; then
     cp "Sources/Pulse/Resources/AppIcon.icns" "$APP/Contents/Resources/"
 fi
-
-# Agent files are deliberately whitelisted. Never bundle a local .env or venv.
-mkdir -p "$APP/Contents/Resources/pulse-agent" "$APP/Contents/Resources/skills/pulse"
-for f in agent.py context.py pulse_toolkit.py server.py start.sh; do
-    cp "../pulse-agent/$f" "$APP/Contents/Resources/pulse-agent/$f"
-done
-chmod +x "$APP/Contents/Resources/pulse-agent/start.sh"
-cp -R ../.agents/skills/pulse/. "$APP/Contents/Resources/skills/pulse/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

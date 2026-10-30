@@ -33,11 +33,6 @@ struct CommandPaletteView: View {
         }
         list.append(
             Command(
-                title: "Ask about your Mac", subtitle: "Get help using an optional AI provider",
-                symbol: "sparkles"
-            ) { selection = .agent })
-        list.append(
-            Command(
                 title: "Review cleanup", subtitle: "Find files to remove and review them before moving to Trash",
                 symbol: "sparkles"
             ) {

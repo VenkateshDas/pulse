@@ -4,13 +4,17 @@ import Testing
 @Suite("Task navigation")
 struct SidebarVisibilityTests {
     @Test func everyDestinationIsReachable() {
-        let destinations = SidebarItem.everyday + SidebarItem.advanced + [.agent, .settings]
+        let destinations = SidebarItem.everyday + SidebarItem.advanced + [.settings]
         #expect(Set(destinations) == Set(SidebarItem.allCases))
         #expect(Set(destinations).count == destinations.count)
     }
 
+    @Test func removedAssistantRouteIsUnavailable() {
+        #expect(SidebarItem(rawValue: "Agent") == nil)
+    }
+
     @Test func shortcutsKeepTheirOriginalDestinations() {
-        #expect(Array(SidebarItem.allCases.prefix(9)) == [.dashboard, .agent, .storage, .timeline, .optimize, .uninstall, .monitor, .network, .displays])
+        #expect(Array(SidebarItem.allCases.prefix(8)) == [.dashboard, .storage, .timeline, .optimize, .uninstall, .monitor, .network, .displays])
         #expect(SidebarItem(rawValue: "Dashboard") == .dashboard)
         #expect(SidebarItem(rawValue: "Uninstall") == .uninstall)
     }

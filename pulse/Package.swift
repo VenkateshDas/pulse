@@ -39,7 +39,7 @@ let package = Package(
         .executableTarget(name: "Pulse", dependencies: ["PulseKit"], resources: [
             .process("Resources")
         ]),
-        // Native CLI command center for agents and terminal users.
+        // Native CLI command center for terminal users.
         .executableTarget(name: "PulseCLI", dependencies: ["PulseKit"]),
         .testTarget(name: "PulseKitTests", dependencies: ["PulseKit"]),
         // Unit tests for pure app-layer logic (display-mode gating, sidebar

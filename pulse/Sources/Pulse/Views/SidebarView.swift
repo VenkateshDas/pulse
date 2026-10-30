@@ -4,7 +4,6 @@ import SwiftUI
 /// Stable identifiers are retained for existing shortcuts and stored routes.
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
-    case agent = "Agent"
     case storage = "Storage"
     case timeline = "Timeline"
     case optimize = "Optimize"
@@ -22,7 +21,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .dashboard: "Home"
-        case .agent: "Ask Pulse"
         case .storage: "Free up space"
         case .timeline: "Activity"
         case .optimize: "Maintenance"
@@ -41,7 +39,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .dashboard: "house"
-        case .agent: "bubble.left.and.text.bubble.right"
         case .storage: "internaldrive"
         case .timeline: "clock.arrow.circlepath"
         case .optimize: "wrench.and.screwdriver"
@@ -85,7 +82,6 @@ struct SidebarView: View {
             )) {
                 ForEach(SidebarItem.everyday) { item in row(item) }
                 Section("More") {
-                    row(.agent)
                     DisclosureGroup("Advanced tools", isExpanded: $showAdvanced) {
                         ForEach(SidebarItem.advanced) { item in row(item) }
                     }
