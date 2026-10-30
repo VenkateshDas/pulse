@@ -20,6 +20,7 @@ final class ThemeManager {
     /// from UI code already confined to the main thread, and `ThemeManager`
     /// (main-actor) is the sole writer.
     nonisolated(unsafe) static var currentPalette: Palette = AppTheme.precision.palette
+    nonisolated(unsafe) static var currentPaletteID = AppTheme.precision.rawValue
 
     private static let key = "pulse.theme"
 
@@ -30,6 +31,7 @@ final class ThemeManager {
         selected = theme
         Self.currentTextScale = largerText ? 1.15 : 1
         Self.currentPalette = theme.palette
+        Self.currentPaletteID = theme.rawValue
         applyAppearance()
     }
 
@@ -37,6 +39,7 @@ final class ThemeManager {
         guard theme != selected else { return }
         selected = theme
         Self.currentPalette = theme.palette
+        Self.currentPaletteID = theme.rawValue
         UserDefaults.standard.set(theme.rawValue, forKey: Self.key)
         applyAppearance()
     }

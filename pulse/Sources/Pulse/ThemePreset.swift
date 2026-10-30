@@ -35,22 +35,27 @@ struct Palette {
 
 /// User-selectable theme presets, applied app-wide (Command Center + popover).
 enum AppTheme: String, CaseIterable, Identifiable, Codable {
-    case precision, midnight, contrast, slate
+    case precision, light, midnight, contrast, slate
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .precision: "Pulse"
-        case .midnight: "Midnight"
+        case .precision: "System"
+        case .light: "Light"
+        case .midnight: "Dark"
         case .contrast: "Contrast"
         case .slate: "Slate"
         }
     }
 
-    /// `nil` = follow system appearance. Only Midnight forces dark.
+    /// Native appearance switching; legacy palette identifiers remain readable.
     var forcedAppearance: NSAppearance.Name? {
-        self == .midnight ? .darkAqua : nil
+        switch self {
+        case .light: .aqua
+        case .midnight: .darkAqua
+        default: nil
+        }
     }
 
     /// Preset identifiers remain stable so saved appearance choices survive.
@@ -70,23 +75,8 @@ enum AppTheme: String, CaseIterable, Identifiable, Codable {
             interactive: .hex(0x176B56, 0x70D6B3)
         )
         switch self {
-        case .precision:
+        case .precision, .light, .midnight:
             return base
-        case .midnight:
-            return Palette(
-                void: .hex(0x111526, 0x111526),
-                surface1: .hex(0x1D2439, 0x1D2439),
-                surface2: .hex(0x2D3650, 0x2D3650),
-                border: .hex(0x8090B3, 0x8090B3),
-                borderSubtle: .hex(0x4E5B78, 0x4E5B78),
-                textPrimary: .hex(0xF2F4FF, 0xF2F4FF),
-                textSecondary: .hex(0xC0C9E3, 0xC0C9E3),
-                textDim: .hex(0xC0C9E3, 0xC0C9E3),
-                nominal: .hex(0x70D6B3, 0x70D6B3),
-                warning: .hex(0xF4C16A, 0xF4C16A),
-                critical: .hex(0xFF9DA4, 0xFF9DA4),
-                interactive: .hex(0xB2C1FF, 0xB2C1FF)
-            )
         case .contrast:
             return Palette(
                 void: .hex(0xFFFFFF, 0x000000),
