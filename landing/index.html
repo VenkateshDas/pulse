@@ -6,7 +6,7 @@
     <title>Pulse — A clearer picture of your Mac. Join early access.</title>
     <meta
       name="description"
-      content="A clearer view of storage, memory and busy apps. See the real Pulse app, explore its controls and join the early-access list."
+      content="A clearer view of storage, memory and busy apps. Explore Pulse’s interface, explore its controls and join the early-access list."
     />
     <meta name="theme-color" content="#f5f7f8" />
     <meta name="color-scheme" content="light" />
@@ -23,9 +23,9 @@
     />
     <meta
       property="og:image"
-      content="https://venkateshdas.github.io/pulse/assets/pulse-home-light.webp"
+      content="https://venkateshdas.github.io/pulse/assets/apple-touch-icon.png"
     />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary" />
     <meta
       name="twitter:title"
       content="Pulse — A clearer picture of your Mac."
@@ -36,7 +36,7 @@
     />
     <meta
       name="twitter:image"
-      content="https://venkateshdas.github.io/pulse/assets/pulse-home-light.webp"
+      content="https://venkateshdas.github.io/pulse/assets/apple-touch-icon.png"
     />
     <link rel="icon" href="assets/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
@@ -56,31 +56,31 @@
           ><a href="#approach">Our approach</a><a href="#questions">FAQ</a>
         </div>
         <a class="button button-small" href="#early-access"
-          >Join early access <span aria-hidden="true">↗</span></a
+          >Join early access <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a
         >
       </nav>
     </header>
     <main id="main">
       <section class="hero wrap" id="top" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <h1 id="hero-title">Your Mac has clues.<br />See them clearly.</h1>
+          <h1 id="hero-title">Know your Mac.<br /><span>See what’s next.</span></h1>
           <p class="hero-description">
-            A full disk. A busy app. A Mac that feels slower than it should.
-            Pulse brings storage, memory and app activity into one native view,
-            so your next step starts with understanding.
+            What’s filling your disk? Which app is working overtime?
+            Bring storage, memory and app activity into focus—then choose
+            your next step with Pulse.
           </p>
           <div class="hero-actions">
             <a class="button" href="#early-access"
-              >Join early access <span aria-hidden="true">↗</span></a
-            ><a class="text-link" href="#preview"
-              >Take a closer look <span aria-hidden="true">↓</span></a
+              >Join early access <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a
+            ><a class="text-link" href="#storage"
+              >Explore storage <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 9l5 5 5-5"/></svg></a
             >
           </div>
           <p class="supporting">In development for macOS · No payment to join the list.</p>
         </div>
         <figure class="product-figure" id="preview">
           <figcaption class="preview-caption">
-            <span>This is Pulse. Running on a real Mac.</span>
+            <span>Pulse interface · Demo data</span>
             <div class="appearance-tabs" role="tablist" aria-label="Screenshot appearance" aria-orientation="horizontal">
               <button id="tab-light" role="tab" aria-selected="true" aria-controls="panel-light" tabindex="0">Light</button>
               <button id="tab-dark" role="tab" aria-selected="false" aria-controls="panel-dark" tabindex="-1">Dark</button>
@@ -88,19 +88,38 @@
           </figcaption>
           <div class="product-stage">
             <div id="panel-light" role="tabpanel" aria-labelledby="tab-light" tabindex="0">
-              <a class="screenshot-link" href="assets/pulse-home-light.webp" target="_blank" rel="noopener" aria-label="Open full-size Pulse Home screenshot in light mode (new tab)"><img class="app-shot" src="assets/pulse-home-light.webp" width="2288" height="1660" fetchpriority="high" alt="Pulse Home in light mode: memory, storage, battery and a next-step summary in one native Mac window." /></a>
+              <a class="screenshot-link" href="assets/pulse-demo-home-light.svg" target="_blank" rel="noopener" aria-label="Open full-size Pulse Home preview in light mode (new tab)"><img class="app-shot" src="assets/pulse-demo-home-light.svg" width="1440" height="1040" fetchpriority="high" alt="Pulse Home in light mode: memory, storage, battery and a next-step summary in one native Mac window." /></a>
             </div>
             <div id="panel-dark" role="tabpanel" aria-labelledby="tab-dark" tabindex="0" hidden>
-              <a class="screenshot-link" href="assets/pulse-home-dark.webp" target="_blank" rel="noopener" aria-label="Open full-size Pulse Home screenshot in dark mode (new tab)"><img class="app-shot" src="assets/pulse-home-dark.webp" width="2288" height="1660" alt="The same Pulse Home dashboard in dark mode, with green accents and readable system summaries." /></a>
+              <a class="screenshot-link" href="assets/pulse-demo-home-dark.svg" target="_blank" rel="noopener" aria-label="Open full-size Pulse Home preview in dark mode (new tab)"><img class="app-shot" src="assets/pulse-demo-home-dark.svg" width="1440" height="1040" alt="The same Pulse Home dashboard in dark mode, with green accents and readable system summaries." /></a>
             </div>
           </div>
-          <p class="capture-note">Actual development-build captures · Click a screen to inspect it · Interface may change before early access.</p>
+          <p class="capture-note">Interface replicas with fictional data · Open a preview for a closer look · Design may change.</p>
         </figure>
+      </section>
+      <section class="storage-showcase" id="storage" aria-labelledby="storage-title">
+        <div class="wrap">
+          <div class="storage-heading">
+            <h2 id="storage-title">A full disk.<br /><span>A place to start.</span></h2>
+            <div><p>Go beyond “storage almost full.” See which folders take up space, then follow the trail through your Mac.</p>
+            <a class="storage-full-link" href="assets/pulse-demo-storage.svg" target="_blank" rel="noopener">Inspect the demo interface <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg><span class="sr-only"> (opens a new tab)</span></a></div>
+          </div>
+          <figure class="storage-figure">
+            <a class="storage-screen screenshot-link" href="assets/pulse-demo-storage.svg" target="_blank" rel="noopener" aria-label="Open full-size Pulse storage viewer preview (new tab)"><img src="assets/pulse-demo-storage.svg" width="1440" height="1040" loading="lazy" alt="Pulse Files interface demo: three columns follow Demo Disk into Library and Application Support, with fictional folder sizes and usage bars." /></a>
+            <figcaption class="storage-caption">Pulse Files interface replica · Fictional folders and sizes · No access to your Mac.</figcaption>
+          </figure>
+          <ol class="storage-steps">
+            <li><span class="step-number">1</span><div><h3>Spot the heavy folders.</h3><p>Sizes and relative bars make larger folders easier to compare.</p></div></li>
+            <li><span class="step-number">2</span><div><h3>Follow the space.</h3><p>Open a folder in the next column. Keep the path in view as you explore.</p></div></li>
+            <li><span class="step-number">3</span><div><h3>Understand before acting.</h3><p>Large doesn’t mean disposable. Browsing files doesn’t remove them.</p></div></li>
+          </ol>
+          <div class="storage-footer"><p>Less hunting through folders.<br />More context for your next decision.</p><a class="button" href="#early-access">Join early access <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a></div>
+        </div>
       </section>
       <section class="features wrap" aria-labelledby="features-title">
         <div class="feature-intro">
           <h2 id="features-title">From “what’s going on?”<br />to a closer look.</h2>
-          <p>Start with the overview. Follow the question that matters to you. These are screens from the app we’re building.</p>
+          <p>Start with the overview. Follow the question that matters to you. These previews follow Pulse’s interface, with fictional examples throughout.</p>
         </div>
         <article class="feature-row">
           <div class="feature-copy">
@@ -109,8 +128,8 @@
             <p class="feature-detail">High usage can be normal. Review the context before deciding whether an app needs attention.</p>
           </div>
           <figure>
-            <a class="screenshot-link" href="assets/pulse-activity.webp" target="_blank" rel="noopener" aria-label="Open full-size App activity screenshot (new tab)"><img src="assets/pulse-activity.webp" width="2288" height="1660" loading="lazy" alt="Real Pulse App activity screen grouping browser and application processes with CPU and memory columns." /></a>
-            <figcaption>App activity · Real readings at capture time</figcaption>
+            <a class="screenshot-link" href="assets/pulse-demo-activity.svg" target="_blank" rel="noopener" aria-label="Open full-size App activity preview (new tab)"><img src="assets/pulse-demo-activity.svg" width="1440" height="1040" loading="lazy" alt="Pulse App activity interface demo with fictional applications, CPU use and memory readings." /></a>
+            <figcaption>App activity · Fictional apps and readings</figcaption>
           </figure>
         </article>
         <article class="feature-row feature-row-reverse">
@@ -120,8 +139,8 @@
             <p class="feature-detail">You choose what goes. Files still take up storage until Trash is emptied.</p>
           </div>
           <figure>
-            <a class="screenshot-link" href="assets/pulse-app-review.webp" target="_blank" rel="noopener" aria-label="Open full-size app removal review screenshot (new tab)"><img src="assets/pulse-app-review.webp" width="2288" height="1660" loading="lazy" alt="Pulse reviewing a selected app and two matched related files, with individual checkboxes, permission guidance and Trash warnings." /></a>
-            <figcaption>App review · Nothing was removed for this capture</figcaption>
+            <a class="screenshot-link" href="assets/pulse-demo-app-review.svg" target="_blank" rel="noopener" aria-label="Open full-size app removal review preview (new tab)"><img src="assets/pulse-demo-app-review.svg" width="1440" height="1040" loading="lazy" alt="Pulse reviewing a selected app and two matched related files, with individual checkboxes, permission guidance and Trash warnings." /></a>
+            <figcaption>App review · Fictional app and related files</figcaption>
           </figure>
         </article>
         <p class="feature-tail">Also in Pulse: storage exploration, battery and energy, display brightness, and startup helpers. <a href="#early-access">Help us choose what to focus on next.</a></p>
@@ -187,7 +206,7 @@
             id="signup-link"
             href="#signup-status"
             aria-describedby="signup-status"
-            >Join early access <span aria-hidden="true">↗</span></a
+            >Join early access <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a
           >
           <p id="signup-status" class="signup-status" role="status">
             Signup opens soon. We’re preparing the early-access list.
@@ -221,12 +240,13 @@
             </p>
           </details>
           <details>
-            <summary>Are these real app screenshots?</summary>
+            <summary>Is this real data from a Mac?</summary>
             <p>
-              Yes. They were captured from a running Pulse development build on
-              a Mac, with real readings at that moment. The studio backdrop is
-              AI-generated; the app screens are unchanged apart from cropping
-              the window toolbar. This website doesn’t inspect your Mac or run cleanup.
+              No. These are faithful interface replicas based on Pulse’s development
+              UI. All folders, apps, readings and sizes are fictional demonstration
+              data. They aren’t screenshots of a person’s Mac or a live scan of
+              yours. The studio backdrop is AI-generated; the interface demos are
+              rendered from deterministic sample data.
             </p>
           </details>
           <details>

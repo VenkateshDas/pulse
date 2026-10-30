@@ -4,7 +4,7 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
-- **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, three illustrative interactive previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. No analytics or subscriber collection enabled. Approved next stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.
+- **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, fictional interface previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. No analytics or subscriber collection enabled. Approved next stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.
 
 ## Components
 
@@ -116,4 +116,6 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 
 - **Landing feature coverage (2026-10-17):** [Approved content plan](docs/superpowers/specs/2026-10-17-landing-current-features-design.md). Landing copy covers released app features, optional AI/provider costs, history and restore limits; removes unshipped plans and unsupported guarantees.
 
-- **Real product landing (2026-10-30):** [Capture, copy and validation notes](docs/marketing/real-product-landing.md). Landing uses actual Home Light/Dark, App activity and removal-review screenshots over a generated studio backdrop; origin sidecars accompany assets. Signup remains closed pending MailerLite configuration.
+- **Real product landing (2026-10-30):** [Capture, copy and validation notes](docs/marketing/real-product-landing.md). Landing now uses deterministic fictional UI replicas for Home Light/Dark, Files, App activity and removal review over a generated studio backdrop. Earlier real-data captures are removed from the current tree after the user’s privacy correction. Signup remains closed pending MailerLite configuration.
+
+- **Home hero + storage showcase:** [Approved direction and implementation notes](docs/marketing/storage-showcase-design.md). Stronger split hero preserves Home; forest-green Files showcase explains size comparison and drill-down with fictional demo data.

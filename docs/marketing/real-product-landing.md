@@ -1,40 +1,23 @@
-# Real product landing — 2026-10-30
+# Pulse marketing previews — current state 2026-10-30
 
-## Delivered
+The earlier real-data capture approach is superseded. User requested fictional data after noticing that screenshots expose their Mac’s information.
 
-- Actual Pulse Home captures, Light and Dark; keyboard-operable appearance tabs.
-- Actual App activity and app-removal review screens; full-size links for inspection, including on phones.
-- AI-generated studio backdrop around the Home screenshot. App UI and telemetry were not generated, retouched or replaced.
-- Buyer-focused copy: recognizable Mac questions, concrete native proof, explanation of control, then early-access invitation. No invented testimonials, urgency, performance gains or launch price.
-- No frontend dependency or additional service. Removed the obsolete illustrative interface and unused legacy background files.
+## Current implementation
 
-## Capture provenance
+- Home stays in the hero, with Light/Dark previews beside stronger copy.
+- Separate forest-green storage stage enlarges the Files columns and explains folder sizes, drill-down and judgment before removal.
+- Home, Files, App activity and removal-review previews are static SVG interface replicas based on Pulse’s development UI. All apps, folders, sizes and readings are fictional. They are not native app screenshots; visible captions and FAQ say so.
+- `landing/scripts/render-demos.py` renders all five assets deterministically using Python’s standard library. It does not inspect the host Mac, import screenshots, sample system APIs or read user directories.
+- Example storage totals: 512 GB total, 448 GB used, 64 GB free. Root and nested fictional folder totals agree. Sample app identities use `com.example`.
+- Existing image-generated studio backdrop frames Home; no application content is AI-generated or copied from the owner’s machine.
+- Earlier Home, activity and removal screenshots plus their sidecars are removed from the current shipped tree. The temporary local preview snapshot also removes their files; old asset URLs return HTTP 404. Storage’s real capture was never committed.
 
-Source: latest local `pulse/dist/Pulse.app`, built on `feat/landing-aligned-app` (PR #95, commit b698bfd). The landing branch does not include that native implementation; do not rebuild the app from this branch expecting the new native UI.
+Historical limit: previous commit `585f4b8` on PR #94 contains the earlier real captures. This change removes them from the current page and assets; it does not purge Git objects, old commit URLs or remote caches.
 
-| Asset | Origin |
-| --- | --- |
-| pulse-home-light.webp | Actual Home, Light mode, technical details collapsed |
-| pulse-home-dark.webp | Actual Home, Dark mode, technical details collapsed |
-| pulse-activity.webp | Actual grouped App activity, real readings at capture time |
-| pulse-app-review.webp | Actual KeepingYouAwake related-file review; nothing removed |
-| pulse-studio.webp | `image_gen.imagegen`, background only |
+## Verification
 
-All four app captures: 2288 × 1660, lossless WebP. Only the top 104px OS/window toolbar was cropped from 2288 × 1764 captures. No visible personal paths, SSIDs or private document names. Snapshot readings are not a live browser scan or a performance benchmark. Full prompt/origin is preserved beside each asset in `.json`. Studio output is 1672 × 941, encoded as quality-85 WebP (~18 KB); original generation output remains in the local generated-images directory.
+Browser checks at 1440px, 390px and 320px: no horizontal overflow. All five demo assets load. Keyboard Light/Dark switch and the fictional-data FAQ work. Browser warning/error logs empty. HTML IDs/ARIA/fragment links, local asset paths, XML parsing, original-capture 404 responses, JavaScript syntax, raster provenance and whitespace checks pass.
 
-## Sales approach
+Independent design reviewer scored proportional bars and all icon cleanup resolved (ship at fix scope); documenter confirmed no native-system documentation change required.
 
-Used the Sales plugin's `plan-deal-strategy` guidance for an initial buyer motion, plus the copywriting skill. Buyer uncertainty: what is happening, whether actions need judgment, whether the product is real, and what joining entails. Proof is the native interface; the ask is an invitation when ready and an opportunity to influence priorities. Copy explicitly retains caveats around CPU use, related documents, Trash, availability and undecided pricing.
-
-## Validation
-
-- Browser: 1440px, 390px and 320px; no horizontal overflow. All four app assets loaded; no browser error/warning logs.
-- Arrow-key and Home-key screenshot tab changes; correct selected state and panel visibility.
-- Native FAQ disclosure exposes screenshot origin and generated-backdrop disclosure.
-- Closed signup click reports no email collected; no form submission or network collection enabled.
-- JavaScript syntax, unique IDs, fragment/ARIA targets, local assets and whitespace checks pass.
-- Impeccable finish review: ship. A displaced skip link in the full-page mobile capture was a stitching artifact; normal viewport capture and offscreen DOM bounds confirm no page defect.
-
-## Remaining activation gate
-
-`landing/config.js` still has an empty `waitlistUrl`. Signup is deliberately closed. User must finish Pulse email/MailerLite account setup and provide an approved HTTPS hosted-form Share URL. Then verify double opt-in, invitation sender, privacy, confirmation and unsubscribe before driving acquisition. No analytics installed in this slice. No deployment or merge performed; user visual/functional approval remains the merge gate.
+No native code changed, no new service or frontend dependency. Signup remains closed pending the user’s approved MailerLite URL and real confirmation/unsubscribe-flow validation. No analytics, deployment or merge enabled by this work. User visual approval remains the merge gate.
