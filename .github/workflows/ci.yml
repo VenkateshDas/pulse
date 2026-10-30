@@ -54,3 +54,6 @@ jobs:
         run: |
           make bundle SWIFT=swift
           test -x dist/Pulse.app/Contents/MacOS/Pulse
+          test -x dist/Pulse.app/Contents/Resources/pulse
+          test ! -e dist/Pulse.app/Contents/Resources/pulse-agent
+          test ! -e dist/Pulse.app/Contents/Resources/skills

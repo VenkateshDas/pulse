@@ -4,7 +4,6 @@ import SwiftUI
 /// Stable identifiers are retained for existing shortcuts and stored routes.
 enum SidebarItem: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
-    case agent = "Agent"
     case storage = "Storage"
     case timeline = "Timeline"
     case optimize = "Optimize"
@@ -22,7 +21,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .dashboard: "Home"
-        case .agent: "Ask Pulse"
         case .storage: "Free up space"
         case .timeline: "Activity"
         case .optimize: "Maintenance"
@@ -41,7 +39,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .dashboard: "house"
-        case .agent: "bubble.left.and.text.bubble.right"
         case .storage: "internaldrive"
         case .timeline: "clock.arrow.circlepath"
         case .optimize: "wrench.and.screwdriver"
@@ -60,13 +57,11 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var isAvailable: Bool { true }
     static let everyday: [SidebarItem] = [.dashboard, .storage, .uninstall, .health, .network, .displays, .timeline]
     static let advanced: [SidebarItem] = [.monitor, .optimize, .startup, .benchmark, .diagnostics]
-    static let advancedGatedItems = Set(advanced)
 }
 
 struct SidebarView: View {
     @Environment(DashboardModel.self) private var model
     @Binding var selection: SidebarItem
-    @State private var showAdvanced = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -84,13 +79,8 @@ struct SidebarView: View {
                 get: { selection }, set: { if let item = $0 { selection = item } }
             )) {
                 ForEach(SidebarItem.everyday) { item in row(item) }
-                Section("More") {
-                    row(.agent)
-                    DisclosureGroup("Advanced tools", isExpanded: $showAdvanced) {
-                        ForEach(SidebarItem.advanced) { item in row(item) }
-                    }
-                    row(.settings)
-                }
+                ForEach(SidebarItem.advanced) { item in row(item) }
+                row(.settings)
             }
             .listStyle(.sidebar)
             .font(Halo.font(size: 14))
@@ -104,8 +94,6 @@ struct SidebarView: View {
         }
         .foregroundStyle(Halo.textPrimary)
         .background(Halo.void)
-        .onAppear { revealSelection() }
-        .onChange(of: selection) { _, _ in revealSelection() }
     }
 
     private func row(_ item: SidebarItem) -> some View {
@@ -113,10 +101,6 @@ struct SidebarView: View {
             .padding(.vertical, 4)
             .tag(item)
             .accessibilityLabel(item.title)
-    }
-
-    private func revealSelection() {
-        if SidebarItem.advancedGatedItems.contains(selection) { showAdvanced = true }
     }
 
     private var statusText: String {

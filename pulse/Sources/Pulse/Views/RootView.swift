@@ -38,7 +38,6 @@ struct RootView: View {
             GeometryReader { geometry in
             Group {
                 switch selection {
-                case .agent: AgentView()
                 case .storage: DiskView()
                 case .timeline: TimelineView()
                 case .optimize: OptimizeView()

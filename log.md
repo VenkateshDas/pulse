@@ -157,3 +157,9 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 ## [2026-10-17] Publish beta download | Release v0.3.0-beta.5 from main with grouped-app quit fix; expose direct DMG download on landing page and clarify optional waitlist.
 
 ## [2026-10-17] Refresh landing feature coverage | Align feature grid, advanced tools, metadata, illustrative demos, FAQ and beta offer with released main. Include Ask Pulse, duplicates, battery history, investigations and CLI; correct privacy, recovery and performance claims. Desktop and 390px mobile review verified wrapping and FAQ expansion; clip decorative overflow and remove fixed FAQ answer-height cap.
+
+
+## [2026-10-30] Remove Ask Pulse | Remove chat navigation, provider/model/API-key settings, client/daemon, Python sidecar and related tests; remove AI runtime/skill packaging and landing-page claims. Preserve native monitoring, cleanup and CLI. AI work remains on feat/home-ask-pulse. Debug build, 355 tests across 81 suites and CLI smoke pass; signed release bundle and artifact checks pass. Running Home/sidebar and Settings confirm no Ask Pulse or provider controls; user review pending. CI now rejects bundles containing the removed AI runtime or skills.
+
+
+## [2026-10-30] Reorder Home and flatten navigation | Move technical details above task actions; show advanced destinations directly in the sidebar, removing More/disclosure and expansion state. User specified layout. Debug build, 355 tests and signed release bundle pass; restarted app verifies requested ordering and flat sidebar. User review remains pending.
