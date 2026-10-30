@@ -28,6 +28,14 @@
       }
     });
   });
+  document.querySelectorAll('.native-pan').forEach((panel) => {
+    panel.addEventListener('keydown', (event) => {
+      if (event.target !== panel || panel.scrollWidth <= panel.clientWidth) return;
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      panel.scrollBy({ left: panel.clientWidth * (event.key === 'ArrowRight' ? 0.8 : -0.8), behavior: 'auto' });
+    });
+  });
   const signup = document.getElementById("signup-link");
   const status = document.getElementById("signup-status");
   let waitlistUrl;

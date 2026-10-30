@@ -14,6 +14,8 @@ The earlier real-data capture approach is superseded. User requested fictional d
 
 Historical limit: previous commit `585f4b8` on PR #94 contains the earlier real captures. This change removes them from the current page and assets; it does not purge Git objects, old commit URLs or remote caches.
 
+A later [pain-led story update](pain-solution-story.md) adds authentic native technical-indicator component rendering with fictional fixtures. Other screen previews remain SVG replicas; all data remains authored.
+
 ## Verification
 
 Browser checks at 1440px, 390px and 320px: no horizontal overflow. All five demo assets load. Keyboard Light/Dark switch and the fictional-data FAQ work. Browser warning/error logs empty. HTML IDs/ARIA/fragment links, local asset paths, XML parsing, original-capture 404 responses, JavaScript syntax, raster provenance and whitespace checks pass.

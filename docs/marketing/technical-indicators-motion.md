@@ -23,3 +23,7 @@ Scope: remove two annotated elements; add fictional technical indicator showcase
 Three.js documents CSS3DRenderer’s normal-zoom limitation. The runtime reverts to static after detected pixel-ratio or visual-viewport scale changes; initial nondefault browser/display zoom was not separately exercised. Sources: https://threejs.org/docs/pages/CSS3DRenderer.html and https://registry.npmjs.org/three/0.187.0.
 
 No native app code, analytics, signup activation, deployment or merge. Required macOS CI runs on PR #94; user visual approval remains the merge gate.
+
+## Subsequent native-proof and content refinement
+
+See [pain-led product story](pain-solution-story.md): the original semantic sample-value panel is replaced visually by an actual native SwiftUI component render with fictional fixtures. The optional Three.js transform now wraps that image figure. It has descriptive alternative text and keyboard-accessible horizontal panning on narrow screens; the rest of the copy remains semantic HTML. This supersedes the earlier selectable-text description for the indicator panel.

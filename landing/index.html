@@ -64,17 +64,17 @@
     <main id="main">
       <section class="hero wrap" id="top" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <h1 id="hero-title">Know your Mac.<br /><span>See what’s next.</span></h1>
+          <h1 id="hero-title">Your Mac feels off.<br /><span>Know where to start.</span></h1>
           <p class="hero-description">
-            What’s filling your disk? Which app is working overtime?
-            Bring storage, memory and app activity into focus—then choose
-            your next step with Pulse.
+            Storage filling up? Apps feeling slow? Pulse helps you see what’s
+            taking space, what’s working hard, and what you can review next—all
+            in one native Mac app.
           </p>
           <div class="hero-actions">
             <a class="button" href="#early-access"
               >Join early access <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a
-            ><a class="text-link" href="#storage"
-              >Explore storage <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 9l5 5 5-5"/></svg></a
+            ><a class="text-link" href="#scenarios"
+              >Find your starting point <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M3 9l5 5 5-5"/></svg></a
             >
           </div>
           <p class="supporting">In development for macOS · No payment to join the list.</p>
@@ -97,30 +97,24 @@
           <p class="capture-note">Interface replicas with fictional data · Open a preview for a closer look · Design may change.</p>
         </figure>
       </section>
+      <section class="scenarios wrap" id="scenarios" aria-labelledby="scenarios-title">
+        <div class="section-heading"><h2 id="scenarios-title">You know the feeling.<br /><span>You want a way forward.</span></h2><p>The useful answer starts with what’s happening on your Mac—not a promise to fix everything.</p></div>
+        <div class="scenario-list">
+          <article><div class="scenario-pain"><h3>“My disk is full.<br />What’s actually in there?”</h3><p>The storage total tells you there’s a problem. It doesn’t give you a place to start.</p></div><div class="scenario-solution"><h3>Follow the folders behind the total.</h3><p>Compare folder sizes, open the next level and see where the space is going. Review what you recognize before choosing what to remove.</p><a href="#storage">Explore storage <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a></div></article>
+          <article><div class="scenario-pain"><h3>“It’s slow.<br />Is it the app, or my Mac?”</h3><p>Closing random tabs gets old. You want to know which app is busy and whether memory is under pressure.</p></div><div class="scenario-solution"><h3>Bring the clues into the same view.</h3><p>Check CPU, memory and thermal state, then inspect grouped app activity. High use can be normal; the context helps you choose a next step.</p><a href="#indicators">See the indicators <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a></div></article>
+          <article><div class="scenario-pain"><h3>“I’m done with that app.<br />What else belongs to it?”</h3><p>You don’t want to dig through Library folders—or remove something you still need.</p></div><div class="scenario-solution"><h3>Review the app and its related files.</h3><p>See matched files and the reasons behind the match. Keep preferences or documents you want, then move your selection to Trash.</p><a href="#app-review">See app review <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a></div></article>
+        </div>
+      </section>
       <section class="indicators wrap" id="indicators" aria-labelledby="indicators-title">
-        <div class="indicators-copy">
-          <h2 id="indicators-title">The details.<br /><span>Without the guesswork.</span></h2>
-          <p>Go deeper when you need to. Bring processor load, memory pressure and the signals behind a slowdown into one view.</p>
-          <ul class="indicator-benefits">
-            <li>Separate busy processors from memory pressure.</li>
-            <li>Check storage and network activity alongside app use.</li>
-            <li>See available graphics and thermal readings in context.</li>
-          </ul>
-          <p class="indicator-note">GPU and temperature readings vary by Mac. When temperatures aren’t available, Pulse shows macOS thermal state.</p>
-        </div>
+        <div class="section-heading"><h2 id="indicators-title">A slowdown needs<br /><span>more than a guess.</span></h2><p>These are Pulse’s native indicator views, shown with example readings. See processor and graphics activity, memory pressure, disk usage, network traffic and thermal state.</p></div>
         <div class="indicator-scene">
-          <div class="indicator-board" role="group" aria-label="Technical indicator preview with fictional readings">
-            <div class="indicator-board-header"><span>Technical details</span><span class="indicator-status">Sample readings</span></div>
-            <dl class="indicator-readings">
-              <div><dt>CPU</dt><dd>18<span>%</span><small>Processor activity</small></dd></div>
-              <div><dt>Memory</dt><dd>6.4 <span>/ 16 GB</span><small>Pressure: normal</small></dd></div>
-              <div><dt>GPU</dt><dd>12<span>%</span><small>Graphics activity</small></dd></div>
-              <div><dt>Storage</dt><dd>64 <span>GB</span><small>Available space</small></dd></div>
-              <div><dt>Network</dt><dd>1.8 <span>MB/s</span><small>Download activity</small></dd></div>
-              <div><dt>Thermals</dt><dd class="thermal-value">Nominal<small>macOS thermal state</small></dd></div>
-            </dl>
-          </div>
+          <figure class="indicator-board" aria-label="Native Pulse technical indicators with fictional readings">
+            <div class="native-pan" tabindex="0" role="region" aria-label="Native indicator preview. Use left and right arrow keys to explore.">
+            <a class="screenshot-link" href="assets/pulse-native-indicators.webp" target="_blank" rel="noopener" aria-label="Open full-size native Pulse technical indicators with example readings (new tab)"><img src="assets/pulse-native-indicators.webp" width="2240" height="722" loading="lazy" alt="Actual Pulse indicator components with fictional examples: CPU 18%, GPU 12%, memory 6.4 of 16 GB with normal pressure, disk 88% used with 64 GB available, nominal thermal state, and a wired connection transferring example data." /></a>
+            </div>
+          </figure>
         </div>
+        <p class="indicator-note"><span class="indicator-pan-note">Swipe or scroll sideways to see every indicator.</span>Native Pulse UI with fictional readings. GPU and temperature availability varies by Mac; macOS thermal state is shown when temperature readings aren’t available.</p>
       </section>
       <section class="storage-showcase" id="storage" aria-labelledby="storage-title">
         <div class="wrap">
@@ -156,7 +150,7 @@
             <figcaption>App activity · Fictional apps and readings</figcaption>
           </figure>
         </article>
-        <article class="feature-row feature-row-reverse">
+        <article class="feature-row feature-row-reverse" id="app-review">
           <div class="feature-copy">
             <h3>What comes with removing an app?</h3>
             <p>See related files and why they were matched. Review the selection before moving anything to Trash, including preferences or documents you may want to keep.</p>
@@ -168,6 +162,37 @@
           </figure>
         </article>
         <p class="feature-tail">Also in Pulse: storage exploration, battery and energy, display brightness, and startup helpers. <a href="#early-access">Help us choose what to focus on next.</a></p>
+      </section>
+      <section class="capabilities" id="capabilities" aria-labelledby="capabilities-title">
+        <div class="wrap">
+          <div class="section-heading"><h2 id="capabilities-title">The small Mac tasks.<br /><span>Finally, together.</span></h2><p>A closer look when something feels wrong. Useful controls when you just need to get on with your day.</p></div>
+          <div class="capability-map">
+            <svg class="capability-lines" viewBox="0 0 1000 400" preserveAspectRatio="none" aria-hidden="true"><path d="M500 200 180 45M500 200 180 145M500 200 180 245M500 200 180 345M500 200 820 45M500 200 820 145M500 200 820 245M500 200 820 345"/></svg>
+            <div class="capability-hub" aria-hidden="true"><span class="pulse-mark">p</span><span>Pulse</span></div>
+            <ul class="capability-list capability-left">
+              <li><strong>System monitoring</strong><span>CPU, memory, graphics and thermal context.</span></li>
+              <li><strong>Storage exploration</strong><span>Folder sizes and files worth reviewing.</span></li>
+              <li><strong>App removal review</strong><span>Matched files, with a choice over what stays.</span></li>
+              <li><strong>Network checks</strong><span>Connection activity and optional speed estimates.</span></li>
+            </ul>
+            <ul class="capability-list capability-right">
+              <li><strong>Display brightness</strong><span>Adjust supported displays from one place.</span></li>
+              <li><strong>Keep awake</strong><span>Choose a temporary keep-awake session.</span></li>
+              <li><strong>Menu-bar controls</strong><span>Keep readings close and hide a group of icons.</span></li>
+              <li><strong>Startup helpers</strong><span>Review helpers that run at sign-in.</span></li>
+            </ul>
+          </div>
+          <p class="capability-note">Also includes reviewed maintenance tasks and recorded activity. Some controls depend on your hardware and macOS permissions.</p>
+        </div>
+      </section>
+      <section class="trust wrap" aria-labelledby="trust-title">
+        <div class="section-heading"><h2 id="trust-title">You should know<br /><span>what an app will do.</span></h2><p>Especially when it can change your files. Clear choices and visible limits are part of the product.</p></div>
+        <div class="trust-list">
+          <article><h3>Review before a manual cleanup.</h3><p>Cleanup and app removal show a selection to review before you move files to Trash.</p></article>
+          <article><h3>Local system readings.</h3><p>Monitoring reads native Mac data locally. Speed tests and update checks make network connections.</p></article>
+          <article><h3>Source you can inspect.</h3><p>The current code is open source under the MIT license. <a href="https://github.com/VenkateshDas/pulse">Explore the source on GitHub.</a></p></article>
+          <article><h3>Recovery with clear limits.</h3><p>Recorded Trash moves can be restored while the items remain available. Emptying Trash removes that recovery route.</p></article>
+        </div>
       </section>
       <section class="approach" id="approach" aria-labelledby="approach-title">
         <div class="wrap approach-inner">
@@ -266,11 +291,10 @@
           <details>
             <summary>Is this real data from a Mac?</summary>
             <p>
-              No. These are faithful interface replicas based on Pulse’s development
-              UI. All folders, apps, readings and sizes are fictional demonstration
-              data. They aren’t screenshots of a person’s Mac or a live scan of
-              yours. The studio backdrop is AI-generated; the interface demos are
-              rendered from deterministic sample data.
+              No. Every displayed reading, folder size and app example is fictional.
+              The technical-indicator image is rendered from Pulse’s actual native
+              UI components with sample values. Other previews follow the development
+              interface. None captures the owner’s Mac or inspects yours.
             </p>
           </details>
           <details>
