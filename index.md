@@ -2,6 +2,10 @@
 
 Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog for navigating the project.
 
+## Marketing
+
+- **Organic growth pipeline (2026-10-30):** [Approved sequence, initial readiness audit and execution backlog](docs/superpowers/specs/2026-10-30-organic-growth-design.md). Covers release/installer trust, cleanup classifications, landing alignment, broken waitlist endpoint, search measurement, content pilot and later Gum automation. Findings are repository evidence; artifact testing and account access remain unverified. Written design review precedes implementation.
+
 ## Components
 
 - **Home/sidebar layout (2026-10-30):** Home technical details and indicators precede task actions. Advanced destinations appear directly in the sidebar, with no More section or disclosure. Build, 355 tests, signed bundle and running-app inspection pass.
