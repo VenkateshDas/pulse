@@ -62,6 +62,8 @@ P0 items gate broad promotion, not preparatory research or draft content. A cont
 
 ## Tools and dependencies
 
+Founder confirmed on October 30: no custom domain, Search Console property, website analytics or email signup service exists. These are new setups, not account discovery. The existing GitHub Pages site remains the starting host. Proposed order: verify a URL-prefix Search Console property for that site, select and configure one analytics service, then connect a real email signup service or remove the forms. Domain selection/purchase is a separate decision; no purchase is required for the pilot.
+
 Keep GitHub Pages and PRs. Introduce the smallest static Markdown-to-HTML pipeline compatible with the existing landing page; choose the generator during the content-infrastructure design. Preserve current URLs. Decide whether to adopt a custom domain before accumulating many indexed pages; purchasing one is a separate founder decision.
 
 Search Console is the first external data source. Use a URL-prefix property for the current project URL if ownership can be verified there, or DNS verification for a domain property when a domain is controlled. Start with indexing and page/query data. Choose one web analytics provider after reviewing existing accounts, privacy preferences and budget; neither a paid subscription nor new app telemetry is assumed.
