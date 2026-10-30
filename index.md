@@ -119,3 +119,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Real product landing (2026-10-30):** [Capture, copy and validation notes](docs/marketing/real-product-landing.md). Landing now uses deterministic fictional UI replicas for Home Light/Dark, Files, App activity and removal review over a generated studio backdrop. Earlier real-data captures are removed from the current tree after the user’s privacy correction. Signup remains closed pending MailerLite configuration.
 
 - **Home hero + storage showcase:** [Approved direction and implementation notes](docs/marketing/storage-showcase-design.md). Stronger split hero preserves Home; forest-green Files showcase explains size comparison and drill-down with fictional demo data.
+
+- **Technical-indicator marketing + minimal motion (2026-10-30):** [Implementation and validation](docs/marketing/technical-indicators-motion.md). Six fictional technical readings, requested label/link removals, optional locally bundled Three.js scroll leveling and static fallbacks; no native changes or analytics.

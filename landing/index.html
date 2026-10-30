@@ -43,6 +43,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="config.js" defer></script>
     <script src="site.js" defer></script>
+    <script type="module" src="motion.js"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -80,7 +81,6 @@
         </div>
         <figure class="product-figure" id="preview">
           <figcaption class="preview-caption">
-            <span>Pulse interface · Demo data</span>
             <div class="appearance-tabs" role="tablist" aria-label="Screenshot appearance" aria-orientation="horizontal">
               <button id="tab-light" role="tab" aria-selected="true" aria-controls="panel-light" tabindex="0">Light</button>
               <button id="tab-dark" role="tab" aria-selected="false" aria-controls="panel-dark" tabindex="-1">Dark</button>
@@ -97,12 +97,36 @@
           <p class="capture-note">Interface replicas with fictional data · Open a preview for a closer look · Design may change.</p>
         </figure>
       </section>
+      <section class="indicators wrap" id="indicators" aria-labelledby="indicators-title">
+        <div class="indicators-copy">
+          <h2 id="indicators-title">The details.<br /><span>Without the guesswork.</span></h2>
+          <p>Go deeper when you need to. Bring processor load, memory pressure and the signals behind a slowdown into one view.</p>
+          <ul class="indicator-benefits">
+            <li>Separate busy processors from memory pressure.</li>
+            <li>Check storage and network activity alongside app use.</li>
+            <li>See available graphics and thermal readings in context.</li>
+          </ul>
+          <p class="indicator-note">GPU and temperature readings vary by Mac. When temperatures aren’t available, Pulse shows macOS thermal state.</p>
+        </div>
+        <div class="indicator-scene">
+          <div class="indicator-board" role="group" aria-label="Technical indicator preview with fictional readings">
+            <div class="indicator-board-header"><span>Technical details</span><span class="indicator-status">Sample readings</span></div>
+            <dl class="indicator-readings">
+              <div><dt>CPU</dt><dd>18<span>%</span><small>Processor activity</small></dd></div>
+              <div><dt>Memory</dt><dd>6.4 <span>/ 16 GB</span><small>Pressure: normal</small></dd></div>
+              <div><dt>GPU</dt><dd>12<span>%</span><small>Graphics activity</small></dd></div>
+              <div><dt>Storage</dt><dd>64 <span>GB</span><small>Available space</small></dd></div>
+              <div><dt>Network</dt><dd>1.8 <span>MB/s</span><small>Download activity</small></dd></div>
+              <div><dt>Thermals</dt><dd class="thermal-value">Nominal<small>macOS thermal state</small></dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
       <section class="storage-showcase" id="storage" aria-labelledby="storage-title">
         <div class="wrap">
           <div class="storage-heading">
             <h2 id="storage-title">A full disk.<br /><span>A place to start.</span></h2>
-            <div><p>Go beyond “storage almost full.” See which folders take up space, then follow the trail through your Mac.</p>
-            <a class="storage-full-link" href="assets/pulse-demo-storage.svg" target="_blank" rel="noopener">Inspect the demo interface <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg><span class="sr-only"> (opens a new tab)</span></a></div>
+            <div><p>Go beyond “storage almost full.” See which folders take up space, then follow the trail through your Mac.</p></div>
           </div>
           <figure class="storage-figure">
             <a class="storage-screen screenshot-link" href="assets/pulse-demo-storage.svg" target="_blank" rel="noopener" aria-label="Open full-size Pulse storage viewer preview (new tab)"><img src="assets/pulse-demo-storage.svg" width="1440" height="1040" loading="lazy" alt="Pulse Files interface demo: three columns follow Demo Disk into Library and Application Support, with fictional folder sizes and usage bars." /></a>

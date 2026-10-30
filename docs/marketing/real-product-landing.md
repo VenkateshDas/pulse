@@ -20,4 +20,4 @@ Browser checks at 1440px, 390px and 320px: no horizontal overflow. All five demo
 
 Independent design reviewer scored proportional bars and all icon cleanup resolved (ship at fix scope); documenter confirmed no native-system documentation change required.
 
-No native code changed, no new service or frontend dependency. Signup remains closed pending the user’s approved MailerLite URL and real confirmation/unsubscribe-flow validation. No analytics, deployment or merge enabled by this work. User visual approval remains the merge gate.
+No native code changed or new service. A subsequent user-requested [technical-indicator and motion refinement](technical-indicators-motion.md) adds a self-hosted, pinned Three.js CSS3D subset; all preview data remains fictional. Signup remains closed pending the user’s approved MailerLite URL and real confirmation/unsubscribe-flow validation. No analytics, deployment or merge enabled by this work. User visual approval remains the merge gate.
