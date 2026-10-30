@@ -19,8 +19,8 @@ struct SidebarVisibilityTests {
         #expect(SidebarItem(rawValue: "Uninstall") == .uninstall)
     }
 
-    @Test func advancedToolsDoNotCrowdEverydayNavigation() {
-        #expect(Set(SidebarItem.everyday).isDisjoint(with: SidebarItem.advancedGatedItems))
+    @Test func navigationGroupsHaveNoDuplicates() {
+        #expect(Set(SidebarItem.everyday).isDisjoint(with: SidebarItem.advanced))
         #expect(SidebarItem.advanced.contains(.startup))
         #expect(SidebarItem.advanced.contains(.benchmark))
     }

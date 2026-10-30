@@ -30,8 +30,6 @@ struct DashboardView: View {
                 if model.snapshot != nil && !model.attentionItems.isEmpty { AttentionSection() }
                 if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
                 everydaySummary
-                tasks
-                recentRemovals
                 DisclosureGroup("Technical details", isExpanded: $showDetails) {
                     VStack(spacing: 20) {
                         if model.snapshot != nil {
@@ -47,6 +45,8 @@ struct DashboardView: View {
                 }
                 .font(Halo.font(size: 14, weight: .medium))
                 .foregroundStyle(Halo.textPrimary)
+                tasks
+                recentRemovals
             }
             .padding(Halo.Space.xxl)
             .frame(maxWidth: 1040, alignment: .leading)

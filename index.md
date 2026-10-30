@@ -4,13 +4,15 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Components
 
+- **Home/sidebar layout (2026-10-30):** Home technical details and indicators precede task actions. Advanced destinations appear directly in the sidebar, with no More section or disclosure.
+
 - **AI-free Pulse (2026-10-30):** Ask Pulse UI, provider settings, Swift client/daemon and Python runtime removed on `feat/remove-ask-pulse`. The native CLI remains available; app bundles do not include an AI runtime or skill. AI work remains preserved on `feat/home-ask-pulse`. Debug build, 355 Swift tests and CLI smoke checks pass; signed release bundle and artifact checks pass. Running Home/sidebar and Settings confirm no Ask Pulse or provider controls. User review remains pending.
 
 ### [Pulse App](file:///Users/venkateshmurugadas/software_codes/mac-monitor/pulse/README.md)
 The main application: a native macOS command center for performance and storage built with Swift 6.
 - **Location:** `pulse/`
 - **Design System:** HALO design token system (`Theme.swift`) — `Shadow`, `Radius`, `Space`, `Motion` enums, `premiumCard()` / `sectionLabel()` view modifiers. The accessible redesign uses opaque surfaces, paired light/dark semantic colours, minimum 12pt typography and optional Larger text. Built from Apple HIG research (`.claude/skills/macos-design/SKILL.md`).
-- **Sidebar Sections (redesign branch):** Home, Free up space, Apps, Battery & energy, Internet, Displays, Activity; Settings; expandable Advanced tools for App activity, Maintenance, Startup helpers, Performance test and Diagnostics.
+- **Sidebar Sections (redesign branch):** Home, Free up space, Apps, Battery & energy, Internet, Displays, Activity; Settings; directly visible tools for App activity, Maintenance, Startup helpers, Performance test and Diagnostics.
 - **Menu Bar Popover:** Explicit 620pt scroll viewport prevents MenuBarExtra from collapsing to a thin strip; overflow remains scrollable. Review summary, always-visible readings, last download/upload speed with manual retest/stop, Displays and Keep awake. Menu-bar organisation controls remain expanded. Cleanup and maintenance open review; Empty Trash retains explicit confirmation and in-place results.
 - **Command Palette (⌘K):** Fuzzy-searchable navigation and quick actions.
 - **Sampling:** native unlocked snapshots every 2 seconds; expensive process enumeration remains sparse, publishing only while an explicit window or popover state is visible. Idempotent surface states prevent repeated AppKit occlusion events from leaking visibility.
