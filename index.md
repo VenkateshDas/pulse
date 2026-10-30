@@ -4,7 +4,7 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Components
 
-- **AI-free Pulse (2026-10-30):** Ask Pulse UI, provider settings, Swift client/daemon and Python runtime removed on `feat/remove-ask-pulse`. The native CLI remains available; app bundles do not include an AI runtime or skill. AI work remains preserved on `feat/home-ask-pulse`. Debug build, 355 Swift tests and CLI smoke checks pass; release bundle and user review are pending.
+- **AI-free Pulse (2026-10-30):** Ask Pulse UI, provider settings, Swift client/daemon and Python runtime removed on `feat/remove-ask-pulse`. The native CLI remains available; app bundles do not include an AI runtime or skill. AI work remains preserved on `feat/home-ask-pulse`. Debug build, 355 Swift tests and CLI smoke checks pass; signed release bundle and artifact checks pass. Running Home/sidebar and Settings confirm no Ask Pulse or provider controls. User review remains pending.
 
 ### [Pulse App](file:///Users/venkateshmurugadas/software_codes/mac-monitor/pulse/README.md)
 The main application: a native macOS command center for performance and storage built with Swift 6.
