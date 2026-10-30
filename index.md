@@ -115,3 +115,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Beta download (2026-10-17):** Landing navigation and hero link directly to the universal v0.3.0-beta.5 DMG; waitlist remains available for updates. Release includes the grouped app quit fix.
 
 - **Landing feature coverage (2026-10-17):** [Approved content plan](docs/superpowers/specs/2026-10-17-landing-current-features-design.md). Landing copy covers released app features, optional AI/provider costs, history and restore limits; removes unshipped plans and unsupported guarantees.
+
+- **Real product landing (2026-10-30):** [Capture, copy and validation notes](docs/marketing/real-product-landing.md). Landing uses actual Home Light/Dark, App activity and removal-review screenshots over a generated studio backdrop; origin sidecars accompany assets. Signup remains closed pending MailerLite configuration.

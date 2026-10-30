@@ -6,7 +6,7 @@
     <title>Pulse — A clearer picture of your Mac. Join early access.</title>
     <meta
       name="description"
-      content="Understand what is taking up space and slowing down your Mac. Explore Pulse’s product preview and get ready for early access."
+      content="A clearer view of storage, memory and busy apps. See the real Pulse app, explore its controls and join the early-access list."
     />
     <meta name="theme-color" content="#f5f7f8" />
     <meta name="color-scheme" content="light" />
@@ -23,9 +23,9 @@
     />
     <meta
       property="og:image"
-      content="https://venkateshdas.github.io/pulse/assets/apple-touch-icon.png"
+      content="https://venkateshdas.github.io/pulse/assets/pulse-home-light.webp"
     />
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
       content="Pulse — A clearer picture of your Mac."
@@ -36,7 +36,7 @@
     />
     <meta
       name="twitter:image"
-      content="https://venkateshdas.github.io/pulse/assets/apple-touch-icon.png"
+      content="https://venkateshdas.github.io/pulse/assets/pulse-home-light.webp"
     />
     <link rel="icon" href="assets/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
@@ -63,14 +63,11 @@
     <main id="main">
       <section class="hero wrap" id="top" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="availability">
-            <span aria-hidden="true"></span> In development for macOS
-          </p>
-          <h1 id="hero-title">Your Mac.<br />A clearer picture.</h1>
+          <h1 id="hero-title">Your Mac has clues.<br />See them clearly.</h1>
           <p class="hero-description">
-            Running out of space? Wondering what’s slowing things down? Pulse
-            brings the clues together, so you can understand your Mac and choose
-            what to do next.
+            A full disk. A busy app. A Mac that feels slower than it should.
+            Pulse brings storage, memory and app activity into one native view,
+            so your next step starts with understanding.
           </p>
           <div class="hero-actions">
             <a class="button" href="#early-access"
@@ -79,270 +76,59 @@
               >Take a closer look <span aria-hidden="true">↓</span></a
             >
           </div>
-          <p class="supporting">A native Mac app. A thoughtful next step.</p>
-        </div>
-        <div class="hero-note">
-          <span class="note-line" aria-hidden="true"></span>
-          <p>Less guesswork.<br />More understanding.</p>
+          <p class="supporting">In development for macOS · No payment to join the list.</p>
         </div>
         <figure class="product-figure" id="preview">
           <figcaption class="preview-caption">
-            <span>Explore the product preview</span
-            ><span>Illustrative interface · Example data</span>
-          </figcaption>
-          <div class="app-shell">
-            <div class="titlebar">
-              <span class="traffic-lights" aria-hidden="true"
-                ><i></i><i></i><i></i></span
-              ><span>Pulse</span
-              ><span class="window-label">Product preview</span>
+            <span>This is Pulse. Running on a real Mac.</span>
+            <div class="appearance-tabs" role="tablist" aria-label="Screenshot appearance" aria-orientation="horizontal">
+              <button id="tab-light" role="tab" aria-selected="true" aria-controls="panel-light" tabindex="0">Light</button>
+              <button id="tab-dark" role="tab" aria-selected="false" aria-controls="panel-dark" tabindex="-1">Dark</button>
             </div>
-            <div class="app-body">
-              <div class="preview-sidebar">
-                <span class="sidebar-heading">Your Mac, understood.</span>
-                <div
-                  class="preview-tabs"
-                  role="tablist"
-                  aria-label="Product previews"
-                  aria-orientation="vertical"
-                >
-                  <button
-                    role="tab"
-                    id="tab-storage"
-                    aria-controls="panel-storage"
-                    aria-selected="true"
-                    tabindex="0"
-                  >
-                    <span aria-hidden="true">◫</span> Storage
-                  </button>
-                  <button
-                    role="tab"
-                    id="tab-activity"
-                    aria-controls="panel-activity"
-                    aria-selected="false"
-                    tabindex="-1"
-                  >
-                    <span aria-hidden="true">⌁</span> App activity
-                  </button>
-                  <button
-                    role="tab"
-                    id="tab-apps"
-                    aria-controls="panel-apps"
-                    aria-selected="false"
-                    tabindex="-1"
-                  >
-                    <span aria-hidden="true">▤</span> App leftovers
-                  </button>
-                </div>
-                <p class="sidebar-note">
-                  A closer look,<br />before you take action.
-                </p>
-              </div>
-              <div class="preview-content">
-                <section
-                  role="tabpanel"
-                  id="panel-storage"
-                  aria-labelledby="tab-storage"
-                  tabindex="0"
-                >
-                  <div class="panel-heading">
-                    <div>
-                      <p class="panel-kicker">Storage</p>
-                      <h2>Where did all that space go?</h2>
-                    </div>
-                    <span class="example-label">Example</span>
-                  </div>
-                  <p class="panel-description">
-                    See the folders behind the storage total.
-                  </p>
-                  <div class="storage-summary">
-                    <span><strong>384 GB</strong> used of 512 GB</span
-                    ><span>128 GB available</span>
-                  </div>
-                  <div
-                    class="storage-bar"
-                    aria-label="Illustrative storage: documents 31%, applications 21%, developer files 15%, other files 8%, available 25%"
-                  >
-                    <span></span><span></span><span></span><span></span>
-                  </div>
-                  <div class="folder-list">
-                    <div>
-                      <span class="folder-icon" aria-hidden="true">▰</span
-                      ><span
-                        >Documents<small
-                          >Projects, media and personal files</small
-                        ></span
-                      ><strong>158 GB</strong>
-                    </div>
-                    <div>
-                      <span class="folder-icon" aria-hidden="true">▰</span
-                      ><span>Applications<small>Installed apps</small></span
-                      ><strong>108 GB</strong>
-                    </div>
-                    <div>
-                      <span class="folder-icon" aria-hidden="true">▰</span
-                      ><span
-                        >Developer files<small
-                          >Build files and development tools</small
-                        ></span
-                      ><strong>77 GB</strong>
-                    </div>
-                  </div>
-                  <p class="insight">
-                    <span aria-hidden="true">↳</span> Knowing what’s there comes
-                    before deciding what to remove.
-                  </p>
-                </section>
-                <section
-                  role="tabpanel"
-                  id="panel-activity"
-                  aria-labelledby="tab-activity"
-                  tabindex="0"
-                  hidden
-                >
-                  <div class="panel-heading">
-                    <div>
-                      <p class="panel-kicker">App activity</p>
-                      <h2>Find what’s keeping your Mac busy.</h2>
-                    </div>
-                    <span class="example-label">Example</span>
-                  </div>
-                  <p class="panel-description">
-                    Put CPU activity and memory use in context.
-                  </p>
-                  <div class="activity-summary">
-                    <span>CPU activity<strong>42%</strong></span
-                    ><span>Memory pressure<strong>Normal</strong></span>
-                  </div>
-                  <div class="process-table">
-                    <div class="process-header">
-                      <span>Application</span><span>CPU</span
-                      ><span>Memory</span>
-                    </div>
-                    <div>
-                      <span>Video editor</span><strong>31%</strong
-                      ><span>2.4 GB</span>
-                    </div>
-                    <div>
-                      <span>Web browser</span><strong>8%</strong
-                      ><span>1.8 GB</span>
-                    </div>
-                    <div>
-                      <span>Mail</span><strong>1%</strong><span>240 MB</span>
-                    </div>
-                  </div>
-                  <p class="insight">
-                    <span aria-hidden="true">↳</span> A busy app may be doing
-                    useful work. Understand it before quitting.
-                  </p>
-                </section>
-                <section
-                  role="tabpanel"
-                  id="panel-apps"
-                  aria-labelledby="tab-apps"
-                  tabindex="0"
-                  hidden
-                >
-                  <div class="panel-heading">
-                    <div>
-                      <p class="panel-kicker">App leftovers</p>
-                      <h2>See what an app leaves behind.</h2>
-                    </div>
-                    <span class="example-label">Example</span>
-                  </div>
-                  <p class="panel-description">
-                    Review related files, with the evidence to make a choice.
-                  </p>
-                  <div class="app-example">
-                    <span class="sample-app" aria-hidden="true">N</span
-                    ><span
-                      ><strong>Notebook</strong
-                      ><small>Illustrative application</small></span
-                    >
-                  </div>
-                  <div class="review-list">
-                    <div>
-                      <span
-                        >Application cache<small
-                          >Files the app may recreate</small
-                        ></span
-                      ><span class="review-label">Review</span>
-                    </div>
-                    <div>
-                      <span
-                        >Application support<small
-                          >May contain settings and saved data</small
-                        ></span
-                      ><span class="review-label">Review carefully</span>
-                    </div>
-                    <div>
-                      <span
-                        >Shared files<small
-                          >May be used by other applications</small
-                        ></span
-                      ><span class="review-label">Keep unless verified</span>
-                    </div>
-                  </div>
-                  <p class="insight">
-                    <span aria-hidden="true">↳</span> Related doesn’t
-                    automatically mean disposable.
-                  </p>
-                </section>
-              </div>
+          </figcaption>
+          <div class="product-stage">
+            <div id="panel-light" role="tabpanel" aria-labelledby="tab-light" tabindex="0">
+              <a class="screenshot-link" href="assets/pulse-home-light.webp" target="_blank" rel="noopener" aria-label="Open full-size Pulse Home screenshot in light mode (new tab)"><img class="app-shot" src="assets/pulse-home-light.webp" width="2288" height="1660" fetchpriority="high" alt="Pulse Home in light mode: memory, storage, battery and a next-step summary in one native Mac window." /></a>
+            </div>
+            <div id="panel-dark" role="tabpanel" aria-labelledby="tab-dark" tabindex="0" hidden>
+              <a class="screenshot-link" href="assets/pulse-home-dark.webp" target="_blank" rel="noopener" aria-label="Open full-size Pulse Home screenshot in dark mode (new tab)"><img class="app-shot" src="assets/pulse-home-dark.webp" width="2288" height="1660" alt="The same Pulse Home dashboard in dark mode, with green accents and readable system summaries." /></a>
             </div>
           </div>
-          <p class="preview-footnote">
-            An interactive illustration, not a scan of your Mac. Final screens
-            may change.
-          </p>
+          <p class="capture-note">Actual development-build captures · Click a screen to inspect it · Interface may change before early access.</p>
         </figure>
       </section>
-      <section class="outcomes wrap" aria-labelledby="outcomes-title">
-        <div class="section-intro">
-          <p class="section-label">Start with a question.</p>
-          <h2 id="outcomes-title">Get beyond<br />“something feels off.”</h2>
-          <p>
-            You shouldn’t need to be a Mac expert to understand what deserves
-            your attention.
-          </p>
+      <section class="features wrap" aria-labelledby="features-title">
+        <div class="feature-intro">
+          <h2 id="features-title">From “what’s going on?”<br />to a closer look.</h2>
+          <p>Start with the overview. Follow the question that matters to you. These are screens from the app we’re building.</p>
         </div>
-        <div class="outcome-list">
-          <article>
-            <span class="outcome-symbol" aria-hidden="true">◫</span>
-            <div>
-              <h3>“What’s taking up all my space?”</h3>
-              <p>
-                Look beyond the storage total. Explore large folders, overlooked
-                files and places worth investigating.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span class="outcome-symbol" aria-hidden="true">⌁</span>
-            <div>
-              <h3>“Why is my Mac working so hard?”</h3>
-              <p>
-                See which apps are busy and understand CPU activity and memory
-                pressure before choosing an action.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span class="outcome-symbol" aria-hidden="true">▤</span>
-            <div>
-              <h3>“Did that app leave anything behind?”</h3>
-              <p>
-                Review related files and their purpose. Keep control over what
-                stays and what goes.
-              </p>
-            </div>
-          </article>
-        </div>
+        <article class="feature-row">
+          <div class="feature-copy">
+            <h3>Which app is doing all that work?</h3>
+            <p>Your browser is more than one process. Pulse groups related processes by app, so you can compare CPU and memory use without piecing the list together yourself.</p>
+            <p class="feature-detail">High usage can be normal. Review the context before deciding whether an app needs attention.</p>
+          </div>
+          <figure>
+            <a class="screenshot-link" href="assets/pulse-activity.webp" target="_blank" rel="noopener" aria-label="Open full-size App activity screenshot (new tab)"><img src="assets/pulse-activity.webp" width="2288" height="1660" loading="lazy" alt="Real Pulse App activity screen grouping browser and application processes with CPU and memory columns." /></a>
+            <figcaption>App activity · Real readings at capture time</figcaption>
+          </figure>
+        </article>
+        <article class="feature-row feature-row-reverse">
+          <div class="feature-copy">
+            <h3>What comes with removing an app?</h3>
+            <p>See related files and why they were matched. Review the selection before moving anything to Trash, including preferences or documents you may want to keep.</p>
+            <p class="feature-detail">You choose what goes. Files still take up storage until Trash is emptied.</p>
+          </div>
+          <figure>
+            <a class="screenshot-link" href="assets/pulse-app-review.webp" target="_blank" rel="noopener" aria-label="Open full-size app removal review screenshot (new tab)"><img src="assets/pulse-app-review.webp" width="2288" height="1660" loading="lazy" alt="Pulse reviewing a selected app and two matched related files, with individual checkboxes, permission guidance and Trash warnings." /></a>
+            <figcaption>App review · Nothing was removed for this capture</figcaption>
+          </figure>
+        </article>
+        <p class="feature-tail">Also in Pulse: storage exploration, battery and energy, display brightness, and startup helpers. <a href="#early-access">Help us choose what to focus on next.</a></p>
       </section>
       <section class="approach" id="approach" aria-labelledby="approach-title">
         <div class="wrap approach-inner">
           <div>
-            <p class="section-label">The Pulse approach</p>
             <h2 id="approach-title">
               Understand first.<br />Act with context.
             </h2>
@@ -383,16 +169,15 @@
         aria-labelledby="access-title"
       >
         <div>
-          <p class="section-label">Help shape what comes next.</p>
-          <h2 id="access-title">Your Mac questions.<br />Our next chapter.</h2>
+          <h2 id="access-title">Help build the Mac app<br />you wish you had.</h2>
           <p>
-            Join the early-access list for an invitation when Pulse is ready.
-            Tell us what you’d like to understand about your Mac and help shape
-            the experience.
+            Join the list for an early-access invitation when Pulse is ready.
+            Tell us which Mac questions leave you guessing. Your feedback will
+            help shape what we build next.
           </p>
         </div>
         <div class="signup-panel">
-          <h3>Be first to hear about Pulse.</h3>
+          <h3>A clearer Mac starts here.</h3>
           <p>
             Early-access invitations and occasional product updates. No purchase
             required to join.
@@ -436,11 +221,12 @@
             </p>
           </details>
           <details>
-            <summary>Is the preview showing my actual Mac?</summary>
+            <summary>Are these real app screenshots?</summary>
             <p>
-              No. The preview uses illustrative data to explain the experience.
-              It doesn’t inspect your files, measure your system or perform
-              cleanup.
+              Yes. They were captured from a running Pulse development build on
+              a Mac, with real readings at that moment. The studio backdrop is
+              AI-generated; the app screens are unchanged apart from cropping
+              the window toolbar. This website doesn’t inspect your Mac or run cleanup.
             </p>
           </details>
           <details>
@@ -500,7 +286,7 @@
       <a class="wordmark" href="#top"
         ><span class="pulse-mark" aria-hidden="true">p</span>Pulse</a
       >
-      <p>A clearer picture. A more considered next step.</p>
+      <p>Understand your Mac. Choose your next step.</p>
       <div>
         <a href="#privacy">Privacy</a
         ><a href="https://github.com/VenkateshDas/pulse/issues"

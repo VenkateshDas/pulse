@@ -1,7 +1,6 @@
 (() => {
   "use strict";
   const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
-  const tablist = document.querySelector('[role="tablist"]');
   function selectTab(tab, focus = false) {
     tabs.forEach((item) => {
       const selected = item === tab;
@@ -29,16 +28,6 @@
       }
     });
   });
-  const mobileLayout = window.matchMedia("(max-width: 640px)");
-  function updateOrientation() {
-    tablist.setAttribute(
-      "aria-orientation",
-      mobileLayout.matches ? "horizontal" : "vertical",
-    );
-  }
-  mobileLayout.addEventListener("change", updateOrientation);
-  updateOrientation();
-
   const signup = document.getElementById("signup-link");
   const status = document.getElementById("signup-status");
   let waitlistUrl;
