@@ -2,6 +2,10 @@
 
 Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog for navigating the project.
 
+## Marketing
+
+- **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, three illustrative interactive previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. No analytics or subscriber collection enabled. Approved next stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.
+
 ## Components
 
 - **Home/sidebar layout (2026-10-30):** Home technical details and indicators precede task actions. Advanced destinations appear directly in the sidebar, with no More section or disclosure. Build, 355 tests, signed bundle and running-app inspection pass.

@@ -163,3 +163,5 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 
 
 ## [2026-10-30] Reorder Home and flatten navigation | Move technical details above task actions; show advanced destinations directly in the sidebar, removing More/disclosure and expansion state. User specified layout. Debug build, 355 tests and signed release bundle pass; restarted app verifies requested ordering and flat sidebar. User review remains pending.
+
+## [2026-10-30] Build waitlist-first landing | Replace download-first landing with accessible light/green early-access page, user-controlled illustrative previews, native FAQ and honest signup availability. Remove fake Formspree endpoint and offered-price schema; prepare hosted MailerLite Share URL configuration. No accounts, tracking or live collection enabled. See docs/marketing/waitlist-setup.md for activation and validation gates.
