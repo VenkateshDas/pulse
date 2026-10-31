@@ -4,7 +4,7 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
-- **Capability illustration (2026-10-31):** User-approved generated studio illustration replaces the flat capability hub. Optimized WebP, native text equivalent for accessibility/search, and keyboard/touch horizontal exploration on narrow screens. Original eight capabilities and hardware/permission qualifications retained.
+- **Capability illustration (2026-10-31):** User-approved generated studio illustration replaces the flat capability hub. Optimized WebP, native text equivalent for accessibility/search, and a readable feature list beneath the full illustration on narrow screens. Original eight capabilities and hardware/permission qualifications retained.
 
 - **Growth pipeline (2026-10-31):** [Current execution checklist](docs/marketing/growth-pipeline.md). Waitlist setup → explicit PostHog measurement → Search Console → one tested guide → weekly learning. Includes founder inputs, completion checks and the current free-plan limits; supersedes download-first/AI assumptions in older plans. MailerLite group/form created with double opt-in enabled; confirmation delivery/membership and dashboard unsubscribe verified. Campaign unsubscribe link remains untested. A branded thank-you page is prepared; public deployment and redirect configuration remain pending.
 
