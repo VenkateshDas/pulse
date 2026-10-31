@@ -57,11 +57,6 @@
       "Continue to our signup form, then confirm your email to join.";
     document.getElementById("signup-note").textContent =
       "Early-access invitations and occasional updates. Unsubscribe at any time.";
-    // The public notice must be approved before opening collection.
-    document.querySelector("#privacy > p").textContent =
-      "This preview doesn’t access your Mac’s files or system readings. This version of the page has no analytics or session-recording scripts.";
-    document.getElementById("signup-privacy").textContent =
-      "Our signup form is hosted by MailerLite. If you subscribe, MailerLite processes your email address and any information you choose to provide so we can send early-access invitations and occasional Pulse updates. You can unsubscribe using the link in our emails.";
   } else {
     signup.setAttribute("aria-disabled", "true");
     signup.textContent = "Early access opens soon";

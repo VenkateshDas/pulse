@@ -1,6 +1,6 @@
 # Pulse growth pipeline — execution checklist
 
-Updated 31 October 2026. Current operating plan for the approved waitlist-first strategy. This supersedes beta-download, optional-AI and beta-activation recommendations in the October 28 marketing plan/backlog. The landing and app are prepared separately; public launch, signup and analytics are not yet verified live.
+Updated 31 October 2026. Current operating plan for the approved waitlist-first strategy. This supersedes beta-download, optional-AI and beta-activation recommendations in the October 28 marketing plan/backlog. PR #94 is merged and the landing/thank-you page are publicly deployed. MailerLite’s custom redirect is saved and a fresh confirmation reaches it. Signup activation, opt-in analytics and Search Console verification metadata are prepared on the follow-up branch, pending required CI and user merge approval.
 
 ## Sequence and ownership
 
@@ -16,10 +16,10 @@ Start with step 1. Prepare later steps in parallel where account access is unnec
 
 ## Current verified repository state
 
-- `landing/config.js` has an empty `waitlistUrl`; signup fails closed. No subscriber collection or analytics SDK is enabled.
+- Follow-up config contains the verified hosted MailerLite Share URL and PostHog public ingestion token. Analytics uses the native Capture batch API, with no SDK and no requests until browser opt-in. Public main still has closed signup until this follow-up is approved.
 - The configured canonical is `https://venkateshdas.github.io/pulse/`. This is the intended existing-host address, not proof that the new landing is deployed.
-- `.github/workflows/pages.yml` deploys landing changes from main. PR #94 remains subject to required CI and explicit user approval before merge.
-- No guide directory, sitemap or Search Console verification file/tag has been added. Do not claim unpublished URLs exist.
+- `.github/workflows/pages.yml` deploys landing changes from main. PR #94 merged with explicit owner approval; Pages deployment 41185896105 succeeded.
+- Follow-up adds the owner’s Search Console HTML verification tag and a sitemap containing only the live homepage. The noindex thank-you page and unpublished guides are excluded. Verification and sitemap submission must follow public deployment.
 - Native UI marketing proof uses fictional fixtures. Do not collect personal Mac screenshots for guides without a deliberate privacy review.
 - `docs/product_spec.html` remains absent; the supplied AGENTS constraints and current product documentation govern product claims.
 
@@ -65,7 +65,7 @@ First dashboard: visitors/page views by page and source; unique visitors clickin
 
 Create a URL-prefix Search Console property for the final published base URL. For the current GitHub project path, HTML-tag verification avoids relying on a verification file placed at the domain root. Add only the token supplied by the owner, deploy, then verify. A custom-domain property can use DNS if an owned domain is chosen later.
 
-Check canonical URL, indexability and internal links. Publish a sitemap containing only live canonical URLs after guide URLs exist; a project-site sitemap lives under `/pulse/`. A site under this path cannot set domain-root robots.txt policy from its landing folder. Use page metadata when needed. Do not request indexing of drafts or local previews.
+Check canonical URL, indexability and internal links. Publish a sitemap containing only live canonical URLs, starting with the homepage; a project-site sitemap lives under `/pulse/`. A site under this path cannot set domain-root robots.txt policy from its landing folder. Use page metadata when needed. Do not request indexing of drafts or local previews.
 
 Use Search Console for queries, impressions, clicks, CTR and average position once Google has data. Average position is an aggregate, not a guaranteed fixed rank. For prelaunch research use current search results and primary sources, then validate topic choice with actual query data. Search demand and difficulty remain unknown; no paid keyword suite or GA4/Tag Manager is required for the initial pilot.
 
