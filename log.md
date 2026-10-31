@@ -179,3 +179,6 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 ## [2026-10-31] Prepare MailerLite early-access form | Created Pulse early access group and hosted-share form; saved invitation/CTA/check-inbox copy and verified enabled double opt-in. Public form renders; delivery, confirmed membership and unsubscribe await founder-authorized testing. Landing config remains closed; no campaign sent.
 
 ## [2026-10-31] Verify waitlist confirmation and prepare branded thank-you | Authorized alias reached Gmail, confirmed Active group membership, then dashboard unsubscribe verified. No campaign sent; recipient unsubscribe link remains untested. Provider thank-you editing is paid-only; prepare a static Pulse early-access confirmation page for custom redirect after approved deployment. Live redirect and closed landing config unchanged.
+
+
+## [2026-10-31] Integrate approved capability illustration | Replace flat capability hub with the user-selected Pulse-green studio illustration, compressed to 114KB WebP. Retain native eight-feature text for screen readers/search; show it beneath the complete illustration on narrow screens. Preserve hardware/permission qualification. No product screenshots, analytics settings or signup behavior changed.
