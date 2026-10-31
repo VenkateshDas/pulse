@@ -392,6 +392,10 @@ details p {
   color: var(--muted);
   font-size: 15px;
 }
+.analytics-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.analytics-choices[hidden] { display: none; }
+.analytics-choices button:disabled { opacity: .6; cursor: default; }
+.analytics-choices p { flex-basis: 100%; }
 .privacy {
   padding-bottom: 65px;
   scroll-margin-top: 30px;
