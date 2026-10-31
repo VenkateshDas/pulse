@@ -4,6 +4,8 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
+- **Capability illustration (2026-10-31):** User-approved generated studio illustration replaces the flat capability hub. Optimized WebP, native text equivalent for accessibility/search, and keyboard/touch horizontal exploration on narrow screens. Original eight capabilities and hardware/permission qualifications retained.
+
 - **Growth pipeline (2026-10-31):** [Current execution checklist](docs/marketing/growth-pipeline.md). Waitlist setup → explicit PostHog measurement → Search Console → one tested guide → weekly learning. Includes founder inputs, completion checks and the current free-plan limits; supersedes download-first/AI assumptions in older plans. MailerLite group/form created with double opt-in enabled; confirmation delivery/membership and dashboard unsubscribe verified. Campaign unsubscribe link remains untested. A branded thank-you page is prepared; public deployment and redirect configuration remain pending.
 
 - **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, fictional interface previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. No analytics or subscriber collection enabled. Approved next stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.
