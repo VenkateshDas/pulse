@@ -10,6 +10,7 @@
     />
     <meta name="theme-color" content="#f5f7f8" />
     <meta name="color-scheme" content="light" />
+    <meta name="google-site-verification" content="po3pItC7WavbFwB8InAkeW7snTlU_JVBq5pL0y9jwlI" />
     <link rel="canonical" href="https://venkateshdas.github.io/pulse/" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://venkateshdas.github.io/pulse/" />
@@ -43,6 +44,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="config.js" defer></script>
     <script src="site.js" defer></script>
+    <script src="analytics.js" defer></script>
     <script type="module" src="motion.js"></script>
   </head>
   <body>
@@ -308,7 +310,7 @@
           <details>
             <summary>Will Pulse be free?</summary>
             <p>
-              Joining the waitlist will be free. Launch pricing hasn’t been
+              Joining the waitlist is free. Launch pricing hasn’t been
               decided. We’ll explain any pricing before you choose to buy.
             </p>
           </details>
@@ -323,8 +325,8 @@
           <details>
             <summary>What happens after I join?</summary>
             <p>
-              Once signup opens, you’ll confirm your email address and receive
-              an invitation when early access is ready. We may ask about the Mac
+              Confirm your email address to join the early-access list. We’ll
+              share product updates and opportunities to try Pulse. We may ask about the Mac
               problems you’d like help with. You’ll be able to unsubscribe from
               our emails.
             </p>
@@ -338,16 +340,32 @@
       >
         <h2 id="privacy-title">A clear start, including your privacy.</h2>
         <p>
-          This preview doesn’t access your Mac’s files or system readings. This
-          version of the page has no analytics or session-recording scripts.
-          Signup isn’t collecting email addresses until the early-access list
-          opens.
+          This preview doesn’t access your Mac’s files or system readings.
+          Optional website analytics help us understand which pages and product
+          previews are useful. They stay off unless you allow them below.
         </p>
         <p id="signup-privacy">
-          When signup opens, the linked form will explain how your information
-          is handled. We’ll update this notice before enabling signup or
-          analytics.
+          Our signup form is hosted by MailerLite. When you subscribe, MailerLite
+          processes your email address and technical signup records, including
+          IP address and confirmation activity, to manage the list and record
+          your consent. We use this information for early-access invitations
+          and occasional Pulse updates. Unsubscribe using the link in our emails,
+          or contact <a href="mailto:getpulseapp01@gmail.com">getpulseapp01@gmail.com</a>
+          to request removal. See <a href="https://www.mailerlite.com/legal/privacy-policy">MailerLite’s privacy policy</a>.
         </p>
+        <p>
+          If allowed, PostHog processes page visits, broad referral sources and
+          selected button clicks using a random browser identifier. We don’t send
+          email addresses, typed text, URL queries or session recordings. IP
+          storage is disabled. Your choice and, if allowed, the random identifier
+          are saved in this browser. You can turn analytics off here at any time.
+          See <a href="https://posthog.com/privacy">PostHog’s privacy policy</a>.
+        </p>
+        <div class="analytics-choices" hidden>
+          <button class="button button-small" type="button" id="analytics-allow">Allow analytics</button>
+          <button class="button button-small" type="button" id="analytics-deny">Keep analytics off</button>
+          <p id="analytics-status" role="status">Optional analytics are off.</p>
+        </div>
       </section>
     </main>
     <footer class="wrap footer">
