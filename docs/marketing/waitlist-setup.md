@@ -58,3 +58,16 @@ Public Share URL: https://preview.mailerlite.io/forms/2757476/202828385399866630
 Browser verified the hosted form displays the approved early-access introduction, email field and **Join early access** button. The post-submission message instructs readers to check their inbox and confirm. Double opt-in is visibly enabled. Sender is **Pulse** at the founder-created Gmail address. The provider's confirmation subject/content editing controls are disabled in the current account; the default confirmation remains. No upgrade or billing method added. No test subscriber or campaign sent by the agent.
 
 Pending: founder approval for a test alias and inbox/confirmation/unsubscribe verification; sender/account sending eligibility beyond the initial trial; mobile form checks; final provider/privacy review. The landing config stays empty until these checks establish a working flow. A public form rendering successfully is not evidence of confirmation delivery. The provider form itself is accessible via the Share URL; landing-page CTAs remain closed.
+
+
+## Authorized flow test and confirmation wording — October 31
+
+Founder explicitly authorized one test alias submission plus Gmail reading, confirmation and unsubscribe verification, with no campaign sent. Hosted form submission displayed the saved check-inbox message. The confirmation reached the Pulse Gmail inbox from MailerLite's rewritten sender domain. Following its confirmation link displayed the provider thank-you screen, and the test alias became Active in Pulse early access. Dashboard unsubscribe then visibly changed that record to Unsubscribed; it remains a test record, not an acquired user.
+
+**Limits:** the confirmation email contains no unsubscribe link. No campaign was sent, so the recipient-facing campaign unsubscribe link and its suppression behavior are still untested. Dashboard unsubscribe verifies only administrative status change. Current successful delivery is during the initial trial, not proof of long-term sending eligibility. Do not mark the full launch checklist complete.
+
+Founder flagged the provider's post-confirmation text, “You've signed up for the newsletter!” The **Confirmation thank you page → Edit content** link returns **403: Not available on free plan**. The same settings expose **Or use your own landing page → Website URL**. Avoid upgrading: prepare `landing/thanks/index.html` with the approved Pulse style and early-access wording instead.
+
+Local preview: http://localhost:8765/thanks/ . Intended deployed redirect: https://venkateshdas.github.io/pulse/thanks/ . **Do not configure that public URL until it is deployed and HTTP/browser checked.** The provider redirect has not been changed; live confirmations still use the default page. After required CI, explicit owner merge approval and Pages deployment, verify the public page, set the custom thank-you URL in MailerLite, save, reload settings and run an owner-authorized fresh confirmation test. Never use localhost as the public redirect.
+
+The static thank-you page has no tracking, noindex/nofollow and no-referrer metadata; it does not inspect confirmation tokens or prove subscription state. MailerLite confirmed records remain the source of truth. No confirmation URL/token or personal IP is stored in repo documentation.
