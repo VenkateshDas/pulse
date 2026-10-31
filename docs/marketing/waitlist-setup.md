@@ -47,3 +47,14 @@ Local preview: `python3 -m http.server 8765 --directory landing` from the reposi
 - Independent read-only Cavecrew review reported no issues.
 - Full-page desktop/mobile review screenshots saved locally; live MailerLite flow remains untested and blocked on account/form setup.
 - User approved updating Impeccable for future sessions; updater reported v4.8.0 installed. Local skill hooks are not included in the website PR.
+
+
+## Provider setup — October 31
+
+Founder created the Pulse Google/MailerLite accounts and reports address verification complete. In the authenticated MailerLite dashboard, created **Pulse early access** group and an embedded form with the same name. Group ID: `202828400287549005`; form ID: `202828385399866630`.
+
+Public Share URL: https://preview.mailerlite.io/forms/2757476/202828385399866630/share
+
+Browser verified the hosted form displays the approved early-access introduction, email field and **Join early access** button. The post-submission message instructs readers to check their inbox and confirm. Double opt-in is visibly enabled. Sender is **Pulse** at the founder-created Gmail address. The provider's confirmation subject/content editing controls are disabled in the current account; the default confirmation remains. No upgrade or billing method added. No test subscriber or campaign sent by the agent.
+
+Pending: founder approval for a test alias and inbox/confirmation/unsubscribe verification; sender/account sending eligibility beyond the initial trial; mobile form checks; final provider/privacy review. The landing config stays empty until these checks establish a working flow. A public form rendering successfully is not evidence of confirmation delivery. The provider form itself is accessible via the Share URL; landing-page CTAs remain closed.
