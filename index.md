@@ -2,6 +2,12 @@
 
 Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog for navigating the project.
 
+## Marketing
+
+- **Growth pipeline (2026-10-31):** [Current execution checklist](docs/marketing/growth-pipeline.md). Waitlist setup → explicit PostHog measurement → Search Console → one tested guide → weekly learning. Includes founder inputs, completion checks and the current free-plan limits; supersedes download-first/AI assumptions in older plans. MailerLite group/form created with double opt-in enabled; confirmation delivery/membership and dashboard unsubscribe verified. Campaign unsubscribe link remains untested. A branded thank-you page is prepared; public deployment and redirect configuration remain pending.
+
+- **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, fictional interface previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. No analytics or subscriber collection enabled. Approved next stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.
+
 ## Components
 
 - **Home/sidebar layout (2026-10-30):** Home technical details and indicators precede task actions. Advanced destinations appear directly in the sidebar, with no More section or disclosure. Build, 355 tests, signed bundle and running-app inspection pass.
@@ -111,3 +117,11 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Beta download (2026-10-17):** Landing navigation and hero link directly to the universal v0.3.0-beta.5 DMG; waitlist remains available for updates. Release includes the grouped app quit fix.
 
 - **Landing feature coverage (2026-10-17):** [Approved content plan](docs/superpowers/specs/2026-10-17-landing-current-features-design.md). Landing copy covers released app features, optional AI/provider costs, history and restore limits; removes unshipped plans and unsupported guarantees.
+
+- **Real product landing (2026-10-30):** [Capture, copy and validation notes](docs/marketing/real-product-landing.md). Landing now uses deterministic fictional UI replicas for Home Light/Dark, Files, App activity and removal review over a generated studio backdrop. Earlier real-data captures are removed from the current tree after the user’s privacy correction. Signup remains closed pending MailerLite configuration.
+
+- **Home hero + storage showcase:** [Approved direction and implementation notes](docs/marketing/storage-showcase-design.md). Stronger split hero preserves Home; forest-green Files showcase explains size comparison and drill-down with fictional demo data.
+
+- **Technical-indicator marketing + minimal motion (2026-10-30):** [Implementation and validation](docs/marketing/technical-indicators-motion.md). Six fictional technical readings, requested label/link removals, optional locally bundled Three.js scroll leveling and static fallbacks; no native changes or analytics.
+
+- **Pain → solution product story (2026-10-30):** [Content, source evidence and native proof](docs/marketing/pain-solution-story.md). Three relatable scenarios, an eight-capability overview and qualified trust principles; technical proof now renders actual native SwiftUI components with fictional values. Prior privacy, waitlist and minimal-motion constraints remain.
