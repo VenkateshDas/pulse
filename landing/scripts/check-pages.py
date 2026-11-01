@@ -81,3 +81,5 @@ assert article['author']['name'] == 'Pulse'
 assert article['dateModified'] in guide.path.read_text()
 assert any(n['@type'] == 'BreadcrumbList' for n in graph)
 print(f'Static page checks passed: {len(pages)} pages, {len(urls)} sitemap URLs; local assets, fragments and guide schema valid.')
+
+assert pages[ROOT / 'index.html'].refs.count('guides/whats-taking-up-space-on-mac/') == 2, 'Homepage needs guide entry and footer link'
