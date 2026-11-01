@@ -41,10 +41,10 @@
     />
     <link rel="icon" href="assets/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20261101" />
     <script src="config.js" defer></script>
-    <script src="site.js" defer></script>
-    <script src="analytics.js" defer></script>
+    <script src="site.js?v=20261101" defer></script>
+    <script src="analytics.js?v=20261101" defer></script>
     <script type="module" src="motion.js"></script>
   </head>
   <body>
@@ -58,6 +58,7 @@
           <a href="#preview">Explore Pulse</a
           ><a href="#approach">Our approach</a><a href="#questions">FAQ</a>
         </div>
+        <a class="guides-nav-link" href="guides/">Guides</a>
         <a class="button button-small" href="#early-access"
           >Join early access <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M4 4h8v8"/></svg></a
         >
@@ -270,7 +271,7 @@
               JavaScript is needed to open the signup link. Signup may not be
               open yet.
             </p></noscript
-          ><a class="privacy-link" href="#privacy"
+          ><a class="privacy-link" href="privacy/"
             >How we handle your information</a
           >
         </div>
@@ -336,40 +337,6 @@
       <section class="wrap home-guide" aria-labelledby="home-guide-title">
         <div><h2 id="home-guide-title">A full disk.<br />A useful place to start.</h2><div><h3>What’s taking up space on my Mac?</h3><p>Use Storage settings and Finder to find large files, check folder totals and make sense of System Data. A visual guide you can follow without installing anything.</p><a href="guides/whats-taking-up-space-on-mac/">Read the Mac storage guide <span aria-hidden="true">↗</span></a></div></div>
       </section>
-      <section
-        class="privacy wrap"
-        id="privacy"
-        aria-labelledby="privacy-title"
-      >
-        <h2 id="privacy-title">A clear start, including your privacy.</h2>
-        <p>
-          This preview doesn’t access your Mac’s files or system readings.
-          Optional website analytics help us understand which pages and product
-          previews are useful. They stay off unless you allow them below.
-        </p>
-        <p id="signup-privacy">
-          Our signup form is hosted by MailerLite. When you subscribe, MailerLite
-          processes your email address and technical signup records, including
-          IP address and confirmation activity, to manage the list and record
-          your consent. We use this information for early-access invitations
-          and occasional Pulse updates. Unsubscribe using the link in our emails,
-          or contact <a href="mailto:getpulseapp01@gmail.com">getpulseapp01@gmail.com</a>
-          to request removal. See <a href="https://www.mailerlite.com/legal/privacy-policy">MailerLite’s privacy policy</a>.
-        </p>
-        <p>
-          If allowed, PostHog processes page visits, broad referral sources and
-          selected button clicks using a random browser identifier. We don’t send
-          email addresses, typed text, URL queries or session recordings. IP
-          storage is disabled. Your choice and, if allowed, the random identifier
-          are saved in this browser. You can turn analytics off here at any time.
-          See <a href="https://posthog.com/privacy">PostHog’s privacy policy</a>.
-        </p>
-        <div class="analytics-choices" hidden>
-          <button class="button button-small" type="button" id="analytics-allow">Allow analytics</button>
-          <button class="button button-small" type="button" id="analytics-deny">Keep analytics off</button>
-          <p id="analytics-status" role="status">Optional analytics are off.</p>
-        </div>
-      </section>
     </main>
     <footer class="wrap footer">
       <a class="wordmark" href="#top"
@@ -377,8 +344,8 @@
       >
       <p>Understand your Mac. Choose your next step.</p>
       <div>
-        <a href="guides/whats-taking-up-space-on-mac/">Mac storage guide</a>
-        <a href="#privacy">Privacy</a
+        <a href="guides/">Guides</a>
+        <a href="privacy/">Privacy</a
         ><a href="https://github.com/VenkateshDas/pulse/issues"
           >Contact &amp; feedback</a
         >

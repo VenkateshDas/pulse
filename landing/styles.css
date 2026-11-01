@@ -644,3 +644,25 @@ details p {
   .guide-answer { order: 1; }
   .storage-route { order: 2; margin-top: 24px; }
 }
+.guides-nav-link { color: var(--ink); font-size: 15px; text-underline-offset: .25em; }
+.guides-nav-link[aria-current="page"] { color: var(--green); font-weight: 650; }
+.guides-main { padding-block: 72px 88px; }
+.guides-main h1 { font-size: clamp(3rem,6vw,5.2rem); }
+.guides-main h1 span { color: var(--green); }
+.guides-deck { font-size: 1.3rem; color: var(--muted); margin-block: 28px 64px; max-width: 54ch; }
+.guides-main h2 { font-size: 1.6rem; margin-bottom: 28px; }
+.guide-listing { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 48px; padding-block: 32px; border-block: 1px solid var(--line); }
+.guide-listing-image { background: var(--pale); padding: 24px; border-radius: var(--radius); }
+.guide-listing img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.guide-listing h3 { font-size: clamp(1.7rem,3vw,2.3rem); line-height: 1.2; letter-spacing: -.025em; }
+.guide-listing h3 a { text-decoration: none; }
+.guide-listing p { margin-top: 20px; }
+.guide-read-link { display: inline-block; margin-top: 24px; color: var(--green-dark); font-weight: 650; }
+.guides-close { margin-top: 36px; color: var(--muted); }
+.privacy-page { max-width: 780px; padding-block: 64px; }
+.privacy-page h1 { font-size: clamp(2.5rem,5vw,4rem); margin-bottom: 24px; }
+.privacy-page h2 { font-size: 1.7rem; margin-bottom: 20px; }
+.privacy-page section { margin-top: 48px; }
+.privacy-page p + p { margin-top: 20px; }
+@media (max-width: 760px) { .guide-listing { grid-template-columns: 1fr; gap: 28px; } .guides-main { padding-block: 40px 56px; } .guides-deck { margin-bottom: 40px; } }
+@media (max-width: 640px) { .navigation .wordmark { font-size: 21px; gap: 7px; } .navigation .button-small { padding: 11px 12px; font-size: 12px; } .navigation .guides-nav-link { font-size: 14px; } }

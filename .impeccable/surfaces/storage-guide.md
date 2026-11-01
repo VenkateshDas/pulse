@@ -14,3 +14,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 ## Quality bar
 
 At 320/390/1440px, every step and citation remains readable, no document overflow, screenshots open at original resolution, keyboard links and consent controls work, and real captures expose no personal data. Search never claims complete disk coverage. Product claims match the waitlist and fictional preview. Sources and version checks are recorded in docs/marketing/storage-guide-research.md.
+
+## Final revision record — 1 November 2026
+
+Added the Guides index and shared top-navigation/footer destinations. Website measurement and signup privacy details now live on a dedicated noindex privacy page. Limited analytics runs by default with a fresh in-memory random ID per page load; saved opt-outs, GPC and DNT suppress collection. Counts describe views, clicks and handoffs, with no unique-person or cross-page funnel claims.
+
+Finish review: **ship**, no blocking fixes, at 320/390/1440px. Evidence: `.impeccable/review/guides-update`. Existing lazy-loaded homepage captures do not establish that every preview frame is unchanged or verified. Node analytics checks and Python static-page (5)/sitemap (3) checks passed. A fresh local-origin Guides page automatically emitted a test pageview confirmed in PostHog. Full measurement evidence is recorded in `docs/marketing/storage-guide-research.md`.
+
+PR #98 awaits owner visual approval; no publication or merge is recorded. This documentation step adds no design-system or UI changes.

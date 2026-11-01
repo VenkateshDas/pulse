@@ -35,7 +35,7 @@ The disposable practice directory is /Users/Shared/Pulse Storage Example (23 MiB
 
 ## Implementation / measurement
 
-Static article and homepage entry/footer link; no framework, third-party font, new analytics vendor or article animation dependency. Sitemap lists only homepage and the new canonical guide; thanks stays noindex. Article JSON-LD uses the visible Pulse organization byline and review date; no fictional publication date, person or expertise credential is invented.
+Static article and homepage entry/footer link; no framework, third-party font, new analytics vendor or article animation dependency. Sitemap now lists the homepage, Guides index and canonical guide; privacy and thanks stay noindex. Article JSON-LD uses the visible Pulse organization byline and review date; no fictional publication date, person or expertise credential is invented.
 
 Capture explicitly permits only canonical homepage/guide routes. Local root aliases normalize to the same paths and remain test traffic; public root/unknown paths fail closed. `guide_product_click` sends only the fixed guide identifier plus existing coarse context. Existing early-access clicks and form-handoff attempts keep their meanings. No confirmed-signup inference or identity joins. Page breakdowns supplement native saved charts; subscription stock remains in MailerLite.
 
@@ -44,7 +44,7 @@ Capture explicitly permits only canonical homepage/guide routes. Local root alia
 - Automated checks: `node landing/scripts/check-analytics.cjs`, `python3 landing/scripts/check-pages.py`, JS syntax and `git diff --check`.
 - Browser QA: record results below after checking real 320/390/1440 widths, no overflow, image loading, fragment destinations, keyboard navigation, consent withdrawal and hosted form destination. No test signup/email is authorized by this guide task.
 - Required CI: Build & Test (macOS). No native source changes; CI uses make for the native build/test gate.
-- Stop before merge for owner visual/functional approval under the owner-approved implementation plan. This does not authorize PR #97's merge.
+- Stop before merge for owner visual/functional approval under the owner-approved implementation plan. PR #98 awaits owner visual approval; no publication or merge is recorded.
 - After approved merge: verify Pages, HTTP 200/canonical/assets/sitemap and public test-flagged events; only then inspect the new public URL in Search Console. The already scheduled sitemap monitor remains responsible for the existing processing discrepancy.
 - Weekly review: include this guide in page/query observations; no rankings promised and no cross-provider conversion rate. Publishing/approval remains manual.
 
@@ -55,8 +55,23 @@ Checked the finished article and shared stylesheet against PRODUCT.md, DESIGN.md
 The finish reviewer returned **ship**, with no material fixes; three detector warnings about 22px row padding were reviewed as false positives. Retained the incumbent product and design system unchanged: no PRODUCT.md or DESIGN.md edits, no durable token/component changes, and no UI edits during documentation. `.impeccable/design.json` was already absent and remains absent; DESIGN.md’s existing noncanonical headings were not migrated. The indexed `docs/product_spec.html` was also absent, including at its linked original-checkout path; this existing documentation gap was not repaired. This completion record covers design evidence, not publication or owner merge approval.
 
 
-## Final QA — 1 November 2026
+## Initial article QA — 1 November 2026 (before follow-up revisions)
 
 Measured real browser viewports: 1440×1000, 390×844 and 320×844. No document overflow; all checked content boxes stayed within the 320px viewport. All three guide images were loaded before final full-page captures. TOC links reach the intended sections; keyboard skip focuses main. Analytics opt-in, guide-product link and opt-out worked; the new event was visibly received in PostHog with the canonical guide page and `is_test=true`. No email, file path or query data was captured; no signup was submitted. Native Node privacy/route tests and static page/asset/fragment/sitemap/schema checks pass.
 
 Updated existing PostHog insight IDs 6990613 / 6990614 / 6990615 with page breakdowns, retaining daily browser math and `is_test=false`. Dashboard's seven-day default is preserved; referral-source and CTA-position charts are unchanged. The weekly review automation now includes this guide conditionally after public deployment. No new campaign, API credential or recurring email subscription was created. Review-date text and matching Article metadata were set to 1 November during final QA; the original research occurred 31 October.
+
+
+## Follow-up — Guides hub and default measurement
+
+The owner requested automatic analytics and removal of the large public analytics section, plus a top-navigation destination for all Mac guides. Supersedes the earlier opt-in collection design; this section describes the new implementation pending publication.
+
+Added /guides/ with the existing verified article, and navigation/footer links from the homepage, article, privacy and confirmation screens. No placeholder posts or invented publication counts. Moved website measurement and MailerLite signup details to /privacy/ (noindex, followed links); removed analytics controls from the homepage and article. The privacy page emits no measurements and retains an opt-out preference control.
+
+Default collection uses a fresh random identifier in memory for each page load. No cookie, local/session-storage visitor identifier, fingerprint, SDK autocapture or replay. Prior opt-outs and GPC/DNT still suppress collection. The old persistent identifier is removed without reading/reusing it. Only a user preference can be saved; unavailable storage doesn't prevent memory-only default measurement, and the preferences page explicitly reports when a choice cannot persist. IP/GeoIP settings and fixed route/property restrictions remain. This is a technical collection description, not a blanket claim of consent exemption or legal compliance in every jurisdiction. Reference: [PostHog cookieless concepts](https://posthog.com/tutorials/cookieless-tracking); their server-hashed cookieless mode is not used here. [CNIL analytics guidance](https://www.cnil.fr/fr/node/677) notes that audience-measurement exemptions depend on conditions.
+
+Consequently measurement is interpreted as page views, clicks and handoffs. Existing dashboard 1071756 is now named **Pulse growth — views & clicks**; all five existing charts use math `total` and retain `is_test=false`. The weekly review prompt now avoids unique-person and cross-page funnel claims. Signup consent and confirmed membership remain in MailerLite.
+
+Final follow-up verification: a fresh `127.0.0.1` origin automatically emitted a Guides pageview, confirmed in PostHog at `2026-11-01T10:21:00.822Z`, with page `/pulse/guides/`, `is_test=true`, `$geoip_disable=true` and `$process_person_profile=false`. This verifies automatic local test collection, not public deployment.
+
+Node analytics checks passed; Python static-page checks covered five pages and sitemap checks covered three URLs. Finish review returned **ship**, with no blocking fixes, at 320/390/1440px; screenshots are in `.impeccable/review/guides-update`. A targeted check after scrolling confirmed the existing fictional storage preview loaded (`complete=true`, `naturalWidth=1440`); `/tmp/pulse-storage-loaded.png` was visually reviewed. Existing lazy-loaded homepage screenshots do not prove every unchanged preview frame was verified. PR #98 remains pending owner visual approval; no publication or merge is recorded.
