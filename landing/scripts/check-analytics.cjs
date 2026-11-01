@@ -13,7 +13,7 @@ function setup({ restricted = false, stored = {}, blockedStorage = false, pathna
   const window = { PULSE_SITE: { posthogToken: 'test', posthogHost: 'https://eu.i.posthog.com' }, addEventListener(name, fn) { events[name] = fn; } };
   vm.runInNewContext(code, { window, navigator: { globalPrivacyControl: restricted, doNotTrack: dnt ? '1' : '0' },
     document: { referrer: 'https://www.google.com/search?q=private-email@example.com', querySelector: () => controls ? node('controls') : null, getElementById: node,
-      querySelectorAll: (selector) => selector.startsWith('[data-guide-product=') ? [node('guide-product')] : [] },
+      querySelectorAll: (selector) => selector === 'a[href$="#early-access"]' ? [node('early-access')] : selector.startsWith('[data-guide-product=') ? [node('guide-product')] : [] },
     location: { hostname, pathname, search: '?email=private-email@example.com' },
     localStorage: { getItem(key) { if (blockedStorage) throw Error(); return storage.get(key); }, setItem(key, value) { if (blockedStorage) throw Error(); storage.set(key, value); }, removeItem(key) { if (blockedStorage) throw Error(); storage.delete(key); } },
     crypto: { randomUUID: () => `page-load-${++uuid}` }, URL, URLSearchParams,
@@ -76,4 +76,8 @@ for (const pathname of ['/', '/pulse/', '/guides/', '/pulse/guides/', '/guides/w
 }
 for (const pathname of ['/private-person-name/', '/pulse/privacy/', '/pulse/thanks/', '/pulse/guides/private-draft/', '/toString', '/__proto__']) assert.equal(setup({ pathname }).sent.length, 0);
 assert.equal(setup({ pathname: '/', hostname: 'venkateshdas.github.io' }).sent.length, 0);
+const hub = setup({ pathname: '/guides/' });
+hub.node('early-access').handlers.click();
+assert.equal(hub.sent[1].payload.batch[0].event, 'early_access_click');
+assert.equal(hub.sent[1].payload.batch[0].properties.page, '/pulse/guides/');
 console.log('Default-on, per-page identity, legacy-ID removal, preference, browser-signal and route privacy checks passed.');

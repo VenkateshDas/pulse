@@ -90,7 +90,7 @@
     allowed = !restricted && event.newValue !== "denied";
     view(); showChoice();
   });
-  document.querySelectorAll('a[href="#early-access"]').forEach((link) => {
+  document.querySelectorAll('a[href$="#early-access"]').forEach((link) => {
     link.addEventListener("click", () => capture("early_access_click", {
       position: link.closest("nav") ? "navigation" : link.closest(".hero") ? "hero" : "page",
     }));
