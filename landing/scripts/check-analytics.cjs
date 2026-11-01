@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const code = fs.readFileSync(require('node:path').join(__dirname, '../analytics.js'), 'utf8');
-function setup({ restricted = false, stored = {}, blockedStorage = false } = {}) {
+function setup({ restricted = false, stored = {}, blockedStorage = false, pathname = "/", hostname = "localhost", noSignup = false, dnt = false } = {}) {
   const sent = [], storage = new Map(Object.entries(stored)), nodes = new Map(), events = {};
   function node(id) {
     if (!nodes.has(id)) nodes.set(id, { textContent: '', handlers: {},
@@ -13,10 +13,11 @@ function setup({ restricted = false, stored = {}, blockedStorage = false } = {})
   }
   const window = { PULSE_SITE: { posthogToken: 'test', posthogHost: 'https://eu.i.posthog.com' },
     addEventListener(name, fn) { events[name] = fn; } };
-  vm.runInNewContext(code, { window, navigator: { globalPrivacyControl: restricted },
+  vm.runInNewContext(code, { window, navigator: { globalPrivacyControl: restricted, doNotTrack: dnt ? "1" : "0" },
     document: { referrer: 'https://www.google.com/search?q=private-email@example.com',
-      querySelector: node, getElementById: node, querySelectorAll: () => [] },
-    location: { hostname: 'localhost', search: '?email=private-email@example.com' },
+      querySelector: node, getElementById: (id) => noSignup && id === 'signup-link' ? null : node(id),
+      querySelectorAll: (selector) => selector.startsWith('[data-guide-product=') ? [node('guide-product')] : [] },
+    location: { hostname, pathname, search: '?email=private-email@example.com' },
     localStorage: { getItem(key) { if (blockedStorage) throw Error(); return storage.get(key); },
       setItem(key, value) { if (blockedStorage) throw Error(); storage.set(key, value); },
       removeItem(key) { storage.delete(key); } },
@@ -56,3 +57,36 @@ const blocked = setup({ blockedStorage: true });
 blocked.node('analytics-allow').handlers.click();
 assert.equal(blocked.sent.length, 0);
 console.log('Analytics privacy and event smoke checks passed.');
+
+const guidePath = '/pulse/guides/whats-taking-up-space-on-mac/';
+for (const pathname of ['/', '/pulse/', '/guides/whats-taking-up-space-on-mac/', guidePath]) {
+  const route = setup({ pathname, hostname: pathname.startsWith('/pulse/') ? 'venkateshdas.github.io' : 'localhost' });
+  route.node('analytics-allow').handlers.click();
+  const props = route.sent[0].payload.batch[0].properties;
+  assert.equal(props.page, pathname.includes('guides/') ? guidePath : '/pulse/');
+  assert.equal(props.is_test, !pathname.startsWith('/pulse/'));
+  route.node('guide-product').handlers.click();
+  assert.equal(route.sent[1].payload.batch[0].event, 'guide_product_click');
+  assert.equal(route.sent[1].payload.batch[0].properties.guide, 'whats-taking-up-space-on-mac');
+  route.node('analytics-deny').handlers.click();
+  route.node('guide-product').handlers.click();
+  assert.equal(route.sent.length, 2);
+  assert(!JSON.stringify(route.sent).includes('private-email'));
+}
+for (const pathname of ['/private-person-name/', '/pulse/thanks/', '/pulse/guides/private-draft/', '/toString', '/__proto__']) {
+  const unknown = setup({ pathname, stored: { 'pulse-analytics-consent': 'allowed' } });
+  assert.equal(unknown.sent.length, 0);
+  assert.equal(unknown.node('analytics-allow').handlers.click, undefined);
+}
+const noSignup = setup({ noSignup: true });
+noSignup.node('analytics-allow').handlers.click();
+assert.equal(noSignup.sent.length, 1);
+console.log('Guide routes, product interest, opt-out and unknown-path checks passed.');
+
+const publicRoot = setup({ pathname: '/', hostname: 'venkateshdas.github.io', stored: { 'pulse-analytics-consent': 'allowed' } });
+assert.equal(publicRoot.sent.length, 0);
+
+const guideDnt = setup({ pathname: guidePath, dnt: true });
+guideDnt.node('analytics-allow').handlers.click();
+assert.equal(guideDnt.sent.length, 0);
+assert.equal(guideDnt.storage.size, 0);

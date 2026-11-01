@@ -4,6 +4,8 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
+- **First general-Mac guide (2026-10-31):** [Research, verification and release record](docs/marketing/storage-guide-research.md). Visual Storage/Finder walkthrough, disposable sample screenshots, inline Apple citations and privacy-safe page measurement. Prepared on a separate branch; publication awaits CI and explicit owner review.
+
 - **Growth pipeline (2026-10-31):** [Current execution checklist](docs/marketing/growth-pipeline.md). Waitlist setup → explicit PostHog measurement → Search Console → one tested guide → weekly learning. Includes founder inputs, completion checks and the current free-plan limits; supersedes download-first/AI assumptions in older plans. PR #94 merged with owner approval; landing and branded thank-you deployed. MailerLite custom redirect saved and fresh confirmation verified. Follow-up signup activation, opt-in PostHog collection and Search Console verification tag/sitemap are prepared; final public rollout awaits CI and merge approval. See growth-pipeline.md and growth-instrumentation.md for current evidence.
 
 - **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, fictional interface previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. Public main signup remains closed pending the follow-up activation PR. Approved stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.

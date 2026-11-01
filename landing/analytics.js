@@ -15,7 +15,18 @@
   let viewed = false;
   const test = location.hostname !== "venkateshdas.github.io" ||
     new URLSearchParams(location.search).get("pulse_test") === "1";
-  const page = "/pulse/";
+  // Explicit routes only: never send arbitrary paths, filenames or URL queries.
+  const guidePath = "/pulse/guides/whats-taking-up-space-on-mac/";
+  const pages = {
+    "/pulse/": "/pulse/",
+    [guidePath]: guidePath,
+  };
+  // Local preview omits the GitHub project prefix; public routes never do.
+  const pathname = location.hostname !== "venkateshdas.github.io" &&
+    ["/", "/guides/whats-taking-up-space-on-mac/"].includes(location.pathname)
+    ? `/pulse${location.pathname}` : location.pathname;
+  const page = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
+  if (!page) return;
   let source = "direct";
   try {
     const referrer = new URL(document.referrer).hostname;
@@ -80,10 +91,15 @@
       position: link.closest("nav") ? "navigation" : link.closest(".hero") ? "hero" : "page",
     }));
   });
-  document.getElementById("signup-link").addEventListener("click", () => {
+  document.getElementById("signup-link")?.addEventListener("click", () => {
     if (document.getElementById("signup-link").getAttribute("aria-disabled") === "true") return;
     // One request keeps the two observations together during navigation.
     capture(["early_access_click", "waitlist_form_open"], { position: "signup" });
+  });
+  document.querySelectorAll('[data-guide-product="whats-taking-up-space-on-mac"]').forEach((link) => {
+    link.addEventListener("click", () => capture("guide_product_click", {
+      guide: "whats-taking-up-space-on-mac",
+    }));
   });
   document.querySelectorAll('[role="tab"]').forEach((tab) => {
     tab.addEventListener("click", () => capture("preview_theme_selected", {
