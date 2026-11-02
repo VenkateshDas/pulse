@@ -126,4 +126,6 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 
 - **Pain → solution product story (2026-10-30):** [Content, source evidence and native proof](docs/marketing/pain-solution-story.md). Three relatable scenarios, an eight-capability overview and qualified trust principles; technical proof now renders actual native SwiftUI components with fictional values. Prior privacy, waitlist and minimal-motion constraints remain.
 
-- **Landing + Guides redesign (2026-11-02):** [Follow the space design](docs/superpowers/specs/2026-11-02-landing-field-guide-design.md). User selected study F: warm white, forest green, upright product preview and numbered guide progression. Spec review pending; implementation and publication have not started.
+- **Landing + Guides redesign (2026-11-02):** [Follow the space design](docs/superpowers/specs/2026-11-02-landing-field-guide-design.md). User selected study F: warm white, forest green, upright product preview and numbered guide progression. Design approved and implemented on `feat/landing-field-guide`; landing, Guides hub and article reuse existing assets. Local responsive and static checks pass; publication remains pending.
+
+- **Field guide implementation:** [Changes and validation](docs/marketing/field-guide-redesign.md). Existing images reused byte for byte; 355 native tests, static pages and analytics checks pass.

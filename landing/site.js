@@ -51,6 +51,7 @@
   } catch {
     /* An empty/invalid setting leaves signup closed. */
   }
+  if (!signup || !status) return;
   if (waitlistUrl) {
     signup.href = waitlistUrl;
     status.textContent =
