@@ -38,6 +38,7 @@
   });
   const signup = document.getElementById("signup-link");
   const status = document.getElementById("signup-status");
+  if (!signup || !status) return;
   let waitlistUrl;
   try {
     const candidate = new URL(window.PULSE_SITE?.waitlistUrl || "");
