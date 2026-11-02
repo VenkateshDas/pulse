@@ -1,0 +1,9 @@
+{
+  "origin": "Built-in image_gen; user-approved capability illustration generated 31 October 2026 from the supplied capability-map screenshot.",
+  "prompt": "Transform the Pulse capability map into a polished landscape marketing illustration: satin forest-green lowercase p app icon, eight off-white feature plates with sculpted utility icons and delicate curved mint connections. Palette #176B56, #105240, #E5EEEA, #F5F7F8, #172126, #4F6068. Preserve the eight capabilities and qualified captions; no actual app readings, metrics, prices or additional claims.",
+  "source_dimensions": [
+    1536,
+    1024
+  ],
+  "encoding": "WebP quality 92; original PNG preserved in the generated-image output directory. Illustration, not a product screenshot."
+}
