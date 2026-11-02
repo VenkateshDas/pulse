@@ -3,6 +3,17 @@ import Testing
 
 @Suite("Task navigation")
 struct SidebarVisibilityTests {
+    @Test func arrowNavigationCoversEveryDestinationAndStopsAtEdges() {
+        let items = SidebarItem.navigationOrder
+        #expect(Set(items) == Set(SidebarItem.allCases))
+        for pair in zip(items, items.dropFirst()) {
+            #expect(SidebarItem.adjacent(to: pair.0, offset: 1) == pair.1)
+            #expect(SidebarItem.adjacent(to: pair.1, offset: -1) == pair.0)
+        }
+        #expect(SidebarItem.adjacent(to: items[0], offset: -1) == items[0])
+        #expect(SidebarItem.adjacent(to: items[items.count - 1], offset: 1) == items[items.count - 1])
+    }
+
     @Test func everyDestinationIsReachable() {
         let destinations = SidebarItem.everyday + SidebarItem.advanced + [.settings]
         #expect(Set(destinations) == Set(SidebarItem.allCases))

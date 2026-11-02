@@ -9,7 +9,8 @@ enum Halo {
     /// (`.vibrantDark`/`.vibrantLight`), which `== .darkAqua` never matched —
     /// so every token fell through to its light value.
     private static func dynamicColor(_ pair: ColorPair, name: NSColor.Name) -> Color {
-        Color(nsColor: NSColor(name: name, dynamicProvider: { appearance in
+        // ponytail: namespace named colors so SwiftUI cannot reuse a previous palette.
+        Color(nsColor: NSColor(name: "\(ThemeManager.currentPaletteID).\(name)", dynamicProvider: { appearance in
             let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             let c = isDark ? pair.dark : pair.light
             return NSColor(calibratedRed: c.r, green: c.g, blue: c.b, alpha: 1.0)
@@ -19,10 +20,11 @@ enum Halo {
     // MARK: - Surfaces
     // `static var` (not `let`) so every read reflects the currently selected
     // `ThemeManager.shared` preset. The `name:` argument keys the underlying
-    // `NSColor` dynamic provider — kept stable across theme switches.
+    // `NSColor` dynamic provider — namespaced per theme to invalidate cached styles.
     private static var palette: Palette { ThemeManager.currentPalette }
 
     static var void: Color { dynamicColor(palette.void, name: "Canvas") }
+    static var sidebar: Color { dynamicColor(.hex(0xF0F4F3, 0x1B2524), name: "Sidebar") }
     static var surface1: Color { dynamicColor(palette.surface1, name: "Surface1") }
     static var surface2: Color { dynamicColor(palette.surface2, name: "Surface2") }
     static var border: Color { dynamicColor(palette.border, name: "Border") }

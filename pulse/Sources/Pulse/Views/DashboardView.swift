@@ -25,7 +25,7 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                PageHeader("Home", subtitle: "Understand your Mac. Choose what to do next.")
+                PageHeader("Home", subtitle: "A clearer picture of your Mac. A more considered next step.")
                 condition
                 if model.snapshot != nil && !model.attentionItems.isEmpty { AttentionSection() }
                 if let feedback = model.actionFeedback { FeedbackBadge(message: feedback) }
@@ -59,7 +59,11 @@ struct DashboardView: View {
     private var condition: some View {
         let state = HomeCondition(diagnosis: model.diagnosis, hasSnapshot: model.snapshot != nil, hasAttention: !model.attentionItems.isEmpty)
         return VStack(alignment: .leading, spacing: 14) {
-            Label(state.title, systemImage: state.symbol)
+            Label {
+                Text(state.title)
+            } icon: {
+                Image(systemName: state.symbol).foregroundStyle(Halo.textPrimary)
+            }
                 .font(Halo.font(size: 22, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
                 .accessibilityAddTraits(.isHeader)
@@ -69,8 +73,8 @@ struct DashboardView: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let destination = state.destination {
                 Button(state.actionTitle) { PulseNavigation.open(destination, diskTab: destination == .storage ? 1 : nil) }
-                    .buttonStyle(.borderedProminent)
-                    .foregroundStyle(Halo.onAccent)
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(Halo.interactive)
             }
             if let snapshot = model.snapshot {
                 Text("Last checked \(snapshot.timestamp.formatted(date: .omitted, time: .shortened))")
@@ -82,8 +86,7 @@ struct DashboardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(24)
-        .background(Halo.surface1, in: RoundedRectangle(cornerRadius: 12))
+        .premiumCard(padding: 24, cornerRadius: 12)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Mac condition")
     }
@@ -96,6 +99,7 @@ struct DashboardView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("At a glance")
+        .premiumCard(padding: 20, cornerRadius: 12)
     }
 
     private func summary(_ title: String, value: String, symbol: String, destination: SidebarItem) -> some View {
@@ -127,6 +131,7 @@ struct DashboardView: View {
             TaskRow(title: "Adjust brightness", detail: "Make your screens more comfortable to use.", symbol: "sun.max") { PulseNavigation.open(.displays) }
         }
         .foregroundStyle(Halo.textPrimary)
+        .premiumCard(padding: 20, cornerRadius: 12)
     }
 
     @ViewBuilder private var recentRemovals: some View {

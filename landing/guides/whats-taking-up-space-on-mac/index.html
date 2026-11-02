@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" class="guide-document">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>What’s taking up space on my Mac? A step-by-step guide | Pulse</title>
+  <meta name="description" content="Find what’s taking up space on your Mac with Storage settings and Finder. A visual guide to large files, hidden folder totals and System Data." />
+  <meta name="theme-color" content="#f5f7f8" />
+  <meta name="color-scheme" content="light" />
+  <link rel="canonical" href="https://venkateshdas.github.io/pulse/guides/whats-taking-up-space-on-mac/" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="What’s taking up space on my Mac? A step-by-step guide" />
+  <meta property="og:description" content="Follow the space from a storage total to files and folders you recognize. Built-in Mac tools, real examples and clear next steps." />
+  <meta property="og:url" content="https://venkateshdas.github.io/pulse/guides/whats-taking-up-space-on-mac/" />
+  <meta property="og:image" content="https://venkateshdas.github.io/pulse/assets/guides/finder-size-search.webp" />
+  <meta property="og:image:alt" content="Real Finder size search, using sample files made for this guide." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="What’s taking up space on my Mac?" />
+  <meta name="twitter:description" content="A visual, step-by-step guide using Storage settings and Finder." />
+  <meta name="twitter:image" content="https://venkateshdas.github.io/pulse/assets/guides/finder-size-search.webp" />
+  <link rel="icon" href="../../assets/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="../../styles.css?v=20261102" />
+  <script src="../../config.js" defer></script>
+  <script src="../../site.js?v=20261101" defer></script>
+  
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@graph":[{"@type":"Article","headline":"What’s taking up space on my Mac? A step-by-step guide","description":"Find large files and investigate folder sizes using built-in Mac tools.","mainEntityOfPage":"https://venkateshdas.github.io/pulse/guides/whats-taking-up-space-on-mac/","image":"https://venkateshdas.github.io/pulse/assets/guides/finder-size-search.webp","author":{"@type":"Organization","name":"Pulse","url":"https://venkateshdas.github.io/pulse/"},"publisher":{"@type":"Organization","name":"Pulse","url":"https://venkateshdas.github.io/pulse/"},"dateModified":"2026-11-01","inLanguage":"en"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Pulse","item":"https://venkateshdas.github.io/pulse/"},{"@type":"ListItem","position":2,"name":"Guides","item":"https://venkateshdas.github.io/pulse/guides/"},{"@type":"ListItem","position":3,"name":"Mac storage guide","item":"https://venkateshdas.github.io/pulse/guides/whats-taking-up-space-on-mac/"}]}]}
+  </script>
+<link rel="stylesheet" href="../../field-guide.css?v=20261102" />
+<script src="../../analytics.js?v=20261102" defer></script>
+</head>
+<body class="guide-page">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <nav class="wrap navigation" aria-label="Main navigation">
+      <a class="wordmark" href="../../" aria-label="Pulse home"><span class="pulse-mark" aria-hidden="true">p</span>Pulse</a>
+      <a class="guides-nav-link" href="../">Guides</a>
+      <a class="button button-small" href="#early-access">Join early access</a>
+      <details class="mobile-navigation"><summary>Menu</summary><div><a href="../../#preview">Explore Pulse</a><a href="../../guides/">Guides</a><a href="../../#questions">FAQ</a></div></details>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1">
+    <div class="wrap guide-intro">
+      <nav class="guide-breadcrumb" aria-label="Breadcrumb"><a href="../../">Pulse</a><span aria-hidden="true">/</span><a href="../">Guides</a><span aria-hidden="true">/</span><span>Mac storage guide</span></nav>
+      <div class="guide-opening">
+        <div>
+          <h1>What’s taking up<br class="guide-desktop-break" /> space on my Mac?</h1>
+          <p class="guide-deck">Follow the space. Find the files.<br />Choose what happens next.</p>
+          <p class="guide-byline">By Pulse · Reviewed <time datetime="2026-11-01">1 November 2026</time><br />Mac steps checked on macOS Tahoe 26.5.1</p>
+        </div>
+        <figure class="storage-route" aria-labelledby="route-caption">
+          <ol>
+            <li><span>Your storage total</span><small>How much room is available?</small></li>
+            <li><span>A category</span><small>Which kind of data is using space?</small></li>
+            <li><span>A file or folder</span><small>What can you actually inspect?</small></li>
+          </ol>
+          <figcaption id="route-caption">The route from “almost full” to a useful next step.</figcaption>
+        </figure>
+      </div>
+      <div class="guide-answer">
+        <p><strong>Start here:</strong> Open <strong>System Settings → General → Storage</strong>. Inspect the biggest categories with an info button. Then use Finder to check large files <em>and</em> folder totals. A large folder can contain hundreds of small files that a large-file search misses.</p>
+        <a href="#check-storage">Walk through it step by step <span aria-hidden="true">↓</span></a>
+      </div>
+    </div>
+    <div class="wrap guide-layout">
+      <aside class="guide-contents">
+        <nav aria-label="On this page">
+          <h2>On this page</h2>
+          <ol>
+            <li><a href="#check-storage">Check the storage picture</a></li>
+            <li><a href="#large-files">Find large files</a></li>
+            <li><a href="#folder-sizes">Check folder totals</a></li>
+            <li><a href="#system-data">Make sense of System Data</a></li>
+            <li><a href="#next-action">Choose your next action</a></li>
+            <li><a href="#pulse-view">See the Pulse view</a></li>
+          </ol>
+          <a href="#sources">Sources &amp; checks</a>
+          
+      </nav>
+      </aside>
+      <article class="guide-article" aria-label="Mac storage investigation">
+        <section id="check-storage" aria-labelledby="check-storage-title">
+          <h2 id="check-storage-title">1. Get the storage picture</h2>
+          <p>Your Mac says it’s nearly full, but the colored bar doesn’t tell you what to do. Treat that bar as a map. Your first job is to find a useful place to look.</p>
+          <ol class="guide-steps">
+            <li>Open the <strong>Apple menu → System Settings → General → Storage</strong>.</li>
+            <li>Let the categories finish calculating. Note the available space as your starting point.</li>
+            <li>Look for a large category with an <strong>info button</strong>. Open it to see its options. Some categories send you to the app that manages their files.</li>
+          </ol>
+          <p class="guide-citation">Apple documents this starting point in <a href="https://support.apple.com/en-in/102624">Free up storage space on Mac</a>.</p>
+          <div class="guide-path" aria-label="Storage settings navigation"><span>System Settings</span><span aria-hidden="true">→</span><span>General</span><span aria-hidden="true">→</span><strong>Storage</strong></div>
+          <p>For personal files, open <strong>Documents</strong>. In our macOS check, it offered <strong>Large Files</strong>, <strong>Downloads</strong> and <strong>File Browser</strong>. Use <strong>Size</strong> to compare files; use File Browser to follow folders. <a class="citation" href="#source-categories" aria-label="Source 1: Apple's storage category guide">[1]</a></p>
+          <p class="guide-note"><strong>Inspect first.</strong> Storage settings can offer permanent deletion. Use <strong>Show in Finder</strong> when available to understand an item before choosing what to do.</p>
+        </section>
+        <section id="large-files" aria-labelledby="large-files-title">
+          <h2 id="large-files-title">2. Find the big individual files</h2>
+          <p>A recording, an old installer or a downloaded archive can use more space than thousands of documents. Finder can narrow the search for you.</p>
+          <ol class="guide-steps">
+            <li>Open a Finder window and press <kbd>⌘</kbd> <kbd>F</kbd> (Command-F).</li>
+            <li>Choose <strong>This Mac</strong> for a broad search, or choose the folder name to search just that folder. Leave the text search empty if you want files of any name.</li>
+            <li>On a search-criteria row, open <strong>Kind → Other…</strong>, find <strong>File Size</strong>, select it and click <strong>OK</strong>. Click <strong>+</strong> if a criteria row isn’t visible.</li>
+            <li>Set <strong>File Size → is greater than → 1 → GB</strong>. Lower the threshold to <strong>100 MB</strong> if needed. These are starting points, not cleanup targets.</li>
+          </ol>
+          <p class="guide-citation">The attribute picker and criteria workflow are described in <a href="https://support.apple.com/en-nz/guide/mac-help/-mh15155/mac">Apple’s Finder search guide</a>; the File Size control was checked locally.</p>
+          <figure class="guide-figure annotated-search">
+            <a href="../../assets/guides/finder-size-search.webp" target="_blank" rel="noopener" aria-label="Open full-size Finder size-search screenshot (new tab)"><img src="../../assets/guides/finder-size-search.webp" width="1520" height="688" loading="lazy" alt="Actual Finder search scoped to Pulse Storage Example. File Size is greater than 5 MB and one sample recording appears." /><span class="screenshot-pin scope-pin" aria-hidden="true">1</span><span class="screenshot-pin threshold-pin" aria-hidden="true">2</span></a>
+            <figcaption>Real Finder, sample files only. We used <strong>5 MB</strong> to keep the demonstration small. The filter found our 12.6 MB sample recording. Open the image for a closer look.</figcaption>
+          </figure>
+          <ol class="figure-key"><li><strong>Choose the scope.</strong> This example searches only the sample folder.</li><li><strong>Set a threshold.</strong> The number and unit work together: 5 MB here, 1 GB for a broader first pass.</li></ol>
+          <p><strong>No results doesn’t mean no large files.</strong> Check the scope, try a lower threshold and remember that Finder search depends on what is indexed and included in search. It isn’t a complete inventory of your disk. <a class="citation" href="#source-search-limits" aria-label="Source 3: Finder search limitations">[3]</a></p>
+        </section>
+        <section id="folder-sizes" aria-labelledby="folder-sizes-title">
+          <h2 id="folder-sizes-title">3. Look for small files that add up</h2>
+          <p>This is the step a file-size search can’t do for you. A folder can be large even when none of its individual files crosses your threshold.</p>
+          <div class="folder-lesson">
+            <div class="folder-equation" role="img" aria-label="Eight small sample files, each below 5 MB, add up to an 8.4 MB folder."><span class="sample-files" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><p>Small files.<br /><strong>A larger total.</strong></p><p class="folder-total">8.4 MB <span>in our sample folder</span></p></div>
+            <p>Our <strong>Sample exports</strong> folder contains eight small sample files. None matched the “larger than 5 MB” search. Together, Finder reported an <strong>8.4 MB</strong> folder. The same pattern can happen at a much larger scale.</p>
+          </div>
+          <div class="guide-info-example">
+            <div><h3>Ask Finder for the folder’s total</h3><ol class="guide-steps"><li>Browse to a folder you recognize, such as Downloads, Documents or Movies.</li><li>Select one folder, then choose <strong>File → Get Info</strong> or press <kbd>⌘</kbd> <kbd>I</kbd>.</li><li>Read <strong>Size</strong> under General. Give large folders time to calculate. Open the folder and repeat to follow the space further.</li></ol><p>If list view shows <strong>—</strong> for a folder’s size, that isn’t a zero. Get Info can still show its total.</p></div>
+            <figure class="guide-figure guide-info-figure"><a href="../../assets/guides/finder-folder-info.webp" target="_blank" rel="noopener" aria-label="Open full-size sample-folder Get Info screenshot (new tab)"><img src="../../assets/guides/finder-folder-info.webp" width="544" height="1082" loading="lazy" alt="Actual Finder Get Info for Sample exports: General shows 8,388,608 bytes and 8.4 MB on disk. The folder contains only disposable sample data." /></a><figcaption>The real Get Info window for our sample folder. Read Size under General.</figcaption></figure>
+          </div>
+          <p class="guide-citation">Apple explains <a href="https://support.apple.com/en-am/guide/mac-help/mchlp1774/mac">Get Info and file/folder information</a>. The workflow and sample total were checked on this Mac.</p>
+        </section>
+        <section id="system-data" aria-labelledby="system-data-title">
+          <h2 id="system-data-title">4. “System Data” is a category, not a folder</h2>
+          <p>It’s tempting to look for one thing called System Data and remove it. Apple uses the label for files that don’t fit its other categories. Some are managed by macOS; some belong to apps. The number alone doesn’t tell you what is disposable. <a class="citation" href="#source-categories" aria-label="Source 1: System Data definition">[1]</a></p>
+          <dl class="guide-decisions">
+            <div><dt>System Data is large</dt><dd>Continue investigating recognizable files and app-managed storage. Don’t delete unfamiliar Library or system folders just to reduce the category.</dd></div>
+            <div><dt>The numbers don’t add up neatly</dt><dd>Categories, search results and folder totals measure different views. Available storage can include purgeable space; a file search may leave things out. Avoid treating their totals as interchangeable. <a class="citation" href="#source-categories" aria-label="Source 1: available versus free space">[1]</a></dd></div>
+            <div><dt>You use Time Machine</dt><dd>Local snapshots are managed automatically and their space counts as available. You don’t need to remove them as a routine first step. <a class="citation" href="#source-snapshots" aria-label="Source 5: local snapshots">[5]</a></dd></div>
+          </dl>
+        </section>
+        <section id="next-action" aria-labelledby="next-action-title">
+          <h2 id="next-action-title">5. Choose one action you understand</h2>
+          <p>Finding a large item is a clue, not a recommendation to delete it. Ask: <strong>What is it? Do I still need it? Where else is it saved?</strong></p>
+          <div class="guide-table-wrap"><table class="guide-table"><caption>What to do with what you find</caption><thead><tr><th scope="col">You found</th><th scope="col">A useful next step</th></tr></thead><tbody><tr><th scope="row">A personal download or recording</th><td>Open or preview it. Keep it, make a verified copy elsewhere, or move it to Trash if you no longer need it.</td></tr><tr><th scope="row">A photo library, backup or app data</th><td>Use that app’s storage controls or its documented move/removal instructions. Don’t pull pieces out of its folders.</td></tr><tr><th scope="row">A file in iCloud Drive</th><td>Deleting it can remove it from other synced devices. If the goal is just local space, check the cloud service’s local-download controls first. <a class="citation" href="#source-icloud" aria-label="Source 6: iCloud Drive deletion and downloads">[6]</a></td></tr><tr><th scope="row">Something you don’t recognize</th><td>Leave it in place and identify its owner or purpose before acting.</td></tr></tbody></table></div>
+          <p class="guide-note"><strong>Trash is a review step.</strong> Moving a file there doesn’t reclaim its space yet. Emptying Trash permanently removes those items. Check what’s inside and keep a backup of anything you might need. <a class="citation" href="#source-trash" aria-label="Source 7: Trash and permanent deletion">[7]</a></p>
+          <p>After an intentional change, return to Storage and let it update. Compare available space with your starting point. Removing files can help with storage; it doesn’t prove your Mac or an app is faster.</p>
+        </section>
+        <section class="guide-product" id="pulse-view" aria-labelledby="pulse-view-title">
+          <h2 id="pulse-view-title">Prefer to follow the folders in one view?</h2>
+          <p>That’s the idea behind Pulse’s storage explorer: compare folder sizes, open the next level and keep the path in view as you investigate.</p>
+          <figure class="guide-figure"><a href="../../assets/pulse-demo-storage.svg" target="_blank" rel="noopener" aria-label="Open full-size fictional Pulse storage preview (new tab)"><img src="../../assets/pulse-demo-storage.svg" width="1440" height="1040" loading="lazy" alt="Pulse storage interface replica with columns following a fictional disk into Library and Application Support, showing sample folder sizes." /></a><figcaption>Pulse interface replica with fictional folders and sizes. This webpage does not inspect your Mac.</figcaption></figure>
+          <p>Pulse is in development. The steps above work today with the tools already on your Mac.</p>
+          <a class="guide-product-link" data-guide-product="whats-taking-up-space-on-mac" href="../../#storage">Explore Pulse’s storage view <span aria-hidden="true">↗</span></a>
+        </section>
+        <section id="early-access" class="guide-signup" aria-labelledby="signup-title">
+          <h2 id="signup-title">Know when Pulse is ready</h2>
+          <p>Join the early-access list for product updates and opportunities to try Pulse. No payment to join.</p>
+          <a class="button" id="signup-link" href="https://preview.mailerlite.io/forms/2757476/202828385399866630/share" aria-describedby="signup-status signup-note">Join early access</a>
+          <p class="guide-small" id="signup-status">Continue to our signup form, then confirm your email to join.</p>
+          <p class="guide-small" id="signup-note">Early-access invitations and occasional updates. Unsubscribe at any time.</p>
+          <p class="guide-small">The form is hosted by MailerLite. <a href="../../privacy/#signup">How signup information is used</a>.</p>
+        </section>
+        <section id="sources" class="guide-sources" aria-labelledby="sources-title">
+          <h2 id="sources-title">Sources &amp; checks</h2>
+          <p>Written by Pulse. Mac controls were checked on macOS Tahoe 26.5.1 using disposable sample files. Finder screenshots show those files only; no personal files were deleted and Trash was not emptied. Labels can vary with macOS version and language.</p>
+          <ol>
+            <li id="source-categories"><a href="https://support.apple.com/kk-kz/guide/mac-help/syspf5a64aa6/mac">Apple: Find and delete files on your Mac</a> — category controls, System Data and storage definitions.</li>
+            <li><a href="https://support.apple.com/en-nz/guide/mac-help/-mh15155/mac">Apple: Narrow your search results in Finder</a> — search attributes and criteria.</li>
+            <li id="source-search-limits"><a href="https://support.apple.com/en-by/guide/mac-help/mchlp2962/mac">Apple: If searching your Mac returns unexpected results</a> — scope, exclusions and indexing.</li>
+            <li><a href="https://support.apple.com/en-am/guide/mac-help/mchlp1774/mac">Apple: Get file, folder and disk information</a> — inspecting an item.</li>
+            <li id="source-snapshots"><a href="https://support.apple.com/en-gb/102154">Apple: About Time Machine local snapshots</a> — automatic management and available storage.</li>
+            <li id="source-icloud"><a href="https://support.apple.com/en-gb/guide/mac-help/-mchl1a02d711/mac">Apple: Work with folders and files in iCloud Drive</a> — local-download controls. <a href="https://support.apple.com/en-sg/109344">Apple: Desktop and Documents in iCloud Drive</a> explains deletion across synced devices.</li>
+            <li id="source-trash"><a href="https://support.apple.com/en-al/guide/mac-help/mchlp1093/mac">Apple: Delete files and folders</a> — Trash, backups and permanent deletion.</li>
+          </ol>
+        </section>
+      </article>
+    </div>
+  </main>
+  <footer class="wrap footer"><a class="wordmark" href="../../"><span class="pulse-mark" aria-hidden="true">p</span>Pulse</a><p>Understand your Mac. Choose your next step.</p><div><a href="../">Guides</a><a href="../../privacy/">Privacy</a><a href="#main">Back to top</a></div></footer>
+</body>
+</html>

@@ -4,6 +4,11 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
+- **Guides and default website measurement (2026-11-01):** Guides index and visible navigation added; detailed privacy notice moved to a dedicated page. Automatic in-memory per-page measurement replaces consent-gated persistent browser IDs, with prior opt-outs and GPC/DNT preserved. Use event counts, not returning-visitor estimates. Changes pending PR #98 publication.
+
+- **First general-Mac guide (2026-10-31):** [Research, verification and release record](docs/marketing/storage-guide-research.md). Visual Storage/Finder walkthrough, disposable sample screenshots, inline Apple citations and privacy-safe page measurement. Prepared on a separate branch; publication awaits CI and explicit owner review.
+
+- **Organic growth pipeline (2026-10-30):** [Approved sequence, initial readiness audit and execution backlog](docs/superpowers/specs/2026-10-30-organic-growth-design.md). Covers release/installer trust, cleanup classifications, landing alignment, broken waitlist endpoint, search measurement, content pilot and later Gum automation. Findings are repository evidence; artifact testing and account access remain unverified. Written design review precedes implementation.
 - **Capability illustration (2026-10-31):** User-approved generated studio illustration replaces the flat capability hub. Optimized WebP, native text equivalent for accessibility/search, and a readable feature list beneath the full illustration on narrow screens. Original eight capabilities and hardware/permission qualifications retained. Image PR #97 remains unpublished pending owner merge approval.
 
 - **Growth pipeline (2026-10-31):** [Current execution checklist](docs/marketing/growth-pipeline.md). Waitlist setup → explicit PostHog measurement → Search Console → one tested guide → weekly learning. Includes founder inputs, completion checks and the current free-plan limits; supersedes download-first/AI assumptions in older plans. PR #94 merged with owner approval; landing and branded thank-you deployed. MailerLite custom redirect saved and fresh confirmation verified. PR #96 merged with explicit owner approval; signup and opt-in PostHog collection are public. Google ownership is verified, sitemap submitted and live fetch successful; search report processing/indexing status is tracked in the setup notes. See growth-pipeline.md and growth-instrumentation.md for current evidence.
@@ -11,6 +16,8 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 - **Waitlist-first landing (2026-10-30):** [Implementation and signup handoff](docs/marketing/waitlist-setup.md). Replaces beta download CTAs with early-access positioning, fictional interface previews and a clear closed-signup state until a verified MailerLite Share URL is configured in `landing/config.js`. Public signup now opens the verified MailerLite form; PostHog requires opt-in. Approved stack: PostHog, Search Console and MailerLite; app distribution/signing deferred to launch.
 
 ## Components
+
+- **Landing-aligned native UI (2026-10-30):** [Scope and screenshot provenance](docs/marketing/native-screenshots.md). Explicit System/Light/Dark modes retain legacy preset IDs; palette-specific color names prevent stale tint after switching. Shared sidebar, headers, Home and opaque vitals follow the landing identity. Native button navigation preserves selected traits, Up/Down focus and scroll-to-selection. `make build` and 357 tests pass; final runtime/screenshot evidence is recorded in the linked note.
 
 - **Home/sidebar layout (2026-10-30):** Home technical details and indicators precede task actions. Advanced destinations appear directly in the sidebar, with no More section or disclosure. Build, 355 tests, signed bundle and running-app inspection pass.
 
@@ -127,3 +134,9 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Technical-indicator marketing + minimal motion (2026-10-30):** [Implementation and validation](docs/marketing/technical-indicators-motion.md). Six fictional technical readings, requested label/link removals, optional locally bundled Three.js scroll leveling and static fallbacks; no native changes or analytics.
 
 - **Pain → solution product story (2026-10-30):** [Content, source evidence and native proof](docs/marketing/pain-solution-story.md). Three relatable scenarios, an eight-capability overview and qualified trust principles; technical proof now renders actual native SwiftUI components with fictional values. Prior privacy, waitlist and minimal-motion constraints remain.
+
+- **Landing + Guides redesign (2026-11-02):** [Follow the space design](docs/superpowers/specs/2026-11-02-landing-field-guide-design.md). User selected study F: warm white, forest green, upright product preview and numbered guide progression. Design approved and implemented on `feat/landing-field-guide`; landing, Guides hub and article reuse existing assets. Local responsive and static checks pass; publication remains pending.
+
+- **Field guide implementation:** [Changes and validation](docs/marketing/field-guide-redesign.md). Existing images reused byte for byte; 355 native tests, static pages and analytics checks pass.
+
+- **Approved PR integration (2026-11-02):** Merge #93, #95 and #97–#99 with the latest field-guide website design and per-page analytics. Main retains the AI-free app; #90/#91 stay unmerged.

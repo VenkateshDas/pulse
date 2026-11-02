@@ -45,6 +45,9 @@ jobs:
       - name: Landing analytics privacy checks
         run: node ../landing/scripts/check-analytics.cjs
 
+      - name: Landing pages, links and metadata
+        run: python3 ../landing/scripts/check-pages.py
+
       - name: Test
         run: make test SWIFT=swift TEST_FLAGS=
 

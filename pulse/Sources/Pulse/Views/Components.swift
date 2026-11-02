@@ -105,11 +105,11 @@ struct PageHeader<Trailing: View>: View {
     private var heading: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(Halo.font(size: 24, weight: .semibold))
+                .font(Halo.font(size: 28, weight: .semibold))
                 .foregroundStyle(Halo.textPrimary)
                 .accessibilityAddTraits(.isHeader)
             Text(subtitle)
-                .font(Halo.font(size: 13))
+                .font(Halo.font(size: 14))
                 .foregroundStyle(Halo.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
