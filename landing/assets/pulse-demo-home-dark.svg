@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc"><title id="title">Pulse Home UI demo</title><desc id="desc">Faithful interface replica with entirely fictional sample data. Not a screenshot of a real Mac.</desc><style>text{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;fill:#f2f6f7}.muted{fill:#b5c2c9}.accent{fill:#70d6b3}.num{font-variant-numeric:tabular-nums}.on-accent{fill:#103e31}</style>
+<rect x="0" y="0" width="1440" height="1040" rx="14" fill="#171d21"/>
+<rect x="0" y="0" width="270" height="1040" rx="14" fill="#1b2524"/>
+<rect x="26" y="28" width="38" height="38" rx="9" fill="#70d6b3"/>
+<text x="36" y="55" font-size="32" font-weight="600" class="on-accent" text-anchor="start">p</text>
+<text x="78" y="57" font-size="29" font-weight="650" class="" text-anchor="start">Pulse</text>
+<rect x="18" y="85" width="234" height="44" rx="7" fill="#70d6b3"/>
+<rect x="18" y="85" width="234" height="44" rx="7" fill="#1b2524" opacity=".87"/>
+<g stroke="#70d6b3" stroke-width="1.6" fill="none"><rect x="33" y="95" width="17" height="17" rx="3"/><path d="M37 103h9M41 98v10"/></g>
+<text x="67" y="112" font-size="17" font-weight="600" class="accent" text-anchor="start">Home</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="152" width="17" height="17" rx="3"/><path d="M37 160h9M41 155v10"/></g>
+<text x="67" y="169" font-size="17" font-weight="400" class="" text-anchor="start">Free up space</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="209" width="17" height="17" rx="3"/><path d="M37 217h9M41 212v10"/></g>
+<text x="67" y="226" font-size="17" font-weight="400" class="" text-anchor="start">Apps</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="266" width="17" height="17" rx="3"/><path d="M37 274h9M41 269v10"/></g>
+<text x="67" y="283" font-size="17" font-weight="400" class="" text-anchor="start">Battery &amp; energy</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="323" width="17" height="17" rx="3"/><path d="M37 331h9M41 326v10"/></g>
+<text x="67" y="340" font-size="17" font-weight="400" class="" text-anchor="start">Internet</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="380" width="17" height="17" rx="3"/><path d="M37 388h9M41 383v10"/></g>
+<text x="67" y="397" font-size="17" font-weight="400" class="" text-anchor="start">Displays</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="437" width="17" height="17" rx="3"/><path d="M37 445h9M41 440v10"/></g>
+<text x="67" y="454" font-size="17" font-weight="400" class="" text-anchor="start">Activity</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="494" width="17" height="17" rx="3"/><path d="M37 502h9M41 497v10"/></g>
+<text x="67" y="511" font-size="17" font-weight="400" class="" text-anchor="start">App activity</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="551" width="17" height="17" rx="3"/><path d="M37 559h9M41 554v10"/></g>
+<text x="67" y="568" font-size="17" font-weight="400" class="" text-anchor="start">Maintenance</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="608" width="17" height="17" rx="3"/><path d="M37 616h9M41 611v10"/></g>
+<text x="67" y="625" font-size="17" font-weight="400" class="" text-anchor="start">Startup helpers</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="665" width="17" height="17" rx="3"/><path d="M37 673h9M41 668v10"/></g>
+<text x="67" y="682" font-size="17" font-weight="400" class="" text-anchor="start">Performance test</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="722" width="17" height="17" rx="3"/><path d="M37 730h9M41 725v10"/></g>
+<text x="67" y="739" font-size="17" font-weight="400" class="" text-anchor="start">Diagnostics</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="779" width="17" height="17" rx="3"/><path d="M37 787h9M41 782v10"/></g>
+<text x="67" y="796" font-size="17" font-weight="400" class="" text-anchor="start">Settings</text>
+<text x="30" y="1006" font-size="14" font-weight="400" class="muted" text-anchor="start">Interface preview</text>
+<text x="308" y="1006" font-size="14" font-weight="500" class="muted" text-anchor="start">DEMO DATA · Fictional examples · No access to your Mac</text>
+<text x="310" y="62" font-size="32" font-weight="650" class="" text-anchor="start">Home</text>
+<text x="310" y="95" font-size="17" font-weight="400" class="muted" text-anchor="start">A clearer picture of your Mac. A more considered next step.</text>
+<rect x="310" y="130" width="1090" height="150" rx="10" fill="#222b30" stroke="#52616a"/>
+<text x="336" y="171" font-size="24" font-weight="600" class="" text-anchor="start">No urgent issues detected</text>
+<text x="336" y="205" font-size="16" font-weight="400" class="muted" text-anchor="start">The available readings show no urgent problems. You can keep working</text>
+<text x="336" y="231" font-size="16" font-weight="400" class="muted" text-anchor="start">or choose a task below.</text>
+<text x="336" y="258" font-size="13" font-weight="400" class="muted" text-anchor="start">Example status · Demo data</text>
+<rect x="310" y="310" width="1090" height="105" rx="10" fill="#222b30" stroke="#52616a"/>
+<text x="336" y="348" font-size="15" font-weight="400" class="muted" text-anchor="start">Storage</text>
+<text x="336" y="381" font-size="18" font-weight="600" class="" text-anchor="start">64 GB available</text>
+<text x="680" y="348" font-size="15" font-weight="400" class="muted" text-anchor="start">Battery</text>
+<text x="680" y="381" font-size="18" font-weight="600" class="" text-anchor="start">82% charged</text>
+<text x="1020" y="348" font-size="15" font-weight="400" class="muted" text-anchor="start">Internet</text>
+<text x="1020" y="381" font-size="18" font-weight="600" class="" text-anchor="start">Connected to a network</text>
+<path d="M312 442l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="332" y="453" font-size="16" font-weight="500" class="muted" text-anchor="start">Technical details</text>
+<rect x="310" y="488" width="1090" height="350" rx="10" fill="#222b30" stroke="#52616a"/>
+<text x="336" y="525" font-size="20" font-weight="600" class="" text-anchor="start">What would you like to do?</text>
+<text x="345" y="569" font-size="18" font-weight="550" class="" text-anchor="start">Review cleanup</text>
+<text x="345" y="594" font-size="14" font-weight="400" class="muted" text-anchor="start">Choose files to move to Trash. Nothing is removed during a scan.</text>
+<path d="M1365 570l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M336 609h1036" stroke="#52616a"/>
+<text x="345" y="642" font-size="18" font-weight="550" class="" text-anchor="start">Remove an app</text>
+<text x="345" y="667" font-size="14" font-weight="400" class="muted" text-anchor="start">Review the app and its related files before removing them.</text>
+<path d="M1365 643l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M336 682h1036" stroke="#52616a"/>
+<text x="345" y="715" font-size="18" font-weight="550" class="" text-anchor="start">Check a slowdown</text>
+<text x="345" y="740" font-size="14" font-weight="400" class="muted" text-anchor="start">See which apps are busy and review the process details.</text>
+<path d="M1365 716l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M336 755h1036" stroke="#52616a"/>
+<text x="345" y="788" font-size="18" font-weight="550" class="" text-anchor="start">Adjust brightness</text>
+<text x="345" y="813" font-size="14" font-weight="400" class="muted" text-anchor="start">Make your screens more comfortable to use.</text>
+<path d="M1365 789l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="310" y="892" font-size="19" font-weight="600" class="" text-anchor="start">Recent removal</text>
+<text x="310" y="929" font-size="15" font-weight="400" class="muted" text-anchor="start">Nothing removed in this demo.</text>
+</svg>
