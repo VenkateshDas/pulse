@@ -42,6 +42,9 @@ jobs:
       - name: Build (debug)
         run: make build SWIFT=swift
 
+      - name: Landing analytics privacy checks
+        run: node ../landing/scripts/check-analytics.cjs
+
       - name: Test
         run: make test SWIFT=swift TEST_FLAGS=
 

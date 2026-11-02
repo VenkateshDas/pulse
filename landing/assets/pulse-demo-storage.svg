@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc"><title id="title">Pulse Files UI demo</title><desc id="desc">Faithful interface replica with entirely fictional sample data. Not a screenshot of a real Mac.</desc><style>text{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;fill:#f2f6f7}.muted{fill:#b5c2c9}.accent{fill:#70d6b3}.num{font-variant-numeric:tabular-nums}.on-accent{fill:#103e31}</style>
+<rect x="0" y="0" width="1440" height="1040" rx="14" fill="#171d21"/>
+<rect x="0" y="0" width="270" height="1040" rx="14" fill="#1b2524"/>
+<rect x="26" y="28" width="38" height="38" rx="9" fill="#70d6b3"/>
+<text x="36" y="55" font-size="32" font-weight="600" class="on-accent" text-anchor="start">p</text>
+<text x="78" y="57" font-size="29" font-weight="650" class="" text-anchor="start">Pulse</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="95" width="17" height="17" rx="3"/><path d="M37 103h9M41 98v10"/></g>
+<text x="67" y="112" font-size="17" font-weight="400" class="" text-anchor="start">Home</text>
+<rect x="18" y="142" width="234" height="44" rx="7" fill="#70d6b3"/>
+<rect x="18" y="142" width="234" height="44" rx="7" fill="#1b2524" opacity=".87"/>
+<g stroke="#70d6b3" stroke-width="1.6" fill="none"><rect x="33" y="152" width="17" height="17" rx="3"/><path d="M37 160h9M41 155v10"/></g>
+<text x="67" y="169" font-size="17" font-weight="600" class="accent" text-anchor="start">Free up space</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="209" width="17" height="17" rx="3"/><path d="M37 217h9M41 212v10"/></g>
+<text x="67" y="226" font-size="17" font-weight="400" class="" text-anchor="start">Apps</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="266" width="17" height="17" rx="3"/><path d="M37 274h9M41 269v10"/></g>
+<text x="67" y="283" font-size="17" font-weight="400" class="" text-anchor="start">Battery &amp; energy</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="323" width="17" height="17" rx="3"/><path d="M37 331h9M41 326v10"/></g>
+<text x="67" y="340" font-size="17" font-weight="400" class="" text-anchor="start">Internet</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="380" width="17" height="17" rx="3"/><path d="M37 388h9M41 383v10"/></g>
+<text x="67" y="397" font-size="17" font-weight="400" class="" text-anchor="start">Displays</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="437" width="17" height="17" rx="3"/><path d="M37 445h9M41 440v10"/></g>
+<text x="67" y="454" font-size="17" font-weight="400" class="" text-anchor="start">Activity</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="494" width="17" height="17" rx="3"/><path d="M37 502h9M41 497v10"/></g>
+<text x="67" y="511" font-size="17" font-weight="400" class="" text-anchor="start">App activity</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="551" width="17" height="17" rx="3"/><path d="M37 559h9M41 554v10"/></g>
+<text x="67" y="568" font-size="17" font-weight="400" class="" text-anchor="start">Maintenance</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="608" width="17" height="17" rx="3"/><path d="M37 616h9M41 611v10"/></g>
+<text x="67" y="625" font-size="17" font-weight="400" class="" text-anchor="start">Startup helpers</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="665" width="17" height="17" rx="3"/><path d="M37 673h9M41 668v10"/></g>
+<text x="67" y="682" font-size="17" font-weight="400" class="" text-anchor="start">Performance test</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="722" width="17" height="17" rx="3"/><path d="M37 730h9M41 725v10"/></g>
+<text x="67" y="739" font-size="17" font-weight="400" class="" text-anchor="start">Diagnostics</text>
+<g stroke="#b5c2c9" stroke-width="1.6" fill="none"><rect x="33" y="779" width="17" height="17" rx="3"/><path d="M37 787h9M41 782v10"/></g>
+<text x="67" y="796" font-size="17" font-weight="400" class="" text-anchor="start">Settings</text>
+<text x="30" y="1006" font-size="14" font-weight="400" class="muted" text-anchor="start">Interface preview</text>
+<text x="308" y="1006" font-size="14" font-weight="500" class="muted" text-anchor="start">DEMO DATA · Fictional examples · No access to your Mac</text>
+<rect x="310" y="22" width="145" height="35" rx="6" fill="#222b30"/>
+<text x="382" y="46" font-size="17" font-weight="500" class="" text-anchor="middle">Cleanup</text>
+<rect x="460" y="22" width="145" height="35" rx="6" fill="#52616a"/>
+<text x="532" y="46" font-size="17" font-weight="500" class="" text-anchor="middle">Files</text>
+<rect x="610" y="22" width="145" height="35" rx="6" fill="#222b30"/>
+<text x="682" y="46" font-size="17" font-weight="500" class="" text-anchor="middle">Duplicates</text>
+<rect x="760" y="22" width="145" height="35" rx="6" fill="#222b30"/>
+<text x="832" y="46" font-size="17" font-weight="500" class="" text-anchor="middle">Changes</text>
+<rect x="910" y="22" width="145" height="35" rx="6" fill="#222b30"/>
+<text x="982" y="46" font-size="17" font-weight="500" class="" text-anchor="middle">Trash</text>
+<path d="M270 80h1170" stroke="#52616a"/>
+<rect x="270" y="81" width="1170" height="61" rx="0" fill="#222b30"/>
+<text x="305" y="119" font-size="21" font-weight="600" class="" text-anchor="start">Demo Disk</text>
+<path d="M420 107l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="445" y="119" font-size="21" font-weight="600" class="" text-anchor="start">Library</text>
+<path d="M530 107l5 5-5 5" fill="none" stroke="#b5c2c9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="555" y="119" font-size="21" font-weight="600" class="" text-anchor="start">Application Support</text>
+<rect x="290" y="156" width="356" height="72" rx="6" fill="#70d6b3"/>
+<rect x="290" y="156" width="356" height="72" rx="6" fill="#1b2524"/>
+<rect x="290" y="156" width="356" height="72" rx="6" fill="#70d6b3" opacity=".13"/>
+<path d="M300 167h11l4 4h15v20H300z" fill="#70d6b3" opacity=".8"/>
+<text x="342" y="185" font-size="18" font-weight="550" class="" text-anchor="start">Library</text>
+<text x="627" y="211" font-size="17" font-weight="500" class="num" text-anchor="end">192 GB</text>
+<rect x="342" y="201" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="342" y="201" width="174" height="4" rx="2" fill="#70d6b3"/>
+<path d="M300 253h11l4 4h15v20H300z" fill="#70d6b3" opacity=".8"/>
+<text x="342" y="271" font-size="18" font-weight="400" class="" text-anchor="start">Users</text>
+<text x="627" y="297" font-size="17" font-weight="500" class="num" text-anchor="end">128 GB</text>
+<rect x="342" y="287" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="342" y="287" width="116" height="4" rx="2" fill="#70d6b3"/>
+<path d="M300 339h11l4 4h15v20H300z" fill="#70d6b3" opacity=".8"/>
+<text x="342" y="357" font-size="18" font-weight="400" class="" text-anchor="start">System</text>
+<text x="627" y="383" font-size="17" font-weight="500" class="num" text-anchor="end">96 GB</text>
+<rect x="342" y="373" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="342" y="373" width="87" height="4" rx="2" fill="#70d6b3"/>
+<path d="M300 425h11l4 4h15v20H300z" fill="#70d6b3" opacity=".8"/>
+<text x="342" y="443" font-size="18" font-weight="400" class="" text-anchor="start">Applications</text>
+<text x="627" y="469" font-size="17" font-weight="500" class="num" text-anchor="end">32 GB</text>
+<rect x="342" y="459" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="342" y="459" width="29" height="4" rx="2" fill="#70d6b3"/>
+<path d="M655 142v800" stroke="#52616a"/>
+<rect x="665" y="156" width="356" height="72" rx="6" fill="#70d6b3"/>
+<rect x="665" y="156" width="356" height="72" rx="6" fill="#1b2524"/>
+<rect x="665" y="156" width="356" height="72" rx="6" fill="#70d6b3" opacity=".13"/>
+<path d="M675 167h11l4 4h15v20H675z" fill="#70d6b3" opacity=".8"/>
+<text x="717" y="185" font-size="18" font-weight="550" class="" text-anchor="start">Application Support</text>
+<text x="1002" y="211" font-size="17" font-weight="500" class="num" text-anchor="end">128 GB</text>
+<rect x="717" y="201" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="717" y="201" width="174" height="4" rx="2" fill="#70d6b3"/>
+<path d="M675 253h11l4 4h15v20H675z" fill="#70d6b3" opacity=".8"/>
+<text x="717" y="271" font-size="18" font-weight="400" class="" text-anchor="start">Caches</text>
+<text x="1002" y="297" font-size="17" font-weight="500" class="num" text-anchor="end">32 GB</text>
+<rect x="717" y="287" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="717" y="287" width="44" height="4" rx="2" fill="#70d6b3"/>
+<path d="M675 339h11l4 4h15v20H675z" fill="#70d6b3" opacity=".8"/>
+<text x="717" y="357" font-size="18" font-weight="400" class="" text-anchor="start">Frameworks</text>
+<text x="1002" y="383" font-size="17" font-weight="500" class="num" text-anchor="end">16 GB</text>
+<rect x="717" y="373" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="717" y="373" width="22" height="4" rx="2" fill="#70d6b3"/>
+<path d="M675 425h11l4 4h15v20H675z" fill="#70d6b3" opacity=".8"/>
+<text x="717" y="443" font-size="18" font-weight="400" class="" text-anchor="start">Updates</text>
+<text x="1002" y="469" font-size="17" font-weight="500" class="num" text-anchor="end">16 GB</text>
+<rect x="717" y="459" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="717" y="459" width="22" height="4" rx="2" fill="#70d6b3"/>
+<path d="M1030 142v800" stroke="#52616a"/>
+<path d="M1050 167h11l4 4h15v20H1050z" fill="#70d6b3" opacity=".8"/>
+<text x="1092" y="185" font-size="18" font-weight="550" class="" text-anchor="start">Sample Studio</text>
+<text x="1377" y="211" font-size="17" font-weight="500" class="num" text-anchor="end">72 GB</text>
+<rect x="1092" y="201" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="1092" y="201" width="174" height="4" rx="2" fill="#70d6b3"/>
+<path d="M1050 253h11l4 4h15v20H1050z" fill="#70d6b3" opacity=".8"/>
+<text x="1092" y="271" font-size="18" font-weight="400" class="" text-anchor="start">Demo Browser</text>
+<text x="1377" y="297" font-size="17" font-weight="500" class="num" text-anchor="end">32 GB</text>
+<rect x="1092" y="287" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="1092" y="287" width="77" height="4" rx="2" fill="#70d6b3"/>
+<path d="M1050 339h11l4 4h15v20H1050z" fill="#70d6b3" opacity=".8"/>
+<text x="1092" y="357" font-size="18" font-weight="400" class="" text-anchor="start">Audio Library</text>
+<text x="1377" y="383" font-size="17" font-weight="500" class="num" text-anchor="end">16 GB</text>
+<rect x="1092" y="373" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="1092" y="373" width="39" height="4" rx="2" fill="#70d6b3"/>
+<path d="M1050 425h11l4 4h15v20H1050z" fill="#70d6b3" opacity=".8"/>
+<text x="1092" y="443" font-size="18" font-weight="400" class="" text-anchor="start">Shared Assets</text>
+<text x="1377" y="469" font-size="17" font-weight="500" class="num" text-anchor="end">8 GB</text>
+<rect x="1092" y="459" width="174" height="4" rx="2" fill="#52616a"/>
+<rect x="1092" y="459" width="19" height="4" rx="2" fill="#70d6b3"/>
+<rect x="270" y="933" width="1170" height="47" rx="0" fill="#222b30"/>
+<text x="305" y="964" font-size="17" font-weight="600" class="" text-anchor="start">Demo Disk</text>
+<text x="1390" y="964" font-size="16" font-weight="500" class="num" text-anchor="end">Used: 448 GB   Purgeable: 20 GB   Free: 64 GB   Total: 512 GB</text>
+</svg>
