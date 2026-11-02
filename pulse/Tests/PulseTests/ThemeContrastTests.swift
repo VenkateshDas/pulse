@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Pulse
@@ -10,6 +11,15 @@ struct ThemeContrastTests {
             return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
         }
         return 0.2126 * linear(rgb.r) + 0.7152 * linear(rgb.g) + 0.0722 * linear(rgb.b)
+    }
+
+    @Test func explicitModesAndSavedThemesRemainAvailable() {
+        #expect(AppTheme.light.forcedAppearance == .aqua)
+        #expect(AppTheme.midnight.forcedAppearance == .darkAqua)
+        #expect(AppTheme.precision.forcedAppearance == nil)
+        for storedValue in ["precision", "midnight", "contrast", "slate"] {
+            #expect(AppTheme(rawValue: storedValue) != nil)
+        }
     }
 
     @Test func textAndStatusTokensMeetNormalTextContrast() {

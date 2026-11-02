@@ -57,33 +57,55 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     var isAvailable: Bool { true }
     static let everyday: [SidebarItem] = [.dashboard, .storage, .uninstall, .health, .network, .displays, .timeline]
     static let advanced: [SidebarItem] = [.monitor, .optimize, .startup, .benchmark, .diagnostics]
+    static var navigationOrder: [SidebarItem] { everyday + advanced + [.settings] }
+
+    static func adjacent(to item: SidebarItem, offset: Int) -> SidebarItem {
+        let items = navigationOrder
+        let index = items.firstIndex(of: item) ?? 0
+        return items[min(max(index + offset, 0), items.count - 1)]
+    }
 }
 
 struct SidebarView: View {
     @Environment(DashboardModel.self) private var model
     @Binding var selection: SidebarItem
+    @FocusState private var focusedItem: SidebarItem?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: "circle.inset.filled")
-                    .foregroundStyle(Halo.interactive)
+                Text("p")
+                    .font(Halo.font(size: 25, weight: .medium, design: .rounded))
+                    .foregroundStyle(Halo.onAccent)
+                    .frame(width: 30, height: 30)
+                    .background(Halo.interactive, in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityHidden(true)
                 Text("Pulse")
                     .font(Halo.font(size: 22, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Halo.textPrimary)
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
 
-            List(selection: Binding<SidebarItem?>(
-                get: { selection }, set: { if let item = $0 { selection = item } }
-            )) {
-                ForEach(SidebarItem.everyday) { item in row(item) }
-                ForEach(SidebarItem.advanced) { item in row(item) }
-                row(.settings)
+            // ponytail: native buttons plus move commands keep the short list accessible.
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 3) {
+                        ForEach(SidebarItem.navigationOrder) { item in row(item) }
+                    }
+                    .padding(.horizontal, 12)
+                }
+                .onMoveCommand { direction in
+                    guard direction == .up || direction == .down else { return }
+                    let next = SidebarItem.adjacent(to: focusedItem ?? selection,
+                                                   offset: direction == .down ? 1 : -1)
+                    selection = next
+                    focusedItem = next
+                    proxy.scrollTo(next)
+                }
             }
-            .listStyle(.sidebar)
             .font(Halo.font(size: 14))
+            .accessibilityElement(children: .contain)
             .accessibilityLabel("Navigation")
 
             Label(statusText, systemImage: statusSymbol)
@@ -92,15 +114,30 @@ struct SidebarView: View {
                 .padding(16)
                 .accessibilityElement(children: .combine)
         }
-        .foregroundStyle(Halo.textPrimary)
-        .background(Halo.void)
+        .background(Halo.sidebar)
     }
 
     private func row(_ item: SidebarItem) -> some View {
-        Label(item.title, systemImage: item.symbol)
-            .padding(.vertical, 4)
-            .tag(item)
-            .accessibilityLabel(item.title)
+        Button {
+            selection = item
+            focusedItem = item
+        } label: {
+            Label(item.title, systemImage: item.symbol)
+                .foregroundStyle(selection == item ? Halo.interactive : Halo.textPrimary)
+                .fontWeight(selection == item ? .medium : .regular)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+                .background(selection == item ? Halo.tealSoft : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .focusable()
+        .focused($focusedItem, equals: item)
+        .id(item)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(selection == item ? .isSelected : [])
     }
 
     private var statusText: String {
