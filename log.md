@@ -182,3 +182,5 @@ Native-list release built and relaunched. Keyboard End reaches lower rows with i
 
 
 ## [2026-10-31] Deploy landing and prepare growth instrumentation | Owner approved PR #94; merged and verified Pages deployment. Saved MailerLite branded redirect and tested fresh confirmation, one-recipient update delivery and recipient unsubscribe; dashboard confirms test alias Unsubscribed. Created free EU PostHog project through Pulse Google sign-in, disabled broad collection, verified synthetic events and saved three production-only charts. Prepare opt-in native batch capture, verified hosted signup URL, privacy controls, Search Console meta tag and homepage-only sitemap in a follow-up PR. Public analytics/signup activation and Search Console verification await approved deployment.
+
+## [2026-11-02] Design | Recorded user-selected F direction for landing, Guides hub and storage article; specified responsive behavior, preserved content and validation gates. Awaiting written-spec review.

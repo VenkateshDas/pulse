@@ -125,3 +125,5 @@ Features from `pulse-mole-super-spec.html` cross-referenced against implementati
 - **Technical-indicator marketing + minimal motion (2026-10-30):** [Implementation and validation](docs/marketing/technical-indicators-motion.md). Six fictional technical readings, requested label/link removals, optional locally bundled Three.js scroll leveling and static fallbacks; no native changes or analytics.
 
 - **Pain → solution product story (2026-10-30):** [Content, source evidence and native proof](docs/marketing/pain-solution-story.md). Three relatable scenarios, an eight-capability overview and qualified trust principles; technical proof now renders actual native SwiftUI components with fictional values. Prior privacy, waitlist and minimal-motion constraints remain.
+
+- **Landing + Guides redesign (2026-11-02):** [Follow the space design](docs/superpowers/specs/2026-11-02-landing-field-guide-design.md). User selected study F: warm white, forest green, upright product preview and numbered guide progression. Spec review pending; implementation and publication have not started.
