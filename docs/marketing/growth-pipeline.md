@@ -1,6 +1,6 @@
 # Pulse growth pipeline — execution checklist
 
-Updated 31 October 2026. Current operating plan for the approved waitlist-first strategy. This supersedes beta-download, optional-AI and beta-activation recommendations in the October 28 marketing plan/backlog. PR #94 is merged and the landing/thank-you page are publicly deployed. MailerLite’s custom redirect is saved and a fresh confirmation reaches it. Signup activation, opt-in analytics and Search Console verification metadata are prepared on the follow-up branch, pending required CI and user merge approval.
+Updated 31 October 2026. Current operating plan for the approved waitlist-first strategy. This supersedes beta-download, optional-AI and beta-activation recommendations in the October 28 marketing plan/backlog. PR #94 is merged and the landing/thank-you page are publicly deployed. MailerLite’s custom redirect is saved and a fresh confirmation reaches it. PR #96 merged with explicit owner approval and deployed signup activation, opt-in analytics and Search Console verification metadata. Google ownership is verified; sitemap processing and homepage indexing are tracked in growth-instrumentation.md.
 
 ## Sequence and ownership
 
@@ -16,10 +16,10 @@ Start with step 1. Prepare later steps in parallel where account access is unnec
 
 ## Current verified repository state
 
-- Follow-up config contains the verified hosted MailerLite Share URL and PostHog public ingestion token. Analytics uses the native Capture batch API, with no SDK and no requests until browser opt-in. Public main still has closed signup until this follow-up is approved.
+- Follow-up config contains the verified hosted MailerLite Share URL and PostHog public ingestion token. Analytics uses the native Capture batch API, with no SDK and no requests until browser opt-in. The verified hosted form link and consent controls are now public; live QA events are flagged as tests.
 - The configured canonical is `https://venkateshdas.github.io/pulse/`. This is the intended existing-host address, not proof that the new landing is deployed.
 - `.github/workflows/pages.yml` deploys landing changes from main. PR #94 merged with explicit owner approval; Pages deployment 41185896105 succeeded.
-- Follow-up adds the owner’s Search Console HTML verification tag and a sitemap containing only the live homepage. The noindex thank-you page and unpublished guides are excluded. Verification and sitemap submission must follow public deployment.
+- Public landing includes the owner’s Search Console HTML verification tag and a sitemap containing only the live homepage. The noindex thank-you page and unpublished guides are excluded. Ownership verified after deployment; sitemap submitted and live fetch successful, with report processing still to be confirmed.
 - Native UI marketing proof uses fictional fixtures. Do not collect personal Mac screenshots for guides without a deliberate privacy review.
 - `docs/product_spec.html` remains absent; the supplied AGENTS constraints and current product documentation govern product claims.
 
