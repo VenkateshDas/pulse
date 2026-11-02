@@ -29,3 +29,7 @@ The landing-page PR remains separate. Screenshot assets are ready for its real-i
 - Raw full-window PNGs and compact evidence remain in `/tmp/pulse-home-light.png`, `/tmp/pulse-home-dark.png` and `/tmp/pulse-home-compact.png` for this local review session. Shared assets are the WebP files, not those temporary paths.
 
 No sampling/performance-budget recertification is claimed for this UI-only change. Background publication gates and sampling code are unchanged; the strict background budget remains a product requirement.
+
+## November 2 integration
+
+The current landing uses fictional demo previews after the owner’s privacy correction. The old real-reading screenshot assets from this branch are excluded from the integrated tree; the native theme and navigation improvements are retained. Earlier screenshot notes above are historical evidence, not instructions to replace the current previews.
