@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en" class="guide-document">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Why is my Mac slow? Check CPU, memory and storage | Pulse</title>
+  <meta name="description" content="Investigate a slow Mac with Activity Monitor: check CPU activity, memory pressure and storage, then choose one change to compare. Built-in tools and Apple sources." />
+  <meta name="theme-color" content="#f5f7f8" />
+  <meta name="color-scheme" content="light" />
+  <link rel="canonical" href="https://venkateshdas.github.io/pulse/guides/why-is-my-mac-so-slow/" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Why is my Mac slow? Check CPU, memory and storage" />
+  <meta property="og:description" content="Check CPU, memory pressure and storage with built-in Mac tools and Apple sources." />
+  <meta property="og:url" content="https://venkateshdas.github.io/pulse/guides/why-is-my-mac-so-slow/" />
+  <meta property="og:image" content="https://venkateshdas.github.io/pulse/assets/pulse-native-indicators.webp" />
+  <meta property="og:image:alt" content="Fictional Pulse CPU, memory and storage readings" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Why is my Mac slow?" />
+  <meta name="twitter:description" content="A practical Activity Monitor check with built-in tools and Apple sources." />
+  <meta name="twitter:image" content="https://venkateshdas.github.io/pulse/assets/pulse-native-indicators.webp" />
+  <link rel="icon" href="../../assets/favicon.png" type="image/png" />
+  <link rel="stylesheet" href="../../styles.css?v=20261102" />
+  <script src="../../config.js" defer></script>
+  <script src="../../site.js?v=20261101" defer></script>
+  
+  
+<link rel="stylesheet" href="../../field-guide.css?v=20261103" />
+<script src="../../analytics.js?v=20261103" defer></script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Article", "headline": "Why is my Mac slow? Check CPU, memory and storage before changing anything", "description": "Investigate a slow Mac using built-in tools and Apple sources.", "mainEntityOfPage": "https://venkateshdas.github.io/pulse/guides/why-is-my-mac-so-slow/", "author": {"@type": "Organization", "name": "Pulse", "url": "https://venkateshdas.github.io/pulse/"}, "publisher": {"@type": "Organization", "name": "Pulse", "url": "https://venkateshdas.github.io/pulse/"}, "datePublished": "2026-11-03", "dateModified": "2026-11-03", "inLanguage": "en"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Pulse", "item": "https://venkateshdas.github.io/pulse/"}, {"@type": "ListItem", "position": 2, "name": "Guides", "item": "https://venkateshdas.github.io/pulse/guides/"}, {"@type": "ListItem", "position": 3, "name": "Slow Mac guide", "item": "https://venkateshdas.github.io/pulse/guides/why-is-my-mac-so-slow/"}]}]}</script></head>
+<body class="guide-page slow-mac-guide"><a class="skip-link" href="#main">Skip to content</a>  <header class="site-header">
+    <nav class="wrap navigation" aria-label="Main navigation">
+      <a class="wordmark" href="../../" aria-label="Pulse home"><span class="pulse-mark" aria-hidden="true">p</span>Pulse</a>
+      <a class="guides-nav-link" href="../">Guides</a>
+      <a class="button button-small" href="#early-access">Join early access</a>
+      <details class="mobile-navigation"><summary>Menu</summary><div><a href="../../#preview">Explore Pulse</a><a href="../../guides/">Guides</a><a href="../../#questions">FAQ</a></div></details>
+    </nav>
+  </header>
+
+<main id="main" tabindex="-1"><div class="wrap guide-intro">
+<nav class="guide-breadcrumb" aria-label="Breadcrumb"><a href="../../">Pulse</a><span aria-hidden="true">/</span><a href="../">Guides</a><span aria-hidden="true">/</span><span>Slow Mac guide</span></nav>
+<div class="guide-opening"><div><h1>Why is my Mac slow?</h1><p class="guide-deck">Check what is busy.<br />Change one thing. Compare.</p><p class="guide-byline">By Pulse · Published <time datetime="2026-11-03">3 November 2026</time><br />Apple sources reviewed 2 November 2026</p></div>
+<figure class="storage-route"><ol><li><span>CPU activity</span><small>Does the activity fit the work?</small></li><li><span>Memory pressure</span><small>How well is memory serving the task?</small></li><li><span>Available storage</span><small>Is the startup disk short of room?</small></li></ol><figcaption>Three checks to help choose your next step.</figcaption></figure></div>
+<div class="guide-answer"><p><strong>Start here:</strong> Open Activity Monitor and check CPU activity and Memory Pressure while the slowdown happens. Check available storage in System Settings. Save your work before quitting apps, then change one thing and retry the same task.</p><a href="#choose-task">Walk through the checks ↓</a></div></div>
+<div class="wrap guide-layout"><aside class="guide-contents"><nav aria-label="On this page"><h2>On this page</h2><ol><li><a href="#choose-task">First, choose a task you can try again</a></li><li><a href="#cpu">Check whether CPU activity fits the work</a></li><li><a href="#memory">Read Memory Pressure before Memory Used</a></li><li><a href="#storage">Check available storage before deleting files</a></li><li><a href="#next-step">Choose the next step from what you observed</a></li><li><a href="#pulse-view">Observe the same signals in Pulse</a></li></ol><a href="#sources">Sources &amp; checks</a></nav></aside>
+<article class="guide-article" aria-label="Slow Mac investigation"><p>Switching apps takes longer than it should. A document stalls when you scroll. Activity Monitor shows a process at the top of the list, but should you quit it?</p>
+<p>Start with <strong>CPU activity, Memory Pressure and available storage while the slowdown is happening</strong>. These checks can help you choose what to investigate. Apple lists memory demands, limited startup-disk space and app compatibility among the possible causes of a slow Mac. <a href="https://support.apple.com/en-mide/guide/mac-help/mchlp1731/27/mac/27">Apple’s slowdown checklist</a></p>
+<p>You can do every check below with built-in Mac tools. Save open work before quitting apps.</p><section id="choose-task" aria-labelledby="choose-task-title"><h2 id="choose-task-title">First, choose a task you can try again</h2><p>Describe the slowdown in one sentence: “Switching from my browser to my document takes several seconds,” for example. Keep that action for your comparison after each change. If only one website stalls, record that too; it is a narrower problem than every app becoming unresponsive.</p>
+<p>Open <strong>Finder → Applications → Utilities → Activity Monitor</strong>. Choose <strong>View → All Processes</strong> and clear the search field so an old filter does not hide relevant processes. Click a column heading to sort; click again if the largest values are at the bottom. <a href="https://support.apple.com/en-ng/guide/activity-monitor/actmntr1001/mac">Apple’s process-view instructions</a></p>
+<p>Return to the task that feels slow and watch several updates. Our suggested approach is to change one thing, then repeat that task. It gives you a useful comparison without making several changes whose effects you cannot separate.</p></section><section id="cpu" aria-labelledby="cpu-title"><h2 id="cpu-title">Check whether CPU activity fits the work</h2><p>Select <strong>CPU</strong> and sort by <strong>% CPU</strong>, largest first. At the bottom, <strong>User</strong> shows CPU capacity used by your apps and their processes, <strong>System</strong> shows capacity used by macOS processes, and <strong>Idle</strong> shows unused capacity. For activity over time, choose <strong>Window → CPU History</strong>. <a href="https://support.apple.com/guide/activity-monitor/view-cpu-activity-actmntr43452/mac">Apple’s CPU guide</a></p>
+<p>Look at the app names as well as the numbers. Apple notes that calculation-intensive apps use more processor capacity. If an app is busy doing work you requested, the reading may fit the task. If an app you no longer need stays busy while your work stalls, it is worth investigating. Being first in the list does not establish a fault.</p>
+<p>Save and quit that recognised app normally, then retry the slow action. If it improves, you have a lead. If it does not, avoid working down the list and quitting everything in turn.</p>
+<p>For an unfamiliar process, double-click its row for details. <strong>View → All Processes, Hierarchically</strong> can show parent and child processes. Activity Monitor includes background and system processes as well as visible apps; an unfamiliar name alone is not evidence of trouble. <a href="https://support.apple.com/en-ng/guide/activity-monitor/actmntr1001/mac">Apple’s process guide</a></p>
+<h3>Quit and Force Quit have different consequences</h3>
+<p>Use the app’s own Quit command when it responds. In Activity Monitor, select a process and click <strong>Stop</strong> to see the quitting options. <strong>Quit</strong> allows it to close when safe; <strong>Force Quit</strong> ends it immediately and can lose unsaved work or affect other processes that depend on it. Use Force Quit for an identified app that will not close normally. <a href="https://support.apple.com/en-ie/guide/activity-monitor/actmntr1002/10.14/mac/15.0">Apple’s quitting instructions</a></p>
+<p>If the busy process is <strong>kernel_task</strong>, take a different approach. Apple explains that one of its roles is temperature management: it can limit CPU availability to intensive processes in response to heat-related conditions. Treat it as a clue about those conditions, rather than an app to force quit. <a href="https://support.apple.com/en-ie/102172">Apple’s kernel_task explanation</a></p></section><section id="memory" aria-labelledby="memory-title"><h2 id="memory-title">Read Memory Pressure before Memory Used</h2><p>Select <strong>Memory</strong> and look at the <strong>Memory Pressure</strong> graph. Apple describes green as efficient memory use, yellow as a possible need for more RAM, and red as a need for more RAM. Unused memory does not necessarily improve performance. <a href="https://support.apple.com/en-asia/guide/activity-monitor/actmntr34865/10.14/mac/15.0">Apple’s memory-pressure guidance</a></p>
+<p>If pressure is yellow, red or spiking during the slowdown, sort by <strong>Memory</strong>. Find an app you no longer need, save its work and quit it. Then check whether both pressure and responsiveness improve. Apple recommends investigating app use when pressure rises. Look for a recurring pattern in your usual workload before considering a hardware purchase. <a href="https://support.apple.com/en-asia/guide/activity-monitor/actmntr34865/10.14/mac/15.0">Apple’s memory-pressure guidance</a></p>
+<p>The other memory figures need context:</p>
+<ul>
+<li><strong>Cached Files:</strong> memory used to keep files handy so they can be reopened faster.</li>
+<li><strong>Compressed:</strong> memory macOS has compressed to make room for active apps.</li>
+<li><strong>Swap Used:</strong> startup-disk space used to move data to and from RAM.</li>
+</ul>
+<p>Apple’s pressure calculation considers several factors, including swap rate. Our inference: a nonzero swap amount alone cannot establish the cause of a pause. Read it alongside pressure and what you experience. <a href="https://support.apple.com/guide/activity-monitor/view-memory-usage-actmntr1004/mac">Apple’s memory definitions</a></p></section><section id="storage" aria-labelledby="storage-title"><h2 id="storage-title">Check available storage before deleting files</h2><p>Open <strong>System Settings → General → Storage</strong>. Apple identifies insufficient startup-disk space as another possible cause of slow performance. If available space is low, inspect what occupies it before choosing anything to remove. <a href="https://support.apple.com/en-mide/guide/mac-help/mchlp1731/27/mac/27">Apple’s slowdown checklist</a></p>
+<p>Our <a href="../whats-taking-up-space-on-mac/">guide to finding what’s taking up space on a Mac</a> walks through storage categories, large-file searches and folder totals. Review files you recognise and no longer need. Avoid treating an unfamiliar system folder as a cleanup target just because it is large.</p></section><section id="next-step" aria-labelledby="next-step-title"><h2 id="next-step-title">Choose the next step from what you observed</h2><p>This table applies the checks above. It is a troubleshooting aid, not a set of diagnostic thresholds.</p>
+<div class="guide-table-wrap"><table class="guide-table"><caption>Match your observations to a next step</caption>
+<thead>
+<tr>
+<th scope="col">What you observe during the slowdown</th>
+<th scope="col">What to try next</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row">A recognised, unneeded app stays busy on CPU</th>
+<td>Save and quit that app, then repeat the slow task.</td>
+</tr>
+<tr>
+<th scope="row">Memory Pressure rises and an unneeded app uses substantial memory</th>
+<td>Save and quit that app; compare pressure and responsiveness.</td>
+</tr>
+<tr>
+<th scope="row">Available storage is low</th>
+<td>Follow the storage guide to inspect files before removing anything.</td>
+</tr>
+<tr>
+<th scope="row">Only one app repeatedly stalls without a clear CPU or memory pattern</th>
+<td>Check its compatibility requirements; take your notes to its developer.</td>
+</tr>
+<tr>
+<th scope="row">The whole Mac keeps stalling without a clear pattern</th>
+<td>Take the observations to Apple Support rather than terminating unfamiliar processes.</td>
+</tr>
+</tbody>
+</table></div>
+<p>For example, <strong>a hypothetical result</strong> might be: “Switching to my document stalled while memory pressure was yellow. After saving and quitting an unused app, pressure returned to green and switching felt responsive.” That supports investigating the workload’s memory demand. It does not prove the app has a defect or that the Mac needs replacing.</p>
+<p>Keep the task, reading, change and result in your notes. Green memory pressure or low CPU activity does not rule out other software or hardware problems. If the slowdown returns, those notes give the app developer or Apple Support something more specific to investigate.</p></section><section id="pulse-view" aria-labelledby="pulse-view-title"><h2 id="pulse-view-title">Observe the same signals in Pulse</h2><p>Pulse’s native dashboard includes CPU and memory readings, memory-pressure indicators and swap information. Those readings support observation; they do not guarantee a diagnosis or speedup. You can complete this guide using Activity Monitor without installing Pulse.</p>
+<p><a data-guide-product="why-is-my-mac-so-slow" href="../../#preview">Explore Pulse’s dashboard</a>.</p></section>        <section id="early-access" class="guide-signup" aria-labelledby="signup-title">
+          <h2 id="signup-title">Know when Pulse is ready</h2>
+          <p>Join the early-access list for product updates and opportunities to try Pulse. No payment to join.</p>
+          <a class="button" id="signup-link" href="https://preview.mailerlite.io/forms/2757476/202828385399866630/share" aria-describedby="signup-status signup-note">Join early access</a>
+          <p class="guide-small" id="signup-status">Continue to our signup form, then confirm your email to join.</p>
+          <p class="guide-small" id="signup-note">Early-access invitations and occasional updates. Unsubscribe at any time.</p>
+          <p class="guide-small">The form is hosted by MailerLite. <a href="../../privacy/#signup">How signup information is used</a>.</p>
+        </section>
+
+<section id="sources" class="guide-sources" aria-labelledby="sources-title"><h2 id="sources-title">Sources &amp; checks</h2><p>Written by Pulse from Apple documentation; sources are linked beside each technical explanation. The decision table and comparison method are editorial troubleshooting advice. The example is hypothetical, not a measured result. These instructions have not been tested in a local macOS walkthrough. Labels may vary by version and language.</p></section></article></div></main>  <footer class="wrap footer"><a class="wordmark" href="../../"><span class="pulse-mark" aria-hidden="true">p</span>Pulse</a><p>Understand your Mac. Choose your next step.</p><div><a href="../">Guides</a><a href="../../privacy/">Privacy</a><a href="#main">Back to top</a></div></footer>
+</body>
+</html>

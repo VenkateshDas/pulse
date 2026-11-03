@@ -297,3 +297,9 @@ details p { font-size: 16px; margin-top: 16px; }
   .folder-equation { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .button, .appearance-tabs button { transition: none; } }
+
+/* Separate distinct guide topics without changing the article layout. */
+.guides-main > section + section { margin-top: 64px; }
+@media (max-width: 640px) {
+  .guides-main > section + section { margin-top: 48px; }
+}

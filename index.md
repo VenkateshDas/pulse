@@ -4,7 +4,7 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
-- **Second guide draft (2026-11-02):** [Slow Mac evidence record](docs/marketing/slow-mac-guide-research.md) and [article](docs/marketing/articles/why-is-my-mac-so-slow.md). Reviewed Apple-sourced Activity Monitor investigation, memory-pressure interpretation, decision table and clearly hypothetical comparison. Documentation-verified draft; native walkthrough and website publication remain pending.
+- **Second guide (2026-11-03):** [Slow Mac evidence record](docs/marketing/slow-mac-guide-research.md) and [article](docs/marketing/articles/why-is-my-mac-so-slow.md). Reviewed Apple-sourced Activity Monitor investigation, memory-pressure interpretation, decision table and clearly hypothetical comparison. Documentation-verified article prepared for website publication at the owner’s request; native walkthrough remains unverified. See the evidence record for publication checks.
 
 - **Guides and default website measurement (2026-11-01):** Guides index and visible navigation added; detailed privacy notice moved to a dedicated page. Automatic in-memory per-page measurement replaces consent-gated persistent browser IDs, with prior opt-outs and GPC/DNT preserved. Use event counts, not returning-visitor estimates. Changes pending PR #98 publication.
 
