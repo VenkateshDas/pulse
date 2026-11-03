@@ -1,5 +1,14 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-11-02] Content | Review second guide
+- Tightened the opening and CPU/memory interpretation; added actionable decision table, process hierarchy and an explicitly hypothetical comparison.
+- Moved safe quitting instructions beside the action; corrected early-access waitlist wording and recorded evidence limits.
+
+## [2026-11-02] Content | Evidence-based second guide draft
+- Researched Apple documentation for slow-Mac investigation, CPU context, memory pressure, storage and safe process quitting.
+- Wrote an unpublished general-Mac article with adjacent citations and a separate claim/boundary record; no native UI test or causal performance result claimed.
+- Indexed both documents; no app, live website or measurement changes.
+
 ## [2026-09-19] Fix | Resume Agno human approvals without breaking Agent chat
 - Retained the resumable `RunOutput` emitted after `RunPausedEvent`, rather than incorrectly attempting to resume the notification event.
 - Kept mutation confirmation enforced; unavailable or failed resumes now yield safe terminal Agent events rather than closing the SSE response mid-stream.
