@@ -29,6 +29,17 @@ The [audit](seo-search-demand-audit-2026-11-03.md) records the observed discover
 - Homepage console inspection showed no errors. The pre-change public PageSpeed lab runs and their limits are recorded in the audit; they are not a post-deployment ranking claim.
 - Review screenshots and private account UI evidence remain under `/tmp/pulse-seo-audit`, outside the public repository.
 
+### Stop-hook padding review
+
+Reviewed all six unique `cramped-padding` findings surfaced by the completion hook (the raw scan repeats the identical list/decision-row findings). All were false positives in the existing layout, not SEO-pass regressions:
+
+- Homepage storage, capabilities and home-guide colored sections have 80px desktop / 64px mobile block padding, with inner `.wrap` side gutters of 80px / 24px at 1440px / 390px.
+- The approach section applies the same 80px / 64px vertical inset to its inner wrapper and has the same side gutters.
+- All eight capability list rows have 16px padding above/below their text. At desktop the list is a clipped screen-reader equivalent; it becomes visible on mobile with that padding intact.
+- All three storage-guide decision rows have 24px vertical padding; their first text starts 25px below the 1px top border, on desktop and mobile.
+
+Rendered screenshots and computed styles confirm adequate spacing. Preserved the intended layout. Used the skill's `hooks ignore-value` command to persist `cramped-padding=*` exceptions scoped to only `landing/index.html` and `landing/guides/whats-taking-up-space-on-mac/index.html`, with the measurements as reasons. No global rule/file ignore was added. The follow-up detector scan returned no findings. No confirmed defect or uncertain finding remains from this hook review.
+
 ## Search actions already completed
 
 Indexing requests for both guides and the hub were accepted. The sitemap submission was accepted, but its status table continued to show Couldn't fetch. Homepage indexed state and canonical are correct. AI inclusion inherits Include; no setting was changed. These account actions do not mean the prepared website changes are deployed.
