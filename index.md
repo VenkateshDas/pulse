@@ -4,6 +4,8 @@ Welcome to the Pulse repository LLM Wiki. This file serves as the main catalog f
 
 ## Marketing
 
+- **Search discovery and US keyword audit (2026-11-03):** [Evidence, SEO/AEO findings, tools and content priorities](docs/marketing/seo-search-demand-audit-2026-11-03.md), [keyword observations](docs/marketing/seo-evidence/keywords-us-2026-11-03.csv), and [approved website scope](docs/superpowers/specs/2026-11-03-search-discovery-design.md). Homepage indexed; guide/hub indexing requested; sitemap processing discrepancy remains unresolved. Includes reviewed System Data and startup drafts, with local verification required before publication. [Implementation checks and release state](docs/marketing/seo-implementation-2026-11-03.md) distinguish prepared PR changes from deployed content.
+
 - **Second guide (2026-11-03):** [Slow Mac evidence record](docs/marketing/slow-mac-guide-research.md) and [article](docs/marketing/articles/why-is-my-mac-so-slow.md). Reviewed Apple-sourced Activity Monitor investigation, memory-pressure interpretation, decision table and clearly hypothetical comparison. Documentation-verified article prepared for website publication at the owner’s request; native walkthrough remains unverified. See the evidence record for publication checks.
 
 - **Guides and default website measurement (2026-11-01):** Guides index and visible navigation added; detailed privacy notice moved to a dedicated page. Automatic in-memory per-page measurement replaces consent-gated persistent browser IDs, with prior opt-outs and GPC/DNT preserved. Use event counts, not returning-visitor estimates. Changes pending PR #98 publication.

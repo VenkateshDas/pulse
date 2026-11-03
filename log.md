@@ -1,5 +1,11 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-11-03] Search | Audit discovery and prepare SEO improvements
+- Verified the homepage is indexed; both guides and hub were unknown to Google. Accepted indexing requests for all three; sitemap resubmitted once, with its fetch discrepancy still unresolved. Google AI inclusion already inherits Include.
+- Researched current official SEO/AEO guidance, three US keyword-tool lookups and three Trends comparisons. Saved 35 relevant keyword observations across 34 phrases; excluded ten cooking results and flagged historical spikes, sparse data and unknown freshness.
+- Implemented the owner-approved metadata, homepage guide link, hub editorial-methods section, linked bylines, truthful identity/collection schema and supported storage publication date. Preserved the redesign and early-access positioning.
+- Prepared sourced System Data and startup drafts outside the public site, with local walkthroughs required before publication. Static/analytics checks and desktop/mobile inspection pass; protected-main PR and CI gate publication.
+
 ## [2026-11-03] Website | Publish slow Mac guide
 - Rendered the reviewed article in the current guide design; added hub/related links, metadata, schema and sitemap entry.
 - Extended privacy-preserving analytics allowlists and checks for the second guide; reused existing signup configuration.

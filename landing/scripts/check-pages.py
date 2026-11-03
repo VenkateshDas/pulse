@@ -79,9 +79,30 @@ for path, guide in pages.items():
     article = next(n for n in graph if n['@type'] == 'Article')
     assert article['mainEntityOfPage'] == guide.canonical
     assert article['author']['name'] == 'Pulse'
+    assert article['author']['url'] == BASE + 'guides/#how-we-write'
     assert article['dateModified'] in guide.path.read_text()
+    assert article['datePublished'] in guide.path.read_text()
+    assert 'rel="author" href="../#how-we-write"' in guide.path.read_text()
     assert any(n['@type'] == 'BreadcrumbList' for n in graph)
-print(f'Static page checks passed: {len(pages)} pages, {len(urls)} sitemap URLs; local assets, fragments and guide schema valid.')
 
-assert 'guides/whats-taking-up-space-on-mac/' in pages[ROOT / 'index.html'].refs, 'Homepage needs a guide entry'
+home = pages[ROOT / 'index.html']
+for slug in ('whats-taking-up-space-on-mac', 'why-is-my-mac-so-slow'):
+    assert f'guides/{slug}/' in home.refs, f'Homepage needs a direct link to {slug}'
 assert pages[ROOT / 'index.html'].refs.count('guides/') >= 2, 'Homepage needs guide index navigation and footer links'
+home_graph = home.schemas[0]['@graph']
+organization = next(n for n in home_graph if n['@type'] == 'Organization')
+website = next(n for n in home_graph if n['@type'] == 'WebSite')
+assert organization['name'] == website['name'] == 'Pulse'
+assert organization['url'] == website['url'] == home.canonical
+assert website['publisher']['@id'] == organization['@id']
+hub = pages[ROOT / 'guides/index.html']
+assert 'how-we-write' in hub.ids, 'Author links need a visible editorial-methods destination'
+hub_graph = hub.schemas[0]['@graph']
+collection = next(n for n in hub_graph if n['@type'] == 'CollectionPage')
+assert collection['url'] == hub.canonical
+assert collection['isPartOf']['@id'] == website['@id']
+assert any(n['@type'] == 'BreadcrumbList' for n in hub_graph)
+listed = [n['url'] for n in collection['mainEntity']['itemListElement']]
+assert len(listed) == len(set(listed)), 'Duplicate guide listing in structured data'
+assert set(listed) == {p.canonical for path, p in pages.items() if path.parent.parent == ROOT / 'guides'}, 'Hub schema must list the published guides'
+print(f'Static page checks passed: {len(pages)} pages, {len(urls)} sitemap URLs; local assets, fragments, identity metadata and guide schema valid.')

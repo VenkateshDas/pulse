@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "landing/index.html"
+        ],
+        "createdAt": "2026-11-03T11:27:58.838Z",
+        "reason": "Agent verified at 1440px and 390px: colored sections use inner wrap gutters of 80px/24px and padding-block of 80px/64px; capability rows have 16px block padding. Static detector misses logical padding and inner wrappers."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "landing/guides/whats-taking-up-space-on-mac/index.html"
+        ],
+        "createdAt": "2026-11-03T11:27:58.904Z",
+        "reason": "Agent verified all three guide-decisions rows at desktop and mobile: padding is 24px 0px, text begins 25px below the 1px top border. Static detector misses the existing logical padding; no visual crowding."
+      }
+    ]
+  }
+}
