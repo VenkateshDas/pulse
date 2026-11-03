@@ -1,6 +1,6 @@
 # Pulse search discovery and editorial improvements
 
-Date: 3 November 2026. Proposed implementation; not yet approved. Scope: the existing static website, US-first search research and worldwide English help content. Preserve the current redesign and early-access product state.
+Date: 3 November 2026. Website pass approved by the owner in chat on 3 November 2026. Scope: the existing static website, US-first search research and worldwide English help content. Preserve the current redesign and early-access product state.
 
 ## Evidence and objective
 
