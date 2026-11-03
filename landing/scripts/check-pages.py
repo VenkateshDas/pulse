@@ -73,13 +73,14 @@ for path, p in pages.items():
 xml = ET.parse(ROOT / 'sitemap.xml')
 urls = [n.text for n in xml.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')]
 assert len(urls) == len(set(urls)) and set(urls) == indexable, 'Sitemap/indexable page mismatch'
-guide = pages[ROOT / 'guides/whats-taking-up-space-on-mac/index.html']
-graph = guide.schemas[0]['@graph']
-article = next(n for n in graph if n['@type'] == 'Article')
-assert article['mainEntityOfPage'] == guide.canonical
-assert article['author']['name'] == 'Pulse'
-assert article['dateModified'] in guide.path.read_text()
-assert any(n['@type'] == 'BreadcrumbList' for n in graph)
+for path, guide in pages.items():
+    if path.parent.parent != ROOT / 'guides': continue
+    graph = guide.schemas[0]['@graph']
+    article = next(n for n in graph if n['@type'] == 'Article')
+    assert article['mainEntityOfPage'] == guide.canonical
+    assert article['author']['name'] == 'Pulse'
+    assert article['dateModified'] in guide.path.read_text()
+    assert any(n['@type'] == 'BreadcrumbList' for n in graph)
 print(f'Static page checks passed: {len(pages)} pages, {len(urls)} sitemap URLs; local assets, fragments and guide schema valid.')
 
 assert 'guides/whats-taking-up-space-on-mac/' in pages[ROOT / 'index.html'].refs, 'Homepage needs a guide entry'

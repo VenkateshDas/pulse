@@ -1,5 +1,10 @@
 # Pulse Changelog & Wiki Log
 
+## [2026-11-03] Website | Publish slow Mac guide
+- Rendered the reviewed article in the current guide design; added hub/related links, metadata, schema and sitemap entry.
+- Extended privacy-preserving analytics allowlists and checks for the second guide; reused existing signup configuration.
+- Static and analytics checks pass; responsive checks cover 320/390/1440px without document overflow. Publication follows required CI and Pages deployment.
+
 ## [2026-11-02] Content | Review second guide
 - Tightened the opening and CPU/memory interpretation; added actionable decision table, process hierarchy and an explicitly hypothetical comparison.
 - Moved safe quitting instructions beside the action; corrected early-access waitlist wording and recorded evidence limits.

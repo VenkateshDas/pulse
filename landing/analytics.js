@@ -23,15 +23,17 @@
     new URLSearchParams(location.search).get("pulse_test") === "1";
   // Explicit routes only: never send arbitrary paths, filenames or URL queries.
   const guidePath = "/pulse/guides/whats-taking-up-space-on-mac/";
+  const slowGuidePath = "/pulse/guides/why-is-my-mac-so-slow/";
   const guidesPath = "/pulse/guides/";
   const pages = {
     "/pulse/": "/pulse/",
     [guidePath]: guidePath,
+    [slowGuidePath]: slowGuidePath,
     [guidesPath]: guidesPath,
   };
   // Local preview omits the GitHub project prefix; public routes never do.
   const pathname = location.hostname !== "venkateshdas.github.io" &&
-    ["/", "/guides/", "/guides/whats-taking-up-space-on-mac/"].includes(location.pathname)
+    ["/", "/guides/", "/guides/whats-taking-up-space-on-mac/", "/guides/why-is-my-mac-so-slow/"].includes(location.pathname)
     ? `/pulse${location.pathname}` : location.pathname;
   const page = Object.hasOwn(pages, pathname) ? pages[pathname] : null;
   // Privacy/preferences and unapproved paths never emit measurements.
@@ -100,11 +102,11 @@
     // One request keeps the two observations together during navigation.
     capture(["early_access_click", "waitlist_form_open"], { position: "signup" });
   });
-  document.querySelectorAll('[data-guide-product="whats-taking-up-space-on-mac"]').forEach((link) => {
-    link.addEventListener("click", () => capture("guide_product_click", {
-      guide: "whats-taking-up-space-on-mac",
-    }));
-  });
+  for (const guide of ["whats-taking-up-space-on-mac", "why-is-my-mac-so-slow"]) {
+    document.querySelectorAll(`[data-guide-product="${guide}"]`).forEach((link) => {
+      link.addEventListener("click", () => capture("guide_product_click", { guide }));
+    });
+  }
   document.querySelectorAll('[role="tab"]').forEach((tab) => {
     tab.addEventListener("click", () => capture("preview_theme_selected", {
       theme: tab.textContent.trim() === "Dark" ? "dark" : "light",
